@@ -1,0 +1,20 @@
+import Link from "next/link";
+import { requireParent } from "@/lib/auth";
+import { logoutAction } from "@/lib/actions/auth";
+import { SettingsForm } from "@/components/SettingsForm";
+
+export default async function SettingsPage() {
+  const { family, profile } = await requireParent();
+  return (
+    <main className="space-y-4">
+      <h1 className="h1">More</h1>
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/parent/children" className="card text-center"><div className="text-3xl">🧒</div><div className="font-semibold mt-1">Kids & timetable</div></Link>
+        <Link href="/parent/reports" className="card text-center"><div className="text-3xl">📨</div><div className="font-semibold mt-1">Daily reports</div></Link>
+      </div>
+      <SettingsForm family={family} />
+      <div className="card text-sm muted">Signed in as {profile.full_name}</div>
+      <form action={logoutAction}><button className="btn-ghost w-full">Sign out</button></form>
+    </main>
+  );
+}
