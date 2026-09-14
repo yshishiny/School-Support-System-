@@ -4,6 +4,7 @@ import { todayIn, shiftDate, weekdayOf, prettyDate } from "@/lib/dates";
 import { computeStreak, levelFor } from "@/lib/points";
 import { CheckinForm } from "@/components/CheckinForm";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
+import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
 
 export default async function TodayPage() {
@@ -12,13 +13,15 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
     supabase.from("subjects").select("*").eq("student_id", profile.id).order("name"),
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).eq("weekday", weekdayOf(today)).order("start_time"),
+    supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
   ]);
+  const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
   const assignments = (open ?? []) as Assignment[];
   const dueNow = assignments.filter((a) => a.due_date !== null && a.due_date <= today);
@@ -81,6 +84,18 @@ export default async function TodayPage() {
           </ul>
         </section>
       )}
+
+      <Link href={(dueReviews ?? 0) > 0 ? "/review" : "/learn"} className="card flex items-center gap-3">
+        <span className="text-3xl">🧠</span>
+        <div className="flex-1">
+          <div className="font-bold">{(dueReviews ?? 0) > 0 ? `${dueReviews} questions to review` : "Practise 10 minutes"}</div>
+          <div className="text-xs muted">
+            {(dueReviews ?? 0) > 0 ? "Missed questions, back at the right time." : "Pick a topic from today's lessons and do one set."}
+            {profile.target_exam === "ACT" && daysToExam !== null ? ` · ACT in ${daysToExam} days` : ""}
+          </div>
+        </div>
+        <span className="btn-ghost btn-sm">Go</span>
+      </Link>
 
       <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} />
 

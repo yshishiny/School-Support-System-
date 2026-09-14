@@ -24,6 +24,7 @@ describe("buildDailyReport", () => {
         upcoming: [{ title: "Chemistry quiz", kind: "quiz", due_date: "2026-09-17" }],
         overdue: [],
         pendingRedemptions: [],
+        practice: { sets: 2, correct: 13, total: 16, reviewsDue: 0, flags: ["Geometry set: Answered very fast"] },
       },
       {
         name: "Omar",
@@ -45,5 +46,7 @@ describe("buildDailyReport", () => {
     expect(text).toContain("No check-in today");
     expect(text).toContain("Overdue: Science worksheet");
     expect(text).toContain("Wants to redeem: Pizza night (100 pts)");
+    expect(text).toContain("Practice: 2 sets, 13/16 correct (81%)");
+    expect(text).toContain("⚠️ Geometry set: Answered very fast");
   });
 });

@@ -22,13 +22,17 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const { data: students } = await admin.from("profiles").select("*").eq("family_id", familyId).eq("role", "student").order("grade", { ascending: false });
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
-    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }] = await Promise.all([
+    const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }] = await Promise.all([
       admin.from("checkins").select("*, checkin_items(status, assignments(title, kind))").eq("student_id", s.id).eq("checkin_date", today).maybeSingle(),
       admin.from("checkins").select("checkin_date").eq("student_id", s.id),
       admin.from("points_ledger").select("delta, created_at").eq("student_id", s.id),
       admin.from("assignments").select("*").eq("student_id", s.id).eq("status", "open"),
       admin.from("redemptions").select("points_spent, rewards(title)").eq("student_id", s.id).eq("status", "pending"),
+      admin.from("attempts").select("score, total, flagged, flag_reason, quizzes(title)").eq("student_id", s.id).gte("submitted_at", dayAgoIso),
+      admin.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", s.id).lte("due_date", today),
     ]);
+    const done = (attempts ?? []) as unknown as { score: number | null; total: number | null; flagged: boolean; flag_reason: string | null; quizzes: { title: string } | null }[];
     const open = (assignments ?? []) as Assignment[];
     // "Today" for points: anything earned in the last 24 hours.
     const dayAgo = Date.now() - 24 * 3600 * 1000;
@@ -62,6 +66,13 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
         title: p.rewards?.title ?? "reward",
         points: p.points_spent,
       })),
+      practice: {
+        sets: done.length,
+        correct: done.reduce((a, d) => a + (d.score ?? 0), 0),
+        total: done.reduce((a, d) => a + (d.total ?? 0), 0),
+        reviewsDue: reviewsDue ?? 0,
+        flags: done.filter((d) => d.flagged).map((d) => `${d.quizzes?.title ?? "review"}: ${d.flag_reason}`),
+      },
     });
   }
 

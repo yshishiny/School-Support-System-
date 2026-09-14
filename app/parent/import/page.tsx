@@ -1,7 +1,10 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ImportWizard } from "@/components/ImportWizard";
+import { TimetablePhotoWizard } from "@/components/TimetablePhotoWizard";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
+
+export const maxDuration = 60;
 
 export default async function ImportPage() {
   const { family } = await requireParent();
@@ -17,10 +20,18 @@ export default async function ImportPage() {
     <main className="space-y-4">
       <h1 className="h1">Import from WhatsApp</h1>
       <div className="card text-sm space-y-1 muted">
-        <p><b className="text-ink">How:</b> open the class group → tap the group name → <b className="text-ink">Export chat</b> → <b className="text-ink">Without media</b> → save or share the .txt file to yourself, then upload it here.</p>
-        <p>The AI reads only messages after the date you pick, finds homework, quizzes, exams and events, and shows them for you to approve before anything is added.</p>
+        <p><b className="text-ink">Photos:</b> save the homework, supply list or announcement images from the group and upload them. The AI reads English and Arabic.</p>
+        <p><b className="text-ink">Chat text:</b> group name → <b className="text-ink">Export chat</b> → <b className="text-ink">Without media</b> → upload the .txt file. Only messages after the date you pick are read.</p>
+        <p>Everything is shown for you to approve before it is added.</p>
       </div>
-      {(kids ?? []).length === 0 ? <p className="card">Add a child first.</p> : <ImportWizard students={kids ?? []} defaultSince={last} />}
+      {(kids ?? []).length === 0 ? (
+        <p className="card">Add a child first.</p>
+      ) : (
+        <>
+          <ImportWizard students={kids ?? []} defaultSince={last} />
+          <TimetablePhotoWizard students={kids ?? []} />
+        </>
+      )}
       {(imports ?? []).length > 0 && (
         <section className="card">
           <h2 className="h2 mb-2">Recent imports</h2>

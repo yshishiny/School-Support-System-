@@ -31,7 +31,7 @@ export function ImportWizard({ students, defaultSince }: { students: { id: strin
     return (
       <div className="space-y-3">
         <div className="card space-y-2">
-          <p className="text-sm muted">{state.messageCount} messages read.</p>
+          <p className="text-sm muted">{state.messageCount} message(s) or photo(s) read.</p>
           {state.summary && <p className="text-sm">{state.summary}</p>}
         </div>
         {items.length === 0 && <p className="card muted">Nothing actionable found in that range.</p>}
@@ -71,7 +71,11 @@ export function ImportWizard({ students, defaultSince }: { students: { id: strin
         </select>
       </div>
       <div>
-        <label className="label">Exported chat file (.txt)</label>
+        <label className="label">Photos or screenshots from the group (several at once is fine)</label>
+        <input name="images" type="file" accept="image/*" multiple className="input" />
+      </div>
+      <div>
+        <label className="label">…or the exported chat file (.txt)</label>
         <input name="file" type="file" accept=".txt,text/plain" className="input" />
       </div>
       <div>
@@ -79,7 +83,7 @@ export function ImportWizard({ students, defaultSince }: { students: { id: strin
         <textarea name="pasted" rows={5} className="input" placeholder="14/09/2026, 20:15 - Ms. Sarah: Homework page 45..." />
       </div>
       <div>
-        <label className="label">Only read messages since</label>
+        <label className="label">For chat files: only read messages since</label>
         <input name="since" type="date" className="input" defaultValue={defaultSince} />
       </div>
       <SubmitButton className="btn-primary w-full" pendingText="Reading messages… (10–30s)">Analyze</SubmitButton>

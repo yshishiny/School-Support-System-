@@ -9,6 +9,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
       <BottomNav
         items={[
           { href: "/today", label: "Today", emoji: "🔥" },
+          { href: "/learn", label: "Learn", emoji: "🧠" },
           { href: "/calendar", label: "Planner", emoji: "🗓️" },
           { href: "/rewards", label: "Rewards", emoji: "🎁" },
           { href: "/me", label: "Me", emoji: "🧑‍🚀" },

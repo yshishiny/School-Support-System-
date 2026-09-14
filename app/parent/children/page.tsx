@@ -1,7 +1,7 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddChildForm } from "@/components/AddChildForm";
-import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction } from "@/lib/actions/children";
+import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction } from "@/lib/actions/children";
 import type { Profile, Subject, TimetableEntry } from "@/lib/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -54,14 +54,20 @@ export default async function ChildrenPage() {
             </div>
 
             <div>
-              <h3 className="font-semibold mb-1">Timetable</h3>
+              <div className="flex items-center justify-between mb-1">
+                <h3 className="font-semibold">Timetable</h3>
+                <form action={applyTimetableTemplateAction}>
+                  <input type="hidden" name="student_id" value={s.id} />
+                  <button className="btn-ghost btn-sm" title="Replace with the KIS American Division timetable for this grade">Load school timetable</button>
+                </form>
+              </div>
               {tt.length > 0 && (
                 <ul className="text-sm mb-2 divide-y divide-line">
                   {tt.map((t) => (
                     <li key={t.id} className="py-1 flex items-center gap-2">
                       <span className="muted w-10">{DAYS[t.weekday]}</span>
                       <span className="muted w-24">{t.start_time.slice(0, 5)}{t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}</span>
-                      <span className="flex-1">{t.subject_name}{t.room ? ` · ${t.room}` : ""}</span>
+                      <span className="flex-1">{t.subject_name}{t.room ? <span className="muted"> · {t.room}</span> : null}</span>
                       <form action={deleteTimetableAction}><input type="hidden" name="id" value={t.id} /><button className="muted hover:text-bad">×</button></form>
                     </li>
                   ))}
@@ -75,7 +81,7 @@ export default async function ChildrenPage() {
                 <input name="start_time" type="time" className="input col-span-2" required />
                 <input name="end_time" type="time" className="input col-span-2" />
                 <input name="subject_name" className="input col-span-3" placeholder="Subject" required />
-                <input name="room" className="input col-span-2" placeholder="Room" />
+                <input name="room" className="input col-span-2" placeholder="Teacher / room" />
                 <button className="btn-ghost btn-sm col-span-1">Add</button>
               </form>
             </div>

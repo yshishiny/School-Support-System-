@@ -19,6 +19,7 @@ export interface ReportChild {
   upcoming: { title: string; kind: AssignmentKind; due_date: string }[]; // quizzes/exams in the next 7 days
   overdue: { title: string; kind: AssignmentKind; due_date: string }[];
   pendingRedemptions: { title: string; points: number }[];
+  practice?: { sets: number; correct: number; total: number; reviewsDue: number; flags: string[] };
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -46,6 +47,15 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
       for (const i of ck.items) lines.push(`  ${statusMark(i.status)} ${KIND_EMOJI[i.kind]} ${i.title}`);
       if (ck.learned) lines.push(`💡 Learned: ${ck.learned.trim()}`);
       if (ck.stuckOn) lines.push(`❓ Stuck on: ${ck.stuckOn.trim()}`);
+    }
+    if (c.practice) {
+      const p = c.practice;
+      if (p.sets > 0) {
+        lines.push(`🧠 Practice: ${p.sets} set${p.sets === 1 ? "" : "s"}, ${p.correct}/${p.total} correct (${Math.round((p.correct / Math.max(1, p.total)) * 100)}%)`);
+      } else {
+        lines.push(`🧠 Practice: none today${p.reviewsDue > 0 ? ` · ${p.reviewsDue} reviews waiting` : ""}`);
+      }
+      for (const f of p.flags) lines.push(`  ⚠️ ${f}`);
     }
     lines.push(`⭐ +${c.pointsToday} today · balance ${c.balance} · streak ${c.streak}🔥`);
     if (c.overdue.length) {

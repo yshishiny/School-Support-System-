@@ -22,6 +22,8 @@ export interface Profile {
   grade: number | null;
   avatar_emoji: string;
   locale: string;
+  target_exam: string | null;
+  target_exam_date: string | null;
 }
 
 export interface Subject {
@@ -138,3 +140,54 @@ export const KIND_EMOJI: Record<AssignmentKind, string> = {
   event: "📅",
   note: "📌",
 };
+
+export type LearningTrack = "school" | "act" | "sat";
+
+export interface Topic {
+  id: string;
+  family_id: string | null;
+  track: LearningTrack;
+  grade: number | null;
+  subject: string;
+  unit: string | null;
+  name: string;
+  description: string | null;
+  act_section: string | null;
+  sort: number;
+}
+
+export interface Quiz {
+  id: string;
+  student_id: string;
+  topic_id: string | null;
+  track: LearningTrack;
+  act_section: string | null;
+  title: string;
+  passage: string | null;
+  difficulty: string;
+  created_at: string;
+}
+
+export interface QuizQuestion {
+  id: string;
+  quiz_id: string;
+  position: number;
+  prompt: string;
+  choices: string[];
+  skill_tag: string | null;
+}
+
+export interface Attempt {
+  id: string;
+  student_id: string;
+  quiz_id: string | null;
+  kind: "quiz" | "review";
+  started_at: string;
+  submitted_at: string | null;
+  score: number | null;
+  total: number | null;
+  seconds: number | null;
+  tab_switches: number;
+  flagged: boolean;
+  flag_reason: string | null;
+}
