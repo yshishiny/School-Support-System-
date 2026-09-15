@@ -136,6 +136,8 @@ export async function connectTelegramAction(_prev: { error?: string; ok?: string
     if ("error" in found) return { error: found.error };
     chatId = found.chatId;
     name = found.name;
+  } else if (process.env.TELEGRAM_BOT_TOKEN.startsWith(chatId + ":")) {
+    return { error: "That number is the bot's own ID. Leave the box empty, send the bot a message in Telegram, and tap Connect." };
   }
   const { error } = await supabase.from("families").update({ telegram_chat_id: chatId }).eq("id", family.id);
   if (error) return { error: error.message };

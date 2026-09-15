@@ -51,10 +51,10 @@ export function TelegramSettings({ family, botUsername }: { family: Family; botU
             <li>Tap <b className="text-ink">Start</b> and send any message.</li>
             <li>Come back here and tap Connect.</li>
           </ol>
-          <div>
-            <label className="label">Or paste your chat ID (from @userinfobot)</label>
-            <input name="telegram_chat_id" className="input" inputMode="numeric" placeholder="optional" />
-          </div>
+          <details>
+            <summary className="text-xs muted cursor-pointer">Advanced: enter your own chat ID</summary>
+            <input name="telegram_chat_id" className="input mt-2" inputMode="numeric" placeholder="Your numeric ID from @userinfobot, not the bot's" />
+          </details>
           <Notice error={state?.error} ok={state?.ok} />
           <SubmitButton className="btn-primary" pendingText="Connecting…">Connect Telegram</SubmitButton>
         </form>
