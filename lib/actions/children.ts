@@ -124,9 +124,13 @@ export async function deleteTimetableAction(formData: FormData) {
 export async function connectTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
   const { family } = await requireParent();
   const supabase = await createClient();
-  const manual = String(formData.get("telegram_chat_id") ?? "").trim();
+  // Accept a bare id, or a pasted link like https://web.telegram.org/a/#8902952794
+  const manual = (String(formData.get("telegram_chat_id") ?? "").match(/-?\d{5,}/) ?? [""])[0];
   let chatId = manual;
   let name = "you";
+  if (!process.env.TELEGRAM_BOT_TOKEN) {
+    return { error: "TELEGRAM_BOT_TOKEN is not set in Vercel yet. Add it under Settings → Environment Variables, redeploy, then connect again." };
+  }
   if (!chatId) {
     const found = await findTelegramChat();
     if ("error" in found) return { error: found.error };

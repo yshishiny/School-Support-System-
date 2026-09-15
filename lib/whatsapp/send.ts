@@ -86,7 +86,7 @@ export async function findTelegramChat(): Promise<{ chatId: string; name: string
 /** Sends the report on every configured channel. Success if any channel delivered. */
 export async function deliverReport(family: { parent_whatsapp: string | null; telegram_chat_id: string | null }, text: string): Promise<SendResult> {
   const results: SendResult[] = [];
-  if (family.telegram_chat_id && process.env.TELEGRAM_BOT_TOKEN) results.push(await sendTelegram(family.telegram_chat_id, text));
+  if (family.telegram_chat_id) results.push(await sendTelegram(family.telegram_chat_id, text));
   if (process.env.WHATSAPP_PROVIDER) results.push(await sendWhatsApp(family.parent_whatsapp, text));
   if (results.length === 0) return { channel: "none", ok: false, error: "No delivery channel configured (Telegram or WhatsApp)" };
   const ok = results.filter((r) => r.ok);
