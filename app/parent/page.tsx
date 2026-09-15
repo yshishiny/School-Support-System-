@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 import { computeStreak } from "@/lib/points";
 import { decideRedemptionAction } from "@/lib/actions/rewards";
+import { loadPlan } from "@/lib/plan/prepare";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type Redemption } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -36,6 +37,10 @@ export default async function ParentHome() {
     supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
   ]);
+  const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
+  const planReady = plans.reduce((n, p) => n + (p ? p.quizzes.filter((q) => q.scheduled_for >= p.today).length : 0), 0);
+  const planWanted = plans.reduce((n, p) => n + (p ? p.wanted.length : 0), 0);
+  const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
   const allCk = (checkins ?? []) as CK[];
   const openAll = (open ?? []) as Assignment[];
@@ -50,6 +55,18 @@ export default async function ParentHome() {
           <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
         </div>
       </div>
+
+      <Link href="/parent/plan" className={`card flex items-center gap-3 ${planMissing > 0 ? "border-warn/60" : "border-good/40"}`}>
+        <span className="text-3xl">📅</span>
+        <div className="flex-1">
+          <div className="font-bold">Weekly quiz plan</div>
+          <div className="text-xs muted">
+            {planWanted === 0 ? "No school days found in the timetables yet." : `${planReady} of ${planWanted} quizzes ready for the next 7 days.`}
+            {planMissing > 0 ? ` ${planMissing} still to prepare.` : planWanted > 0 ? " All set." : ""}
+          </div>
+        </div>
+        <span className={planMissing > 0 ? "btn-primary btn-sm" : "btn-ghost btn-sm"}>{planMissing > 0 ? "Prepare" : "Open"}</span>
+      </Link>
 
       {students.map((s) => {
         const mine = allCk.filter((c) => c.student_id === s.id);

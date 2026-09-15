@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ImportWizard } from "@/components/ImportWizard";
@@ -18,10 +19,14 @@ export default async function ImportPage() {
 
   return (
     <main className="space-y-4">
-      <h1 className="h1">Import from WhatsApp</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="h1">Import from WhatsApp</h1>
+        <Link href="/parent/import/archive" className="btn-ghost btn-sm">🗄️ Chat archive</Link>
+      </div>
       <div className="card text-sm space-y-1 muted">
         <p><b className="text-ink">Photos:</b> save the homework, supply list or announcement images from the group and upload them. The AI reads English and Arabic.</p>
         <p><b className="text-ink">Chat text:</b> group name → <b className="text-ink">Export chat</b> → <b className="text-ink">Without media</b> → upload the .txt file. Only messages after the date you pick are read.</p>
+        <p><b className="text-ink">Whole-year exports</b> with media go to the <Link href="/parent/import/archive" className="text-accent-2">chat archive</Link>, where the app learns how each group communicates.</p>
         <p>Everything is shown for you to approve before it is added.</p>
       </div>
       {(kids ?? []).length === 0 ? (

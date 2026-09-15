@@ -18,6 +18,7 @@ export interface AnalyzeResult {
 }
 
 const MAX_MESSAGES = 600;
+const supabaseFor = () => createClient();
 const IMAGE_TYPES = new Set(["image/jpeg", "image/png", "image/webp", "image/gif"]);
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
@@ -70,7 +71,9 @@ export async function analyzeExportAction(_prev: AnalyzeResult | undefined, form
   if (messages.length > MAX_MESSAGES) messages = messages.slice(-MAX_MESSAGES);
 
   try {
-    const extraction = await extractItemsFromMessages(renderForModel(messages), today);
+    const { data: archive } = await supabaseFor().then((sb) => sb.from("chat_archives").select("stats").eq("family_id", family.id).eq("status", "ready").order("processed_at", { ascending: false }).limit(1).maybeSingle());
+    const conventions = ((archive?.stats as { conventions?: string[] } | null)?.conventions ?? []).slice(0, 12);
+    const extraction = await extractItemsFromMessages(renderForModel(messages), today, conventions);
     return { studentId, messageCount: messages.length, summary: extraction.summary, items: extraction.items };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Analysis failed." };

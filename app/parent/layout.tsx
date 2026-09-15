@@ -9,6 +9,7 @@ export default async function ParentLayout({ children }: { children: React.React
       <BottomNav
         items={[
           { href: "/parent", label: "Home", emoji: "🏠" },
+          { href: "/parent/plan", label: "Plan", emoji: "📅" },
           { href: "/parent/progress", label: "Progress", emoji: "🧠" },
           { href: "/parent/assignments", label: "Tasks", emoji: "📝" },
           { href: "/parent/import", label: "WhatsApp", emoji: "💬" },

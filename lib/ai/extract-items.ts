@@ -29,7 +29,7 @@ Rules:
 - Titles are short and specific. Details keep page numbers, exercise numbers, and links.
 - Never invent dates. If unsure, set due_date to null and confidence to "low".`;
 
-export async function extractItemsFromMessages(renderedMessages: string, today: string): Promise<Extraction> {
+export async function extractItemsFromMessages(renderedMessages: string, today: string, conventions: string[] = []): Promise<Extraction> {
   const client = new Anthropic();
   const stream = client.messages.stream({
     model: "claude-opus-5",
@@ -38,7 +38,7 @@ export async function extractItemsFromMessages(renderedMessages: string, today: 
     messages: [
       {
         role: "user",
-        content: `Today is ${today}. Extract the items from these messages:\n\n${renderedMessages}`,
+        content: `Today is ${today}.${conventions.length ? ` What we know about this group:\n- ${conventions.join("\n- ")}\n\n` : " "}Extract the items from these messages:\n\n${renderedMessages}`,
       },
     ],
     output_config: { format: zodOutputFormat(ExtractionSchema) },

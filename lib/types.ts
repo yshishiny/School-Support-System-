@@ -198,3 +198,21 @@ export interface Attempt {
   flagged: boolean;
   flag_reason: string | null;
 }
+
+export interface ChatArchive {
+  id: string;
+  family_id: string;
+  student_id: string | null;
+  label: string;
+  storage_path: string;
+  status: "uploaded" | "processing" | "ready" | "failed";
+  error: string | null;
+  message_count: number;
+  attachment_count: number;
+  first_date: string | null;
+  last_date: string | null;
+  stats: Record<string, unknown> | null;
+  insights_md: string | null;
+  uploaded_at: string;
+  processed_at: string | null;
+}
