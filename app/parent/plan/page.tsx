@@ -64,7 +64,7 @@ function StudentPlan({ plan }: { plan: PlanOverview }) {
                   const label = w.slot === "school" ? `${subjectLabel(w.subject)}: ${w.topicName ?? "topic"}` : `${EXAM_SECTIONS[w.subject]?.exam ?? ""} ${EXAM_SECTIONS[w.subject]?.label ?? w.subject}`;
                   return (
                     <li key={w.slot} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{w.slot === "school" ? "📘" : "🎓"} {q?.title ?? label}</span>
+                      <span className="truncate">{w.slot === "school" ? "📘" : w.slot === "arabic" ? "📗" : "🎓"} {q?.title ?? label}</span>
                       <span className={`badge shrink-0 ${attempt ? "text-good" : q ? "" : "text-warn"}`}>
                         {attempt ? `✓ ${attempt.score}/${attempt.total}` : q ? "ready" : "not prepared"}
                       </span>

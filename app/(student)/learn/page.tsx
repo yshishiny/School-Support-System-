@@ -48,6 +48,15 @@ export default async function LearnPage() {
         </Link>
       )}
 
+      <Link href="/learn/memorize" className="card flex items-center gap-3 border-good/40">
+        <span className="text-3xl">📿</span>
+        <div className="flex-1">
+          <div className="font-bold">القرآن والحديث · memorise</div>
+          <div className="text-xs muted">Exact ayahs from any surah, or a hadith from your book. Read, hide, recite. Points every day.</div>
+        </div>
+        <span className="btn-ghost btn-sm">Open</span>
+      </Link>
+
       {weakest.length > 0 && (
         <section className="card">
           <h2 className="h2 mb-2">🎯 Work on these</h2>

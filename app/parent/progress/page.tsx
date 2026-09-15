@@ -6,6 +6,9 @@ import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
 import type { Profile, Topic } from "@/lib/types";
 import { subjectLabel } from "@/lib/plan";
+import ReactMarkdown from "react-markdown";
+import { CoachButton } from "@/components/CoachButton";
+import type { CoachReport } from "@/lib/types";
 
 export default async function ProgressPage() {
   const { family } = await requireParent();
@@ -14,11 +17,14 @@ export default async function ProgressPage() {
   const { data: kids } = await supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false });
   const students = (kids ?? []) as Profile[];
   const ids = students.map((s) => s.id);
-  const [{ data: topics }, { data: attempts }, { data: due }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { data: due }, { data: coachRows }] = await Promise.all([
     supabase.from("topics").select("*").order("subject").order("sort"),
     ids.length ? supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").in("student_id", ids).not("submitted_at", "is", null).order("submitted_at", { ascending: false }) : { data: [] },
     ids.length ? supabase.from("review_queue").select("student_id").in("student_id", ids).lte("due_date", today) : { data: [] },
+    ids.length ? supabase.from("coach_reports").select("*").in("student_id", ids).order("created_at", { ascending: false }) : { data: [] },
   ]);
+  const coachByStudent = new Map<string, CoachReport>();
+  for (const r of (coachRows ?? []) as CoachReport[]) if (!coachByStudent.has(r.student_id)) coachByStudent.set(r.student_id, r);
   const allTopics = (topics ?? []) as Topic[];
   const allAttempts = (attempts ?? []) as AttemptWithQuiz[];
 
@@ -35,6 +41,7 @@ export default async function ProgressPage() {
         const flagged = mine.filter((a) => a.flagged).slice(0, 5);
         const dueCount = (due ?? []).filter((d) => d.student_id === s.id).length;
         const exams = examsFor(s.target_exam, s.grade);
+        const coach = coachByStudent.get(s.id) ?? null;
         return (
           <section key={s.id} className="card space-y-4">
             <div className="flex items-center gap-3">
@@ -43,6 +50,43 @@ export default async function ProgressPage() {
                 <div className="font-bold">{s.full_name} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
                 <div className="text-xs muted">{thisWeek.length} sets this week · {dueCount} reviews due · {mine.length} sets total</div>
               </div>
+            </div>
+
+            <div className="rounded-xl border border-accent/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">🦸 Coach&apos;s analysis</span>
+                <CoachButton studentId={s.id} hasReport={!!coach} />
+              </div>
+              {coach ? (
+                <>
+                  <p className="text-sm font-medium">{coach.headline}</p>
+                  <p className="text-[11px] muted">{coach.period_start} → {coach.period_end}</p>
+                  {coach.data.focus.length > 0 && (
+                    <ul className="text-sm space-y-1">
+                      {coach.data.focus.map((f) => (
+                        <li key={f.subject} className="rounded-lg bg-warn/10 border border-warn/30 p-2">
+                          <b>Needs practice: {subjectLabel(f.subject)}</b> · {f.why}
+                          {f.foundation.length > 0 && <div className="text-xs muted mt-0.5">Foundations: {f.foundation.join(" · ")}</div>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {coach.data.accelerate.length > 0 && (
+                    <ul className="text-sm space-y-1">
+                      {coach.data.accelerate.map((a) => (
+                        <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2"><b>Push harder: {subjectLabel(a.subject)}</b> · {a.plan}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <details className="text-sm">
+                    <summary className="cursor-pointer muted">Full report</summary>
+                    <div className="prose-lesson mt-2"><ReactMarkdown>{coach.parent_md}</ReactMarkdown></div>
+                    <div className="text-xs muted mt-2">Quiz levels now: {Object.entries(coach.levels).map(([k, v]) => `${subjectLabel(k)} ${v}`).join(" · ") || "medium everywhere"}</div>
+                  </details>
+                </>
+              ) : (
+                <p className="text-xs muted">Runs every week by itself once there is data. Press to get a first analysis now: which subjects need foundations, where to push harder, and a note for {s.full_name.split(" ")[0]}.</p>
+              )}
             </div>
 
             {exams.map((exam) => (

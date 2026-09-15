@@ -17,7 +17,9 @@ const EXAM_ROTATION: { key: string; exam: "SAT" | "ACT" | "BOTH" }[] = [
   { key: "science", exam: "ACT" },
 ];
 
-export type PlanSlotKind = "school" | "exam";
+export type PlanSlotKind = "school" | "exam" | "arabic";
+export type Level = "easy" | "medium" | "hard";
+export const ARABIC_SUBJECTS = ["Arabic", "Religion", "Arabic Social Studies"];
 
 export interface PlanSlot {
   date: string;
@@ -27,6 +29,7 @@ export interface PlanSlot {
   topicId?: string;
   topicName?: string;
   actSection?: string;
+  difficulty: Level;
 }
 
 export interface PlanTopic {
@@ -51,6 +54,8 @@ export interface PlanInput {
   mastery: Map<string, number>; // topic id -> % from past attempts
   existing: ExistingPlanned[];
   covered?: Set<string>; // topic ids the student logged as taken at school recently
+  levels?: Record<string, Level>; // per-subject difficulty from the coach's last analysis
+  favourites?: string[]; // subjects the student likes: preferred when several are taught the same day
   days?: number;
 }
 
@@ -111,33 +116,52 @@ export function planSlots(input: PlanInput): { wanted: PlanSlot[]; missing: Plan
   const usedSubjects: string[] = [];
 
   const wanted: PlanSlot[] = [];
+  const levelFor = (subject: string): Level => input.levels?.[subject] ?? "medium";
+  const arabicAvailable = ARABIC_SUBJECTS.filter((a) => available.includes(a));
+  const favs = input.favourites ?? [];
+  const covered = input.covered ?? new Set<string>();
+
+  const chooseSubject = (candidates: string[], used: string[]): string | null => {
+    if (candidates.length === 0) return null;
+    const unused = candidates.filter((c) => !used.includes(c));
+    const pool = unused.length ? unused : candidates;
+    // A favourite subject wins a tie; otherwise rotate so the week spreads across subjects.
+    return pool.find((c) => favs.includes(c)) ?? pool[used.filter((u) => candidates.includes(u)).length % pool.length];
+  };
+  const fillSlot = (date: string, slot: PlanSlotKind, candidates: string[], used: string[]) => {
+    const existingRow = input.existing.find((e) => e.scheduled_for === date && e.plan_slot === slot);
+    if (existingRow) {
+      const t = input.topics.find((x) => x.id === existingRow.topic_id);
+      if (t) used.push(t.subject);
+      wanted.push({ date, slot, subject: t?.subject ?? "", topicId: t?.id, topicName: t?.name, difficulty: t ? levelFor(t.subject) : "medium" });
+      return;
+    }
+    const subject = chooseSubject(candidates, used);
+    if (!subject) return;
+    // Reuse a topic only when the subject has nothing else left (a new set is still generated).
+    const topic = pickTopic(input.topics, subject, input.mastery, usedTopics, covered) ?? pickTopic(input.topics, subject, input.mastery, new Set(), covered);
+    if (!topic) return;
+    usedTopics.add(topic.id);
+    used.push(subject);
+    wanted.push({ date, slot, subject, topicId: topic.id, topicName: topic.name, difficulty: levelFor(subject) });
+  };
+  const usedArabic: string[] = [];
+
   for (let i = 0; i < days; i++) {
     const date = shiftDate(input.today, i);
     const wd = weekdayOf(date);
     const rows = input.timetable.filter((t) => t.weekday === wd);
     if (rows.length === 0) continue; // no school that day
 
-    const subjects = [...new Set(rows.map((r) => curriculumSubject(r.subject_name, available)).filter((s): s is string => !!s))];
-    const existingSchool = input.existing.find((e) => e.scheduled_for === date && e.plan_slot === "school");
-    if (existingSchool) {
-      const t = input.topics.find((x) => x.id === existingSchool.topic_id);
-      if (t) usedSubjects.push(t.subject);
-      wanted.push({ date, slot: "school", subject: t?.subject ?? "", topicId: t?.id, topicName: t?.name });
-    } else if (subjects.length) {
-      // Prefer a subject not yet used this window so the week covers different subjects.
-      const subject = subjects.find((s) => !usedSubjects.includes(s)) ?? subjects[usedSubjects.filter((u) => subjects.includes(u)).length % subjects.length];
-      // Reuse a topic only when the subject has nothing else left (a new set is still generated).
-      const covered = input.covered ?? new Set<string>();
-      const topic = pickTopic(input.topics, subject, input.mastery, usedTopics, covered) ?? pickTopic(input.topics, subject, input.mastery, new Set(), covered);
-      if (topic) {
-        usedTopics.add(topic.id);
-        usedSubjects.push(subject);
-        wanted.push({ date, slot: "school", subject, topicId: topic.id, topicName: topic.name });
-      }
-    }
+    const taught = [...new Set(rows.map((r) => curriculumSubject(r.subject_name, available)).filter((s): s is string => !!s))];
+    // English-track school quiz from that day's classes.
+    fillSlot(date, "school", taught.filter((t) => !ARABIC_SUBJECTS.includes(t)), usedSubjects);
+    // Arabic every school day: the Arabic subject taught that day, otherwise rotate through all of them.
+    const arabicToday = taught.filter((t) => ARABIC_SUBJECTS.includes(t));
+    fillSlot(date, "arabic", arabicToday.length ? arabicToday : arabicAvailable, usedArabic);
     if (rotation.length) {
       const r = rotation[dayNumber(date) % rotation.length];
-      wanted.push({ date, slot: "exam", subject: r.key, actSection: r.key });
+      wanted.push({ date, slot: "exam", subject: r.key, actSection: r.key, difficulty: "medium" });
     }
   }
   const missing = wanted.filter((w) => !existingKey.has(`${w.date}:${w.slot}`));

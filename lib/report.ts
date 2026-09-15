@@ -22,6 +22,7 @@ export interface ReportChild {
   practice?: { sets: number; correct: number; total: number; reviewsDue: number; flags: string[] };
   covered?: { subject: string; note: string }[];
   prayers?: { prayer: string; status: "on_time" | "late" }[];
+  coach?: string | null; // latest coach headline
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -69,6 +70,7 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
       for (const f of p.flags) lines.push(`  ⚠️ ${f}`);
     }
     lines.push(`⭐ +${c.pointsToday} today · balance ${c.balance} · streak ${c.streak}🔥`);
+    if (c.coach) lines.push(`🦸 Coach: ${c.coach}`);
     if (c.overdue.length) {
       lines.push(`⏰ Overdue: ${c.overdue.map((o) => `${o.title} (${prettyDate(o.due_date)})`).join("; ")}`);
     }

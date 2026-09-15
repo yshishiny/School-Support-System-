@@ -10,6 +10,7 @@ import { explainTopic } from "@/lib/ai/explain-topic";
 import { integrityFlag, nextReview, quizPoints, QUIZ_POINTS } from "@/lib/learning";
 import { EXAM_SECTIONS, secondsPerQuestion } from "@/lib/exams";
 import { todayIn } from "@/lib/dates";
+import { themeById } from "@/lib/themes";
 import type { Topic } from "@/lib/types";
 
 const QUESTIONS_PER_SET = 8;
@@ -100,6 +101,8 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       avoidPrompts: avoid,
       recallNotes,
       language: topic?.language ?? "en",
+      interests: profile.interests,
+      themeName: themeById(profile.theme).name,
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not generate the quiz." };

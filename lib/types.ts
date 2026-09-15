@@ -28,6 +28,8 @@ export interface Profile {
   target_exam: string | null;
   target_exam_date: string | null;
   theme: string;
+  interests: string | null;
+  favourite_subjects: string[];
 }
 
 export interface Subject {
@@ -217,4 +219,37 @@ export interface ChatArchive {
   insights_md: string | null;
   uploaded_at: string;
   processed_at: string | null;
+}
+
+export interface CoachReport {
+  id: string;
+  student_id: string;
+  family_id: string;
+  period_start: string;
+  period_end: string;
+  headline: string;
+  parent_md: string;
+  kid_md: string;
+  data: {
+    subjects: { subject: string; sets: number; pct: number | null; trend: "up" | "flat" | "down" | null; weakest: string[]; strongest: string[] }[];
+    focus: { subject: string; why: string; foundation: string[] }[];
+    accelerate: { subject: string; plan: string }[];
+  };
+  levels: Record<string, "easy" | "medium" | "hard">;
+  created_at: string;
+}
+
+export interface MemorizeItem {
+  id: string;
+  student_id: string;
+  kind: "quran" | "hadith";
+  title: string;
+  reference: string | null;
+  text_ar: string;
+  translation: string | null;
+  segments: { ref: string; text: string; translation?: string | null }[];
+  best_score: number | null;
+  sessions: number;
+  last_practised: string | null;
+  created_at: string;
 }

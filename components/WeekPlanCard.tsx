@@ -46,7 +46,7 @@ export function WeekPlanCard({ quizzes, today }: { quizzes: PlannedQuiz[]; today
             const a = q.attempts.find((x) => x.submitted_at);
             return (
               <li key={q.id} className="flex items-center gap-2 text-sm">
-                <span className="text-xl">{q.plan_slot === "school" ? "📘" : "🎓"}</span>
+                <span className="text-xl">{q.plan_slot === "school" ? "📘" : q.plan_slot === "arabic" ? "📗" : "🎓"}</span>
                 <span className="flex-1 truncate">{q.title}</span>
                 {a ? <span className="badge text-good">✓ {a.score}/{a.total}</span> : <Link href={`/quiz/${q.id}`} className="btn-primary btn-sm">Start</Link>}
               </li>

@@ -11,6 +11,12 @@ export const QUIZ_POINTS = {
   DAILY_CAP: 60, // practice points per day, so grinding does not outpay real work
 } as const;
 
+/** Quran / hadith memorisation trainer. */
+export const MEMORIZE_POINTS = {
+  SESSION: 5, // one recall session per item per day
+  PERFECT_BONUS: 5, // 95%+ recalled without peeking
+} as const;
+
 import { secondsPerQuestion, scaledEstimate, sectionsFor } from "./exams";
 
 /** Enhanced ACT (2025+) sections; kept for callers that only care about the ACT. */

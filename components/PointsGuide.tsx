@@ -1,6 +1,6 @@
 import { POINTS } from "@/lib/points";
 import { PRAYER_POINTS } from "@/lib/prayers";
-import { QUIZ_POINTS } from "@/lib/learning";
+import { MEMORIZE_POINTS, QUIZ_POINTS } from "@/lib/learning";
 
 /** How points are earned and the fastest daily routine. Shown to the boys. */
 export function PointsGuide({ compact = false }: { compact?: boolean }) {
@@ -25,6 +25,7 @@ export function PointsGuide({ compact = false }: { compact?: boolean }) {
         <Tile emoji="🕌" title="Prayers on time" pts={`+${PRAYER_POINTS.ON_TIME} × 5`} note={`all five on time +${PRAYER_POINTS.ALL_ON_TIME_BONUS}`} />
         <Tile emoji="🧠" title="Practice sets" pts={`+${QUIZ_POINTS.COMPLETE} +1/correct`} note={`80%+ adds +${QUIZ_POINTS.HIGH_SCORE_BONUS}, max ${QUIZ_POINTS.DAILY_CAP}/day`} />
         <Tile emoji="📅" title="Planned quiz on its day" pts={`+${QUIZ_POINTS.PLANNED_ON_DAY} extra`} note="Your week's quizzes are ready on the home page" />
+        <Tile emoji="📿" title="Quran & hadith recall" pts={`+${MEMORIZE_POINTS.SESSION} a day per item`} note={`95%+ from memory adds +${MEMORIZE_POINTS.PERFECT_BONUS}`} />
         <Tile emoji="🔥" title="Streaks" pts="+20 / +50 / +100 / +250" note="3, 7, 14, 30 days in a row" />
       </div>
 

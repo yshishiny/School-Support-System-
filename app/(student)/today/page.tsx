@@ -9,6 +9,7 @@ import { PrayerPill, type PrayerRow } from "@/components/PrayerPill";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { buildLessonDays } from "@/lib/lessons";
+import ReactMarkdown from "react-markdown";
 import { themeById } from "@/lib/themes";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
@@ -24,7 +25,7 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }, { data: topics }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }, { data: topics }, { data: coach }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
@@ -42,6 +43,7 @@ export default async function TodayPage() {
       .lte("scheduled_for", shiftDate(today, 6))
       .order("scheduled_for"),
     supabase.from("topics").select("id, subject, name, unit, sort").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
+    supabase.from("coach_reports").select("kid_md, created_at").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
@@ -145,6 +147,16 @@ export default async function TodayPage() {
                 ))}
             </div>
           </details>
+        </section>
+      )}
+
+      {coach?.kid_md && (
+        <section className="card border-accent/50 space-y-1">
+          <div className="flex items-center justify-between">
+            <h2 className="h2">🦸 Your coach says</h2>
+            <span className="text-[11px] muted">{prettyDate(String(coach.created_at).slice(0, 10))}</span>
+          </div>
+          <div className="prose-lesson text-sm"><ReactMarkdown>{coach.kid_md}</ReactMarkdown></div>
         </section>
       )}
 

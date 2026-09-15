@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
+import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -30,6 +31,18 @@ export async function GET(request: Request) {
         (results[id] ??= []).push(`error: ${err instanceof Error ? err.message : String(err)}`);
         pending.delete(id);
       }
+    }
+  }
+  // Weekly coach analysis per student, when time remains.
+  for (const s of students ?? []) {
+    if (Date.now() - started >= TIME_BUDGET_MS) break;
+    try {
+      if (await coachReportStale(s.id)) {
+        const r = await generateCoachReport(s.id);
+        (results[s.id] ??= []).push(`coach: ${r.headline}`);
+      }
+    } catch (err) {
+      (results[s.id] ??= []).push(`coach error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));

@@ -53,6 +53,8 @@ export interface QuizSpec {
   avoidPrompts: string[]; // previously seen prompts, to reduce repeats
   recallNotes?: string[]; // "Subject: what was covered today" lines for a daily recall set
   language?: "en" | "ar"; // Arabic for the Egyptian Ministry subjects
+  interests?: string | null; // "Real Madrid, gaming, cars" — used to flavour word problems and passages
+  themeName?: string | null; // the app theme the student chose, e.g. "Los Blancos"
 }
 
 const SYSTEM = `You write practice questions for a student at an American-curriculum international school in Egypt. Output multiple-choice questions with exactly four choices (never three, never five) and one correct answer.
@@ -69,6 +71,7 @@ Quality rules:
 - For a daily recall set: the user gives what the student covered at school today, subject by subject. Write questions only on those topics, at the student's grade level, spread across the subjects; prefix each skill_tag with the subject name.
 - Be concise. Do not add commentary outside the JSON.
 - For Digital SAT sets: mirror the real test. Reading & Writing questions each come with their own short passage (25-150 words) placed at the start of the prompt, then the question. SAT Math mixes algebra, advanced math, data analysis and geometry; calculator is allowed.
+- Personalisation: when the student's interests are given, set a good share of the word problems, examples and reading passages inside those interests (football statistics, game scores, cars, space...) while keeping the skill tested identical and the numbers realistic. Make it fun, never childish. Do not force it on grammar, religion or exam-style sets: those stay faithful to the real exam and textbook.
 - Never repeat a prompt that appears in the "avoid" list.
 - When the language is Arabic: write everything (title, prompts, choices, explanations, skill tags) in clear Modern Standard Arabic as used in Egyptian Ministry of Education textbooks, with full diacritics only where they matter for grammar questions. Never mix in English except proper nouns.
 - For a daily recall set, write each question in the language of the note it comes from (Arabic notes get Arabic questions).`;
@@ -83,7 +86,8 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
     `Topic: ${spec.topic}`,
     spec.actSection ? `Exam section: ${spec.actSection}` : null,
     `Language: ${spec.language === "ar" ? "Arabic (Modern Standard, Egyptian curriculum)" : "English"}`,
-    `Difficulty: ${spec.difficulty}`,
+    `Difficulty: ${spec.difficulty}${spec.difficulty === "hard" ? " (the student is strong here: stretch with multi-step and transfer questions)" : spec.difficulty === "easy" ? " (build foundations: one idea per question, scaffolded)" : ""}`,
+    spec.interests ? `Student's interests: ${spec.interests}${spec.themeName ? ` (app theme: ${spec.themeName})` : ""}` : null,
     `Number of questions: ${spec.count}`,
     spec.weakSkills.length ? `Give extra weight to these weak skills: ${spec.weakSkills.join("; ")}` : null,
     spec.recallNotes?.length ? `Covered at school today:\n- ${spec.recallNotes.join("\n- ")}` : null,

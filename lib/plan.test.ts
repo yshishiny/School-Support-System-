@@ -68,6 +68,25 @@ describe("planSlots", () => {
     expect(wanted.every((w) => w.slot === "school")).toBe(true);
     expect(missing).toHaveLength(5);
   });
+  it("adds an Arabic quiz every school day once Arabic topics exist, rotating the three Ministry subjects", () => {
+    const arabicTopics = [
+      { id: "a1", subject: "Arabic", name: "الحال", sort: 1 },
+      { id: "r1", subject: "Religion", name: "الصلاة", sort: 1 },
+      { id: "ss1", subject: "Arabic Social Studies", name: "الفتح الإسلامي", sort: 1 },
+    ];
+    const tt = [...timetable, { weekday: 2, subject_name: "Religion" }];
+    const { wanted } = planSlots({ today: "2026-09-15", timetable: tt, topics: [...topics, ...arabicTopics], exams: [], mastery: new Map(), existing: [] });
+    const arabic = wanted.filter((w) => w.slot === "arabic");
+    expect(arabic).toHaveLength(5);
+    expect(arabic[0].subject).toBe("Religion"); // taught on Tuesday
+    expect(new Set(arabic.slice(0, 3).map((w) => w.subject)).size).toBe(3);
+  });
+  it("uses the coach's level for a subject and prefers a favourite subject on a tie", () => {
+    const { wanted } = planSlots({ today: "2026-09-15", timetable, topics, exams: [], mastery: new Map(), existing: [], levels: { Math: "hard" }, favourites: ["Math"] });
+    expect(wanted[0].subject).toBe("Math"); // Tuesday offers English and Math
+    expect(wanted[0].difficulty).toBe("hard");
+    expect(wanted[1].difficulty).toBe("medium");
+  });
   it("spreads subjects across the week and never repeats a topic", () => {
     const { wanted } = planSlots({ today: "2026-09-15", timetable, topics, exams: [], mastery: new Map(), existing: [] });
     const ids = wanted.map((w) => w.topicId);
