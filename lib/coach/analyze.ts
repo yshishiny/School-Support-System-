@@ -35,6 +35,8 @@ export interface CoachStats {
   minutesStudied: number;
   stuckOn: string[];
   religionNotes: string[];
+  wellbeing: { instrument: string; band: string | null; score: number | null; taken_on: string }[];
+  privateNotes: string[];
 }
 
 interface AttemptRow {
@@ -54,13 +56,15 @@ export async function collectCoachStats(studentId: string, days = 14): Promise<C
   const today = todayIn(family?.timezone ?? "Africa/Cairo");
   const periodStart = shiftDate(today, -days);
 
-  const [{ data: topics }, { data: attempts }, { data: logs }, { data: checkins }, { data: prayers }, { data: planned }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { data: logs }, { data: checkins }, { data: prayers }, { data: planned }, { data: wellbeing }, { data: privateNotes }] = await Promise.all([
     admin.from("topics").select("*").eq("track", "school").eq("grade", p.grade ?? 0),
     admin.from("attempts").select("score, total, submitted_at, flagged, quizzes(topic_id, act_section, track, scheduled_for, plan_slot)").eq("student_id", studentId).not("submitted_at", "is", null).gte("submitted_at", periodStart),
     admin.from("lesson_logs").select("subject_name, note, topic_id").eq("student_id", studentId).gte("log_date", periodStart),
     admin.from("checkins").select("checkin_date, minutes_studied, stuck_on").eq("student_id", studentId).gte("checkin_date", periodStart),
     admin.from("prayer_logs").select("status").eq("student_id", studentId).gte("log_date", periodStart),
     admin.from("quizzes").select("topic_id, plan_slot, scheduled_for, attempts(submitted_at)").eq("student_id", studentId).not("scheduled_for", "is", null).gte("scheduled_for", periodStart).lt("scheduled_for", today),
+    admin.from("wellbeing_checks").select("instrument, band, score, taken_on").eq("student_id", studentId).gte("taken_on", shiftDate(today, -35)).order("taken_on", { ascending: false }).limit(12),
+    admin.from("coach_notes").select("note").eq("student_id", studentId).order("created_at", { ascending: false }).limit(10),
   ]);
   const allTopics = (topics ?? []) as Topic[];
   const topicById = new Map(allTopics.map((t) => [t.id, t]));
@@ -142,5 +146,7 @@ export async function collectCoachStats(studentId: string, days = 14): Promise<C
     minutesStudied: ck.reduce((s, c) => s + (c.minutes_studied ?? 0), 0),
     stuckOn: ck.map((c) => c.stuck_on).filter((x): x is string => !!x).slice(-5),
     religionNotes: religionNotes.slice(-5),
+    wellbeing: (wellbeing ?? []) as { instrument: string; band: string | null; score: number | null; taken_on: string }[],
+    privateNotes: (privateNotes ?? []).map((n) => n.note).reverse(),
   };
 }

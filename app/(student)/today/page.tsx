@@ -10,7 +10,9 @@ import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { buildLessonDays } from "@/lib/lessons";
 import ReactMarkdown from "react-markdown";
+import { INSTRUMENTS, dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
 import { themeById } from "@/lib/themes";
+import { subjectEmoji } from "@/lib/plan";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
@@ -25,7 +27,7 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }, { data: topics }, { data: coach }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }, { data: topics }, { data: coach }, { data: wellbeing }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
@@ -36,7 +38,7 @@ export default async function TodayPage() {
     supabase.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today),
     supabase
       .from("quizzes")
-      .select("id, title, scheduled_for, plan_slot, topic_id, act_section, attempts(score, total, submitted_at)")
+      .select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)")
       .eq("student_id", profile.id)
       .not("scheduled_for", "is", null)
       .gte("scheduled_for", shiftDate(today, -6))
@@ -44,7 +46,9 @@ export default async function TodayPage() {
       .order("scheduled_for"),
     supabase.from("topics").select("id, subject, name, unit, sort").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
     supabase.from("coach_reports").select("kid_md, created_at").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", profile.id).order("taken_on", { ascending: false }).limit(40),
   ]);
+  const dueChecks = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
   // Timetable: today's classes, or the next school day when today is free.
@@ -163,6 +167,17 @@ export default async function TodayPage() {
         </section>
       )}
 
+      {dueChecks.length > 0 && (
+        <Link href={`/coach/check/${dueChecks[0]}`} className="card flex items-center gap-3 border-accent/50">
+          <span className="text-4xl sticker-still">{INSTRUMENTS[dueChecks[0]].emoji}</span>
+          <div className="flex-1">
+            <div className="font-bold">{INSTRUMENTS[dueChecks[0]].title} with your coach</div>
+            <div className="text-xs muted">{INSTRUMENTS[dueChecks[0]].minutes} min · private · +5 pts{dueChecks.length > 1 ? ` · ${dueChecks.length - 1} more waiting` : ""}</div>
+          </div>
+          <span className="btn-primary btn-sm">Go</span>
+        </Link>
+      )}
+
       {coach?.kid_md && (
         <section className="card border-accent/50 space-y-1">
           <div className="flex items-center justify-between">
@@ -173,7 +188,7 @@ export default async function TodayPage() {
         </section>
       )}
 
-      <WeekPlanCard quizzes={(planned ?? []) as PlannedQuiz[]} today={today} />
+      <WeekPlanCard quizzes={((planned ?? []) as unknown as PlannedQuiz[]).map((q) => ({ ...q, subject: q.topics?.subject ?? null }))} today={today} />
 
       {hasNotes && (
         <section className="card flex items-center gap-3 border-accent/50">
@@ -230,7 +245,7 @@ function TimetableList({ rows }: { rows: TimetableEntry[] }) {
       {rows.map((t) => (
         <li key={t.id} className="flex gap-3">
           <span className="muted w-24 shrink-0">{t.start_time.slice(0, 5)}{t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}</span>
-          <span className="font-medium">{t.subject_name}</span>
+          <span className="font-medium"><span className="mr-1">{subjectEmoji(t.subject_name)}</span>{t.subject_name}</span>
           {t.room && <span className="muted truncate">{t.room}</span>}
         </li>
       ))}

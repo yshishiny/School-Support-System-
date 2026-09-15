@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { loadPlan, type PlanOverview } from "@/lib/plan/prepare";
 import { prettyDate } from "@/lib/dates";
 import { EXAM_SECTIONS } from "@/lib/exams";
-import { subjectLabel } from "@/lib/plan";
+import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import { PreparePlanButton } from "@/components/PreparePlanButton";
 import type { Profile } from "@/lib/types";
 
@@ -64,7 +64,7 @@ function StudentPlan({ plan }: { plan: PlanOverview }) {
                   const label = w.slot === "school" ? `${subjectLabel(w.subject)}: ${w.topicName ?? "topic"}` : `${EXAM_SECTIONS[w.subject]?.exam ?? ""} ${EXAM_SECTIONS[w.subject]?.label ?? w.subject}`;
                   return (
                     <li key={w.slot} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{w.slot === "school" ? "📘" : w.slot === "arabic" ? "📗" : "🎓"} {q?.title ?? label}</span>
+                      <span className="truncate">{w.slot === "exam" ? "🎓" : subjectEmoji(w.subject)} {q?.title ?? label}</span>
                       <span className={`badge shrink-0 ${attempt ? "text-good" : q ? "" : "text-warn"}`}>
                         {attempt ? `✓ ${attempt.score}/${attempt.total}` : q ? "ready" : "not prepared"}
                       </span>

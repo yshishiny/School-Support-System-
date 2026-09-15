@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prettyDate } from "@/lib/dates";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
+import { subjectEmoji } from "@/lib/plan";
 
 const SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -46,7 +47,7 @@ export function WeekPlanCard({ quizzes, today }: { quizzes: PlannedQuiz[]; today
             const a = q.attempts.find((x) => x.submitted_at);
             return (
               <li key={q.id} className="flex items-center gap-2 text-sm">
-                <span className="text-3xl sticker-still">{q.plan_slot === "school" ? "📘" : q.plan_slot === "arabic" ? "📗" : "🎓"}</span>
+                <span className="text-3xl sticker-still">{q.plan_slot === "exam" ? "🎓" : q.subject ? subjectEmoji(q.subject) : q.plan_slot === "arabic" ? "📗" : "📘"}</span>
                 <span className="flex-1 truncate">{q.title}</span>
                 {a ? <span className="badge text-good">✓ {a.score}/{a.total}</span> : <Link href={`/quiz/${q.id}`} className="btn-primary btn-sm">Start</Link>}
               </li>

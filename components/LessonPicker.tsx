@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { guessLessonAction } from "@/lib/actions/lessons";
 import type { LessonSubjectInput } from "@/lib/lessons";
+import { subjectEmoji } from "@/lib/plan";
 
 /**
  * One class on the check-in form: tap the lesson title from the curriculum, pick from the full list,
@@ -48,7 +49,7 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
       <input type="hidden" name={`lesson_${fieldKey}`} value={note} />
       <input type="hidden" name={`lessontopic_${fieldKey}`} value={topicId ?? ""} />
       <div className="flex items-center justify-between gap-2">
-        <span className="text-sm font-semibold truncate">{input.subject}</span>
+        <span className="text-sm font-semibold truncate"><span className="text-lg align-middle">{subjectEmoji(input.subject)}</span> {input.subject}</span>
         {note ? <span className="badge text-good truncate max-w-[60%]">✓ {note}</span> : <span className="text-xs muted">what was the lesson?</span>}
       </div>
 

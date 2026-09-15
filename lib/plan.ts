@@ -176,3 +176,22 @@ export function subjectLabel(subject: string): string {
 export function isArabicSubject(subject: string): boolean {
   return subject === "Arabic" || subject === "Religion" || subject === "Arabic Social Studies";
 }
+
+const SUBJECT_EMOJI: Record<string, string> = {
+  Math: "🧮", English: "📚", Science: "🔬", Biology: "🧬", Physics: "⚡", Chemistry: "⚗️", "Social Studies": "🌍",
+  Arabic: "✍️", Religion: "🕌", "Arabic Social Studies": "🏺",
+};
+
+/** Icon for a curriculum subject or a timetable name. */
+export function subjectEmoji(subjectOrTimetableName: string): string {
+  if (SUBJECT_EMOJI[subjectOrTimetableName]) return SUBJECT_EMOJI[subjectOrTimetableName];
+  const mapped = curriculumSubject(subjectOrTimetableName, Object.keys(SUBJECT_EMOJI));
+  if (mapped && SUBJECT_EMOJI[mapped]) return SUBJECT_EMOJI[mapped];
+  const n = subjectOrTimetableName.toLowerCase();
+  if (/p\.?e|sport/.test(n)) return "🏃";
+  if (/art/.test(n)) return "🎨";
+  if (/music/.test(n)) return "🎵";
+  if (/french|german|language/.test(n)) return "🗣️";
+  if (/sat|act/.test(n)) return "🎓";
+  return "📘";
+}

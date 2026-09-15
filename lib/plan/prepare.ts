@@ -18,6 +18,8 @@ export interface PlannedQuiz {
   plan_slot: "school" | "exam" | "arabic";
   topic_id: string | null;
   act_section: string | null;
+  subject?: string | null; // from topics(subject)
+  topics?: { subject: string } | null;
   attempts: { score: number | null; total: number | null; submitted_at: string | null }[];
 }
 
@@ -46,7 +48,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
     admin.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", studentId).not("submitted_at", "is", null),
     admin
       .from("quizzes")
-      .select("id, title, scheduled_for, plan_slot, topic_id, act_section, attempts(score, total, submitted_at)")
+      .select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)")
       .eq("student_id", studentId)
       .not("scheduled_for", "is", null)
       .gte("scheduled_for", shiftDate(today, -6))
@@ -57,7 +59,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
   ]);
   const allTopics = (topics ?? []) as Topic[];
   const { topic: mastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);
-  const planned = (quizzes ?? []) as PlannedQuiz[];
+  const planned = ((quizzes ?? []) as unknown as PlannedQuiz[]).map((q) => ({ ...q, subject: q.topics?.subject ?? null }));
   const { wanted, missing } = planSlots({
     today,
     timetable: timetable ?? [],

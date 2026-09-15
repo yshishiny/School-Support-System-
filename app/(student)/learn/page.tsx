@@ -6,12 +6,11 @@ import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackF
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import { Tabs } from "@/components/Tabs";
-import { isArabicSubject, subjectLabel, ARABIC_SUBJECTS } from "@/lib/plan";
+import { isArabicSubject, subjectEmoji, subjectLabel, ARABIC_SUBJECTS } from "@/lib/plan";
 import type { Topic } from "@/lib/types";
 
 export const maxDuration = 300;
 
-const SUBJECT_EMOJI: Record<string, string> = { Math: "🧮", English: "📚", Science: "🔬", Biology: "🧬", Physics: "⚡", Chemistry: "⚗️", "Social Studies": "🌍", Arabic: "✍️", Religion: "🕌", "Arabic Social Studies": "🏺" };
 
 export default async function LearnPage() {
   const { profile, family } = await requireStudent();
@@ -55,7 +54,7 @@ export default async function LearnPage() {
           <ul className="space-y-1 text-sm">
             {weakest.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2">
-                <Link href={`/learn/topic/${t.id}`} className="flex-1 hover:text-accent-2">{subjectLabel(t.subject)}: {t.name}</Link>
+                <Link href={`/learn/topic/${t.id}`} className="flex-1 hover:text-accent-2">{subjectEmoji(t.subject)} {subjectLabel(t.subject)}: {t.name}</Link>
                 <span className="badge text-warn">{mastery.get(t.id)}%</span>
               </li>
             ))}
@@ -90,11 +89,11 @@ export default async function LearnPage() {
         return {
           id: subject,
           label: subjectLabel(subject),
-          emoji: SUBJECT_EMOJI[subject] ?? "📘",
+          emoji: subjectEmoji(subject),
           content: (
             <section className="card" dir={isArabicSubject(subject) ? "rtl" : undefined}>
               <div className="flex items-center justify-between mb-2">
-                <h2 className="h2">{SUBJECT_EMOJI[subject] ?? "📘"} {subjectLabel(subject)}</h2>
+                <h2 className="h2">{subjectEmoji(subject)} {subjectLabel(subject)}</h2>
                 <span className="text-xs muted">{scores.length}/{list.length} practised{avg !== null ? ` · avg ${avg}%` : ""}</span>
               </div>
               {units.map((unit) => (

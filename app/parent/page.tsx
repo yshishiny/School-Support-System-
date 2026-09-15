@@ -5,6 +5,7 @@ import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 import { computeStreak } from "@/lib/points";
 import { decideRedemptionAction } from "@/lib/actions/rewards";
 import { loadPlan } from "@/lib/plan/prepare";
+import { acknowledgeAlertAction } from "@/lib/actions/wellbeing";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type Redemption } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -29,14 +30,16 @@ export default async function ParentHome() {
     );
   }
   const ids = students.map((s) => s.id);
-  const [{ data: checkins }, { data: open }, { data: ledger }, { data: pending }, { data: report }, { data: prayers }] = await Promise.all([
+  const [{ data: checkins }, { data: open }, { data: ledger }, { data: pending }, { data: report }, { data: prayers }, { data: alerts }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
     supabase.from("redemptions").select("*, rewards(title, emoji, kind, cash_amount_egp), profiles(full_name)").in("student_id", ids).eq("status", "pending"),
     supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
+    supabase.from("safety_alerts").select("*, profiles(full_name)").eq("family_id", family.id).is("acknowledged_at", null).order("created_at", { ascending: false }),
   ]);
+  const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
   const planReady = plans.reduce((n, p) => n + (p ? p.quizzes.filter((q) => q.scheduled_for >= p.today).length : 0), 0);
   const planWanted = plans.reduce((n, p) => n + (p ? p.wanted.length : 0), 0);
@@ -55,6 +58,20 @@ export default async function ParentHome() {
           <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
         </div>
       </div>
+
+      {openAlerts.map((a) => (
+        <section key={a.id} className={`card space-y-2 ${a.level === "red" ? "border-bad" : "border-warn"}`}>
+          <div className="flex items-start gap-3">
+            <span className="text-3xl">{a.level === "red" ? "🚨" : "💛"}</span>
+            <div className="flex-1 text-sm">
+              <div className="font-bold">{a.level === "red" ? "Please talk to" : "A gentle heads-up about"} {a.profiles?.full_name?.split(" ")[0]}</div>
+              <div className="muted">{a.summary}. {a.level === "red" ? "Sit with him calmly today and listen first. If you think he is in immediate danger call 123." : "A relaxed conversation this week, without grades, would help."} What he wrote stays private; the app only tells you that you are needed.</div>
+              <div className="text-[11px] muted mt-1">{String(a.created_at).slice(0, 16).replace("T", " ")}</div>
+            </div>
+          </div>
+          <form action={acknowledgeAlertAction.bind(null, a.id)} className="flex justify-end"><button className="btn-ghost btn-sm">I have talked to him</button></form>
+        </section>
+      ))}
 
       <Link href="/parent/plan" className={`card flex items-center gap-3 ${planMissing > 0 ? "border-warn/60" : "border-good/40"}`}>
         <span className="text-3xl">📅</span>

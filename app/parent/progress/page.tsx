@@ -5,10 +5,12 @@ import { EXAM_INFO, examsFor, scaledEstimate, sectionsFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
 import type { Profile, Topic } from "@/lib/types";
-import { subjectLabel } from "@/lib/plan";
+import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import ReactMarkdown from "react-markdown";
 import { CoachButton } from "@/components/CoachButton";
 import type { CoachReport } from "@/lib/types";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { wellbeingStatus, type CheckHistoryRow } from "@/lib/wellbeing";
 
 export default async function ProgressPage() {
   const { family } = await requireParent();
@@ -23,6 +25,11 @@ export default async function ProgressPage() {
     ids.length ? supabase.from("review_queue").select("student_id").in("student_id", ids).lte("due_date", today) : { data: [] },
     ids.length ? supabase.from("coach_reports").select("*").in("student_id", ids).order("created_at", { ascending: false }) : { data: [] },
   ]);
+  // Wellbeing: parents get a traffic light only. Answers stay with the child (RLS), so this uses the service role and discards them.
+  const admin = createAdminClient();
+  const { data: wbRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, instrument, taken_on, band, score").in("student_id", ids).order("taken_on", { ascending: false }).limit(300) : { data: [] };
+  const wellbeingByStudent = new Map<string, ReturnType<typeof wellbeingStatus>>();
+  for (const s of students) wellbeingByStudent.set(s.id, wellbeingStatus(((wbRows ?? []) as (CheckHistoryRow & { student_id: string })[]).filter((r) => r.student_id === s.id), today));
   const coachByStudent = new Map<string, CoachReport>();
   for (const r of (coachRows ?? []) as CoachReport[]) if (!coachByStudent.has(r.student_id)) coachByStudent.set(r.student_id, r);
   const allTopics = (topics ?? []) as Topic[];
@@ -52,6 +59,20 @@ export default async function ProgressPage() {
               </div>
             </div>
 
+            {(() => {
+              const w = wellbeingByStudent.get(s.id)!;
+              const light = w.band === "green" ? "🟢" : w.band === "amber" ? "🟡" : w.band === "red" ? "🔴" : "⚪";
+              return (
+                <div className="rounded-xl border border-line p-3 text-sm flex items-center gap-3">
+                  <span className="text-2xl">{light}</span>
+                  <div className="flex-1">
+                    <div className="font-semibold">Wellbeing check-ins <span className="muted font-normal">· {w.checks} in the last 5 weeks</span></div>
+                    <div className="muted text-xs">{w.note} You see this light only; his answers and his chat with the coach stay private unless there is danger.</div>
+                  </div>
+                </div>
+              );
+            })()}
+
             <div className="rounded-xl border border-accent/40 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold">🦸 Coach&apos;s analysis</span>
@@ -65,7 +86,7 @@ export default async function ProgressPage() {
                     <ul className="text-sm space-y-1">
                       {coach.data.focus.map((f) => (
                         <li key={f.subject} className="rounded-lg bg-warn/10 border border-warn/30 p-2">
-                          <b>Needs practice: {subjectLabel(f.subject)}</b> · {f.why}
+                          <b>Needs practice: {subjectEmoji(f.subject)} {subjectLabel(f.subject)}</b> · {f.why}
                           {f.foundation.length > 0 && <div className="text-xs muted mt-0.5">Foundations: {f.foundation.join(" · ")}</div>}
                         </li>
                       ))}
@@ -74,7 +95,7 @@ export default async function ProgressPage() {
                   {coach.data.accelerate.length > 0 && (
                     <ul className="text-sm space-y-1">
                       {coach.data.accelerate.map((a) => (
-                        <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2"><b>Push harder: {subjectLabel(a.subject)}</b> · {a.plan}</li>
+                        <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2"><b>Push harder: {subjectEmoji(a.subject)} {subjectLabel(a.subject)}</b> · {a.plan}</li>
                       ))}
                     </ul>
                   )}
@@ -116,7 +137,7 @@ export default async function ProgressPage() {
                 const list = school.filter((t) => t.subject === subject);
                 return (
                   <div key={subject}>
-                    <div className="text-sm font-semibold mb-1">{subjectLabel(subject)}</div>
+                    <div className="text-sm font-semibold mb-1">{subjectEmoji(subject)} {subjectLabel(subject)}</div>
                     <div className="flex flex-wrap gap-1">
                       {list.map((t) => (
                         <span key={t.id} title={`${t.name}: ${mastery.has(t.id) ? mastery.get(t.id) + "%" : "not practised"}`} className={`h-4 w-4 rounded ${masteryColor(mastery.get(t.id))}`} />

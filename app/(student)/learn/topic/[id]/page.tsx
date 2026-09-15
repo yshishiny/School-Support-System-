@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ExplainButton, PracticeButton } from "@/components/LearnButtons";
 import { masteryFor } from "@/lib/learning";
 import type { Topic } from "@/lib/types";
-import { subjectLabel } from "@/lib/plan";
+import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import { Tabs } from "@/components/Tabs";
 
 export const maxDuration = 300;
@@ -33,7 +33,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
     <main className="space-y-4" dir={t.language === "ar" ? "rtl" : undefined} lang={t.language === "ar" ? "ar" : undefined}>
       <Link href="/learn" className="text-sm muted">← Learn</Link>
       <header className="card">
-        <div className="text-xs muted">{subjectLabel(t.subject)}{t.unit ? ` · ${t.unit}` : ""}</div>
+        <div className="text-xs muted"><span className="text-base">{subjectEmoji(t.subject)}</span> {subjectLabel(t.subject)}{t.unit ? ` · ${t.unit}` : ""}</div>
         <h1 className="h1">{t.name}</h1>
         {t.description && <p className="muted text-sm mt-1">{t.description}</p>}
         <div className="flex items-center gap-3 mt-3">
