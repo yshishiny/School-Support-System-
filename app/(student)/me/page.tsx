@@ -58,6 +58,12 @@ export default async function MePage() {
 
       <PointsGuide />
 
+      <Link href="/tour" className="card flex items-center gap-3">
+        <span className="text-4xl sticker-still">🗺️</span>
+        <div className="flex-1"><div className="font-bold">Take the tour again</div><div className="text-xs muted">Two minutes: what each tab does and how points work.</div></div>
+        <span className="btn-ghost btn-sm">Open</span>
+      </Link>
+
       <form action={logoutAction}>
         <button className="btn-ghost w-full">Sign out</button>
       </form>

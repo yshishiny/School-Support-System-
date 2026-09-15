@@ -31,6 +31,7 @@ export interface Profile {
   interests: string | null;
   favourite_subjects: string[];
   learner_profile: { answers: Record<string, string>; completed_at: string } | null;
+  tour_seen_at: string | null;
 }
 
 export interface Subject {

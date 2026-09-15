@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, prettyDate } from "@/lib/dates";
@@ -23,6 +24,7 @@ const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frid
 
 export default async function TodayPage() {
   const { profile, family } = await requireStudent();
+  if (!profile.tour_seen_at) redirect("/tour");
   const supabase = await createClient();
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
@@ -109,7 +111,10 @@ export default async function TodayPage() {
               <div className="text-xs muted truncate">{theme.tagline} · Level {lvl.level} · {lvl.into}/{lvl.span} XP</div>
             </div>
           </div>
-          <PrayerPill rows={prayerRows} onTimeCount={onTimeCount} />
+          <div className="flex items-start gap-1.5">
+            <Link href="/tour" className="badge" title="Tour">❓</Link>
+            <PrayerPill rows={prayerRows} onTimeCount={onTimeCount} />
+          </div>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="badge text-base"><b className="text-accent-2">{balance}</b> ⭐</span>
