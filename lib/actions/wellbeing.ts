@@ -94,6 +94,7 @@ export async function coachChatAction(message: string): Promise<ChatReply> {
       grade: profile.grade,
       themeName: themeById(profile.theme).name,
       learner: learnerPromptLine(profile.learner_profile),
+      guidance: profile.professional_guidance,
       notes: (notes ?? []).map((n) => n.note).reverse(),
       history,
       helplines: HELPLINES.map((h) => `${h.name}: ${h.number}`).join("; "),

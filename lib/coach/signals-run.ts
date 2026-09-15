@@ -14,7 +14,7 @@ export interface AttentionResult {
 /** Gathers 14 days of data for one student and runs the deterministic signal rules. No AI. */
 export async function computeAttention(studentId: string): Promise<AttentionResult> {
   const admin = createAdminClient();
-  const { data: profile } = await admin.from("profiles").select("family_id").eq("id", studentId).single();
+  const { data: profile } = await admin.from("profiles").select("family_id, created_at").eq("id", studentId).single();
   const { data: family } = await admin.from("families").select("timezone").eq("id", profile?.family_id ?? "").maybeSingle();
   const tz = family?.timezone ?? "Africa/Cairo";
   const today = todayIn(tz);
@@ -78,6 +78,7 @@ export async function computeAttention(studentId: string): Promise<AttentionResu
     flaggedAttempts: (attempts ?? []).filter((a) => a.flagged).length,
     daysSinceLastChat: lastUser ? Math.floor((Date.now() - new Date(lastUser.created_at).getTime()) / 86400000) : null,
     lastChatWasLow: !!lastAssistant && (lastAssistant.risk_level === "low" || lastAssistant.risk_level === "moderate"),
+    accountAgeDays: profile?.created_at ? Math.floor((Date.now() - new Date(profile.created_at).getTime()) / 86400000) : 0,
   };
   void notes;
   const signals = computeSignals(input);

@@ -37,6 +37,7 @@ export interface SignalInput {
   flaggedAttempts: number;
   daysSinceLastChat: number | null;
   lastChatWasLow: boolean;
+  accountAgeDays: number; // engagement rules need a history to compare against
 }
 
 const FEELING_WORDS = /(tired|exhausted|sad|cry|hate|alone|lonely|scared|anxious|stress|stressed|can'?t sleep|give up|useless|stupid|زهقت|تعبان|حزين|خايف|قلقان|مش قادر|كرهت)/i;
@@ -77,11 +78,12 @@ export function computeSignals(i: SignalInput): Signal[] {
   const late = i.activityHoursLocal.filter((h) => h >= 0 && h < 5).length;
   if (late >= 4) push("late_night_use", `Using the app after midnight on ${late} occasions`, 8, "body");
 
-  // Engagement
-  if (i.plannedDoneLastWeek >= 3 && i.plannedDoneThisWeek <= i.plannedDoneLastWeek / 2) push("engagement_drop", "Quizzes done fell by half compared with last week", 8, "engagement");
-  if (i.checkinsLastWeek >= 4 && i.checkinsThisWeek <= 1) push("engagement_drop", "Stopped checking in after a regular week", 8, "engagement");
+  // Engagement (only once the account has two weeks of history to compare against)
+  const established = i.accountAgeDays >= 14;
+  if (established && i.plannedDoneLastWeek >= 3 && i.plannedDoneThisWeek <= i.plannedDoneLastWeek / 2) push("engagement_drop", "Quizzes done fell by half compared with last week", 8, "engagement");
+  if (established && i.checkinsLastWeek >= 4 && i.checkinsThisWeek <= 1) push("engagement_drop", "Stopped checking in after a regular week", 8, "engagement");
   if (i.longestStreakBefore >= 7 && i.currentStreak === 0) push("streak_broken", "A long streak ended and did not restart", 5, "engagement");
-  if (i.checkinsThisWeek === 0 && i.checkinsLastWeek === 0) push("no_checkins", "No check-ins for two weeks", 6, "engagement");
+  if (established && i.checkinsThisWeek === 0 && i.checkinsLastWeek === 0) push("no_checkins", "No check-ins for two weeks", 6, "engagement");
   const lowMoods = i.checkinMoods.filter((m) => m <= 2).length;
   if (lowMoods >= 2) push("checkin_mood_low", `Marked the day as bad ${lowMoods} times in two weeks`, 8, "wellbeing");
   if (i.stuckOnTexts.some((t) => FEELING_WORDS.test(t))) push("stuck_feelings", "Wrote about feelings, not schoolwork, in the 'stuck on' box", 8, "wellbeing");

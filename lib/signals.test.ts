@@ -20,6 +20,7 @@ const quiet: SignalInput = {
   flaggedAttempts: 0,
   daysSinceLastChat: 2,
   lastChatWasLow: false,
+  accountAgeDays: 60,
 };
 
 describe("computeSignals", () => {
@@ -47,6 +48,11 @@ describe("computeSignals", () => {
     expect(codes).toContain("engagement_drop");
     expect(codes).toContain("high_pressure");
     expect(attentionTier(s).tier).toBe("amber");
+  });
+  it("does not flag missing check-ins or engagement drops on a brand-new account", () => {
+    const s = computeSignals({ ...quiet, accountAgeDays: 1, checkinsThisWeek: 0, checkinsLastWeek: 0, plannedDoneThisWeek: 0, plannedDoneLastWeek: 4 });
+    expect(s.map((x) => x.code)).not.toContain("no_checkins");
+    expect(s.map((x) => x.code)).not.toContain("engagement_drop");
   });
   it("reads feelings written into the 'stuck on' box, in Arabic too", () => {
     const s = computeSignals({ ...quiet, stuckOnTexts: ["مش قادر أركز وتعبان"] });

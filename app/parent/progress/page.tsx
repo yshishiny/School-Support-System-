@@ -4,6 +4,7 @@ import { todayIn } from "@/lib/dates";
 import { EXAM_INFO, examsFor, scaledEstimate, sectionsFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
+import { setProfessionalGuidanceAction } from "@/lib/actions/guidance";
 import type { Profile, Topic } from "@/lib/types";
 import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import ReactMarkdown from "react-markdown";
@@ -187,6 +188,16 @@ export default async function ProgressPage() {
                 ))}
               </div>
             )}
+
+            <form action={setProfessionalGuidanceAction} className="rounded-xl border border-line p-3 space-y-2">
+              <input type="hidden" name="student_id" value={s.id} />
+              <div>
+                <div className="font-semibold text-sm">🩺 Guidance from a professional</div>
+                <div className="text-xs muted">Paste what the specialist recommends (tone, what to avoid, what to practise). The coach and the private chat follow it; the child is never told it exists.</div>
+              </div>
+              <textarea name="guidance" className="input" rows={3} maxLength={3000} defaultValue={s.professional_guidance ?? ""} placeholder="e.g. Avoid competition framing; praise effort not outcome; keep sessions under 20 minutes; encourage sleep before 11pm." />
+              <div className="flex justify-end"><button className="btn-ghost btn-sm">Save guidance</button></div>
+            </form>
 
             <form action={setTargetExamAction} className="grid grid-cols-5 gap-2 items-end">
               <input type="hidden" name="student_id" value={s.id} />
