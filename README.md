@@ -8,6 +8,7 @@ A family study portal for Youssef (grade 10) and Omar (grade 8). Each boy logs i
 - **Lessons on demand**: any topic can be explained in plain English with worked examples and a self-check. Cached after the first request.
 - **Practice sets**: 8 fresh multiple-choice questions per set, instant feedback with an explanation after every answer. New sets weight the skills the student got wrong before and never repeat a prompt.
 - **Review queue**: missed questions come back on a spaced schedule (1 day, then 3, then longer).
+- **Prayers**: the Today page lists the five prayers with real Cairo times. Tapping "Prayed" while the prayer's window is open counts as on time (+3), after it as late (+1), and all five on time adds +10. The window is enforced on the server, so it cannot be back-dated.
 - **Daily recall**: the check-in lists today's classes from the timetable and asks what each covered. Those notes earn points, go into the evening report, and power a "recall quiz" on exactly that material.
 - **ACT and SAT tracks**: mixed timed sets per section with real pacing (enhanced ACT and Digital SAT), plus skill-by-skill practice. The parent sets the target exam and date per child.
 - **Integrity signals**: answering far faster than plausible with a high score, or leaving the tab repeatedly, flags the attempt, pays no points, and shows on the parent's Progress page and in the evening report.
@@ -41,7 +42,11 @@ Next.js 15 (App Router, server actions), Supabase (Postgres, Auth, RLS), Claude 
    ```
 4. **Deploy**: import the repo in Vercel, add the same environment variables, and set `CRON_SECRET` to a long random string. `vercel.json` schedules the report at 18:00 UTC (20:00/21:00 Cairo).
 
-## WhatsApp delivery
+## Report delivery
+
+**Telegram (recommended).** In Telegram, message @BotFather, send `/newbot`, pick a name and a username, and copy the token. Add `TELEGRAM_BOT_TOKEN` and `TELEGRAM_BOT_USERNAME` to the deployment. Then open the bot, tap Start, and on the portal go to More → Telegram delivery → Connect. Reports arrive instantly with no third-party gateway.
+
+## WhatsApp delivery (optional)
 
 Set `WHATSAPP_PROVIDER` to one of:
 

@@ -46,3 +46,50 @@ export async function sendWhatsApp(toPhone: string | null, text: string): Promis
 export function waShareLink(text: string): string {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
+
+/** Telegram bot delivery: official API, no 24-hour window, no third-party gateway. */
+export async function sendTelegram(chatId: string | null, text: string): Promise<SendResult> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { channel: "telegram", ok: false, error: "TELEGRAM_BOT_TOKEN not configured" };
+  if (!chatId) return { channel: "telegram", ok: false, error: "Telegram not connected in Settings" };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+      signal: AbortSignal.timeout(20000),
+    });
+    if (!res.ok) return { channel: "telegram", ok: false, error: `Telegram HTTP ${res.status}: ${(await res.text()).slice(0, 200)}` };
+    return { channel: "telegram", ok: true };
+  } catch (err) {
+    return { channel: "telegram", ok: false, error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Finds the chat that most recently messaged the bot, so the parent can connect by sending /start. */
+export async function findTelegramChat(): Promise<{ chatId: string; name: string } | { error: string }> {
+  const token = process.env.TELEGRAM_BOT_TOKEN;
+  if (!token) return { error: "TELEGRAM_BOT_TOKEN is not configured on the server." };
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getUpdates?limit=100`, { signal: AbortSignal.timeout(15000) });
+    const json = (await res.json()) as { ok: boolean; result?: { message?: { chat: { id: number; type: string; first_name?: string; username?: string } } }[] };
+    if (!json.ok) return { error: "Telegram rejected the bot token." };
+    const chats = (json.result ?? []).map((u) => u.message?.chat).filter((c): c is NonNullable<typeof c> => !!c && c.type === "private");
+    const last = chats[chats.length - 1];
+    if (!last) return { error: "No message found. Open the bot in Telegram, tap Start, then try again." };
+    return { chatId: String(last.id), name: last.first_name ?? last.username ?? "Telegram user" };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/** Sends the report on every configured channel. Success if any channel delivered. */
+export async function deliverReport(family: { parent_whatsapp: string | null; telegram_chat_id: string | null }, text: string): Promise<SendResult> {
+  const results: SendResult[] = [];
+  if (family.telegram_chat_id && process.env.TELEGRAM_BOT_TOKEN) results.push(await sendTelegram(family.telegram_chat_id, text));
+  if (process.env.WHATSAPP_PROVIDER) results.push(await sendWhatsApp(family.parent_whatsapp, text));
+  if (results.length === 0) return { channel: "none", ok: false, error: "No delivery channel configured (Telegram or WhatsApp)" };
+  const ok = results.filter((r) => r.ok);
+  if (ok.length) return { channel: ok.map((r) => r.channel).join("+"), ok: true };
+  return { channel: results.map((r) => r.channel).join("+"), ok: false, error: results.map((r) => `${r.channel}: ${r.error}`).join(" | ") };
+}

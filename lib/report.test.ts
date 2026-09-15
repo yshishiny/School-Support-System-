@@ -26,6 +26,12 @@ describe("buildDailyReport", () => {
         pendingRedemptions: [],
         practice: { sets: 2, correct: 13, total: 16, reviewsDue: 0, flags: ["Geometry set: Answered very fast"] },
         covered: [{ subject: "Math", note: "quadratic formula" }],
+        prayers: [
+          { prayer: "fajr", status: "on_time" },
+          { prayer: "dhuhr", status: "on_time" },
+          { prayer: "asr", status: "late" },
+          { prayer: "maghrib", status: "on_time" },
+        ],
       },
       {
         name: "Omar",
@@ -49,6 +55,7 @@ describe("buildDailyReport", () => {
     expect(text).toContain("Wants to redeem: Pizza night (100 pts)");
     expect(text).toContain("Practice: 2 sets, 13/16 correct (81%)");
     expect(text).toContain("Covered today: Math: quadratic formula");
+    expect(text).toContain("Prayers: 3/5 on time · late: Asr · 1 not logged");
     expect(text).toContain("⚠️ Geometry set: Answered very fast");
   });
 });

@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildDailyReport, type ReportChild } from "@/lib/report";
-import { sendWhatsApp } from "@/lib/whatsapp/send";
+import { deliverReport } from "@/lib/whatsapp/send";
 import { computeStreak } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
 import type { Assignment, AssignmentKind, ItemStatus } from "@/lib/types";
@@ -23,7 +23,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
     const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }, { data: covered }] = await Promise.all([
+    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }, { data: covered }, { data: prayers }] = await Promise.all([
       admin.from("checkins").select("*, checkin_items(status, assignments(title, kind))").eq("student_id", s.id).eq("checkin_date", today).maybeSingle(),
       admin.from("checkins").select("checkin_date").eq("student_id", s.id),
       admin.from("points_ledger").select("delta, created_at").eq("student_id", s.id),
@@ -32,6 +32,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       admin.from("attempts").select("score, total, flagged, flag_reason, quizzes(title)").eq("student_id", s.id).gte("submitted_at", dayAgoIso),
       admin.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", s.id).lte("due_date", today),
       admin.from("lesson_logs").select("subject_name, note").eq("student_id", s.id).eq("log_date", today),
+      admin.from("prayer_logs").select("prayer, status").eq("student_id", s.id).eq("log_date", today),
     ]);
     const done = (attempts ?? []) as unknown as { score: number | null; total: number | null; flagged: boolean; flag_reason: string | null; quizzes: { title: string } | null }[];
     const open = (assignments ?? []) as Assignment[];
@@ -68,6 +69,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
         points: p.points_spent,
       })),
       covered: (covered ?? []).map((l) => ({ subject: l.subject_name, note: l.note })),
+      prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       practice: {
         sets: done.length,
         correct: done.reduce((a, d) => a + (d.score ?? 0), 0),
@@ -79,7 +81,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   }
 
   const body = buildDailyReport(today, children);
-  const send = await sendWhatsApp(family.parent_whatsapp, body);
+  const send = await deliverReport(family, body);
   const row = {
     family_id: familyId,
     report_date: today,

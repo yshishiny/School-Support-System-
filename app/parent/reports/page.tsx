@@ -18,7 +18,7 @@ export default async function ReportsPage() {
       <h1 className="h1">Daily reports</h1>
       <div className="card space-y-3">
         <p className="text-sm muted">
-          A report is generated automatically every evening and sent to {family.parent_whatsapp ? `WhatsApp +${family.parent_whatsapp}` : "WhatsApp once you set your number in Settings"}. You can also trigger it now.
+          A report is generated automatically every evening and sent to {family.telegram_chat_id ? "Telegram" : "Telegram once connected in Settings"}{family.parent_whatsapp ? ` and WhatsApp +${family.parent_whatsapp}` : ""}. You can also trigger it now.
         </p>
         <SendReportButton />
       </div>

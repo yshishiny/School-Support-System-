@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireParent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
+import { findTelegramChat, sendTelegram } from "@/lib/whatsapp/send";
 
 const CHILD_DOMAIN = process.env.CHILD_LOGIN_DOMAIN ?? "study.local";
 
@@ -118,4 +119,30 @@ export async function deleteTimetableAction(formData: FormData) {
   const supabase = await createClient();
   await supabase.from("timetable_entries").delete().eq("id", String(formData.get("id")));
   revalidatePath("/parent/children");
+}
+
+export async function connectTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+  const { family } = await requireParent();
+  const supabase = await createClient();
+  const manual = String(formData.get("telegram_chat_id") ?? "").trim();
+  let chatId = manual;
+  let name = "you";
+  if (!chatId) {
+    const found = await findTelegramChat();
+    if ("error" in found) return { error: found.error };
+    chatId = found.chatId;
+    name = found.name;
+  }
+  const { error } = await supabase.from("families").update({ telegram_chat_id: chatId }).eq("id", family.id);
+  if (error) return { error: error.message };
+  const test = await sendTelegram(chatId, "✅ Study Portal connected. Daily reports will arrive here.");
+  revalidatePath("/parent/settings");
+  return test.ok ? { ok: `Connected to ${name}. A test message was sent.` } : { error: `Saved, but the test message failed: ${test.error}` };
+}
+
+export async function disconnectTelegramAction() {
+  const { family } = await requireParent();
+  const supabase = await createClient();
+  await supabase.from("families").update({ telegram_chat_id: null }).eq("id", family.id);
+  revalidatePath("/parent/settings");
 }

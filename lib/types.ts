@@ -12,6 +12,9 @@ export interface Family {
   parent_whatsapp: string | null;
   timezone: string;
   report_hour: number;
+  telegram_chat_id: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export interface Profile {

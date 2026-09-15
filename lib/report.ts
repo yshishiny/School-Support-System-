@@ -21,6 +21,7 @@ export interface ReportChild {
   pendingRedemptions: { title: string; points: number }[];
   practice?: { sets: number; correct: number; total: number; reviewsDue: number; flags: string[] };
   covered?: { subject: string; note: string }[];
+  prayers?: { prayer: string; status: "on_time" | "late" }[];
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -48,6 +49,12 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
       for (const i of ck.items) lines.push(`  ${statusMark(i.status)} ${KIND_EMOJI[i.kind]} ${i.title}`);
       if (ck.learned) lines.push(`💡 Learned: ${ck.learned.trim()}`);
       if (ck.stuckOn) lines.push(`❓ Stuck on: ${ck.stuckOn.trim()}`);
+    }
+    if (c.prayers) {
+      const onTime = c.prayers.filter((p) => p.status === "on_time").length;
+      const late = c.prayers.filter((p) => p.status === "late").map((p) => p.prayer[0].toUpperCase() + p.prayer.slice(1));
+      const missing = 5 - c.prayers.length;
+      lines.push(`🕌 Prayers: ${onTime}/5 on time${late.length ? ` · late: ${late.join(", ")}` : ""}${missing > 0 ? ` · ${missing} not logged` : ""}`);
     }
     if (c.covered && c.covered.length) {
       lines.push(`📖 Covered today: ${c.covered.map((l) => `${l.subject}: ${l.note}`).join(" · ")}`);

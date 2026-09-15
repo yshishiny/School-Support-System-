@@ -28,12 +28,13 @@ export default async function ParentHome() {
     );
   }
   const ids = students.map((s) => s.id);
-  const [{ data: checkins }, { data: open }, { data: ledger }, { data: pending }, { data: report }] = await Promise.all([
+  const [{ data: checkins }, { data: open }, { data: ledger }, { data: pending }, { data: report }, { data: prayers }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
     supabase.from("redemptions").select("*, rewards(title, emoji, kind, cash_amount_egp), profiles(full_name)").in("student_id", ids).eq("status", "pending"),
     supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
   ]);
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
   const allCk = (checkins ?? []) as CK[];
@@ -86,6 +87,12 @@ export default async function ParentHome() {
               </div>
             )}
 
+            <div className="text-xs muted">
+              🕌 {["fajr", "dhuhr", "asr", "maghrib", "isha"].map((p) => {
+                const log = (prayers ?? []).find((x) => x.student_id === s.id && x.prayer === p);
+                return <span key={p} className="mr-2">{log ? (log.status === "on_time" ? "✅" : "🟡") : "⬜"} {p[0].toUpperCase() + p.slice(1)}</span>;
+              })}
+            </div>
             {overdue.length > 0 && (
               <div className="text-xs text-bad">⏰ Overdue: {overdue.map((o) => o.title).join(", ")}</div>
             )}

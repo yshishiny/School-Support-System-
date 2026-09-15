@@ -5,6 +5,8 @@ import { computeStreak, levelFor } from "@/lib/points";
 import { CheckinForm } from "@/components/CheckinForm";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
 import { PracticeButton } from "@/components/LearnButtons";
+import { PrayerCard, type PrayerRow } from "@/components/PrayerCard";
+import { PRAYERS, formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
 
@@ -19,7 +21,7 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
@@ -27,6 +29,7 @@ export default async function TodayPage() {
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("lesson_logs").select("subject_name, note").eq("student_id", profile.id).eq("log_date", today),
+    supabase.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today),
   ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
@@ -44,6 +47,20 @@ export default async function TodayPage() {
   const existingNotes: Record<string, string> = {};
   (logs ?? []).forEach((l) => (existingNotes[l.subject_name] = l.note));
   const hasNotes = Object.keys(existingNotes).length > 0;
+
+  // Prayers: real Cairo times, on-time window enforced server-side when logging.
+  const now = new Date();
+  const lat = family.latitude ?? 30.0444;
+  const lng = family.longitude ?? 31.2357;
+  const loggedPrayers = new Map<PrayerName, PrayerStatus>((prayers ?? []).map((p) => [p.prayer as PrayerName, p.status as PrayerStatus]));
+  const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({
+    prayer: w.prayer,
+    time: formatPrayerTime(w.start, family.timezone),
+    state: prayerState(w, now),
+    logged: loggedPrayers.get(w.prayer) ?? null,
+  }));
+  const onTimeCount = [...loggedPrayers.values()].filter((s) => s === "on_time").length;
+  void PRAYERS;
 
   const assignments = (open ?? []) as Assignment[];
   const dueNow = assignments.filter((a) => a.due_date !== null && a.due_date <= today);
@@ -103,6 +120,8 @@ export default async function TodayPage() {
           </details>
         </section>
       )}
+
+      <PrayerCard rows={prayerRows} onTimeCount={onTimeCount} />
 
       {hasNotes && (
         <section className="card flex items-center gap-3 border-accent/50">

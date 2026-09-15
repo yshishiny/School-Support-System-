@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { updateFamilyAction } from "@/lib/actions/children";
+import { updateFamilyAction, connectTelegramAction, disconnectTelegramAction } from "@/lib/actions/children";
 import type { Family } from "@/lib/types";
 import { Notice, SubmitButton } from "./ui";
 
@@ -31,5 +31,34 @@ export function SettingsForm({ family }: { family: Family }) {
       <Notice error={state?.error} ok={state?.ok} />
       <SubmitButton pendingText="Saving…">Save</SubmitButton>
     </form>
+  );
+}
+
+export function TelegramSettings({ family, botUsername }: { family: Family; botUsername: string | null }) {
+  const [state, action] = useActionState(connectTelegramAction, undefined);
+  return (
+    <div className="card space-y-3">
+      <h2 className="h2">Telegram delivery</h2>
+      {family.telegram_chat_id ? (
+        <>
+          <p className="text-sm text-good">Connected. Daily reports go to Telegram chat {family.telegram_chat_id}.</p>
+          <form action={disconnectTelegramAction}><button className="btn-ghost btn-sm">Disconnect</button></form>
+        </>
+      ) : (
+        <form action={action} className="space-y-3">
+          <ol className="text-sm muted list-decimal pl-5 space-y-1">
+            <li>Open Telegram and search for {botUsername ? <b className="text-ink">@{botUsername}</b> : "your bot"}.</li>
+            <li>Tap <b className="text-ink">Start</b> and send any message.</li>
+            <li>Come back here and tap Connect.</li>
+          </ol>
+          <div>
+            <label className="label">Or paste your chat ID (from @userinfobot)</label>
+            <input name="telegram_chat_id" className="input" inputMode="numeric" placeholder="optional" />
+          </div>
+          <Notice error={state?.error} ok={state?.ok} />
+          <SubmitButton className="btn-primary" pendingText="Connecting…">Connect Telegram</SubmitButton>
+        </form>
+      )}
+    </div>
   );
 }
