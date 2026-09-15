@@ -17,11 +17,21 @@
 
 html { color-scheme: dark; }
 body {
-  background: radial-gradient(1200px 600px at 20% -10%, #1d1a4a 0%, var(--color-bg) 55%);
+  --theme-glow: #1d1a4a;
+  background: var(--color-bg);
   color: var(--color-ink);
   font-family: var(--font-sans);
   min-height: 100dvh;
 }
+.theme-root {
+  min-height: 100dvh;
+  background: radial-gradient(1200px 600px at 20% -10%, var(--theme-glow) 0%, var(--color-bg) 55%);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
+.pulse { animation: pulse-ring 1.6s ease-out infinite; }
+.ring { background: conic-gradient(var(--color-accent) calc(var(--pct) * 1%), var(--color-panel-2) 0); }
 
 @layer components {
   .card { @apply bg-panel border border-line rounded-2xl p-4 shadow-[0_8px_30px_rgba(0,0,0,.25)]; }

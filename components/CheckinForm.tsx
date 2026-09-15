@@ -44,7 +44,7 @@ export function CheckinForm({
   }
 
   return (
-    <form action={action} className="card space-y-5">
+    <form action={action} className="card space-y-5" noValidate>
       <div className="flex items-center justify-between">
         <h2 className="h2">{existing ? "Update today's check-in" : "Today's check-in"}</h2>
         {existing && <span className="badge text-good">✓ submitted</span>}
@@ -71,7 +71,7 @@ export function CheckinForm({
               <div className="seg">
                 {(["done", "partial", "not_done"] as ItemStatus[]).map((s) => (
                   <label key={s}>
-                    <input type="radio" name={`item_${a.id}`} value={s} defaultChecked={(existingItems[a.id] ?? "not_done") === s} required />
+                    <input type="radio" name={`item_${a.id}`} value={s} defaultChecked={(existingItems[a.id] ?? "not_done") === s} />
                     <span>{s === "done" ? "Done ✅" : s === "partial" ? "Partly 🟡" : "Not yet ❌"}</span>
                   </label>
                 ))}
@@ -113,7 +113,7 @@ export function CheckinForm({
 
       <div>
         <label className="label">What did you learn today? (one or two sentences, your own words)</label>
-        <textarea name="learned" className="input" rows={3} required minLength={10} defaultValue={existing?.learned ?? ""} placeholder="e.g. In math we did the quadratic formula. In bio, how mitochondria make ATP." />
+        <textarea name="learned" className="input" rows={3} defaultValue={existing?.learned ?? ""} placeholder="e.g. In math we did the quadratic formula. In bio, how mitochondria make ATP." />
       </div>
 
       <div>

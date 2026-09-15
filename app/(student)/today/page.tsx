@@ -5,8 +5,9 @@ import { computeStreak, levelFor } from "@/lib/points";
 import { CheckinForm } from "@/components/CheckinForm";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
 import { PracticeButton } from "@/components/LearnButtons";
-import { PrayerCard, type PrayerRow } from "@/components/PrayerCard";
-import { PRAYERS, formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
+import { PrayerPill, type PrayerRow } from "@/components/PrayerPill";
+import { themeById } from "@/lib/themes";
+import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
 
@@ -56,11 +57,12 @@ export default async function TodayPage() {
   const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({
     prayer: w.prayer,
     time: formatPrayerTime(w.start, family.timezone),
+    startMs: w.start.getTime(),
     state: prayerState(w, now),
     logged: loggedPrayers.get(w.prayer) ?? null,
   }));
+  const theme = themeById(profile.theme);
   const onTimeCount = [...loggedPrayers.values()].filter((s) => s === "on_time").length;
-  void PRAYERS;
 
   const assignments = (open ?? []) as Assignment[];
   const dueNow = assignments.filter((a) => a.due_date !== null && a.due_date <= today);
@@ -77,21 +79,23 @@ export default async function TodayPage() {
 
   return (
     <main className="space-y-4">
-      <header className="card flex items-center gap-3">
-        <div className="text-4xl">{profile.avatar_emoji}</div>
-        <div className="flex-1 min-w-0">
-          <div className="font-extrabold text-lg truncate">Hey {profile.full_name.split(" ")[0]} 👋</div>
-          <div className="flex items-center gap-2 text-xs muted">
-            <span>Level {lvl.level}</span>
-            <div className="h-1.5 flex-1 rounded-full bg-panel-2 overflow-hidden">
-              <div className="h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${(lvl.into / lvl.span) * 100}%` }} />
+      <header className="card space-y-3">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="ring h-14 w-14 shrink-0 rounded-full p-[3px]" style={{ ["--pct" as string]: (lvl.into / lvl.span) * 100 }}>
+              <div className="h-full w-full rounded-full bg-panel flex items-center justify-center text-2xl">{profile.avatar_emoji}</div>
             </div>
-            <span>{lvl.into}/{lvl.span}</span>
+            <div className="min-w-0">
+              <div className="font-extrabold text-lg truncate">Hey {profile.full_name.split(" ")[0]} {theme.emoji}</div>
+              <div className="text-xs muted truncate">{theme.tagline} · Level {lvl.level} · {lvl.into}/{lvl.span} XP</div>
+            </div>
           </div>
+          <PrayerPill rows={prayerRows} onTimeCount={onTimeCount} />
         </div>
-        <div className="text-right">
-          <div className="text-xl font-extrabold text-accent-2">{balance} ⭐</div>
-          <div className="text-xs muted">{streak}🔥 streak</div>
+        <div className="flex items-center gap-3 text-sm">
+          <span className="badge"><b className="text-accent-2">{balance}</b> ⭐ points</span>
+          <span className="badge">{streak} 🔥 streak</span>
+          {daysToExam !== null && <span className="badge muted">{profile.target_exam ?? "Exam"} in {daysToExam}d</span>}
         </div>
       </header>
 
@@ -120,8 +124,6 @@ export default async function TodayPage() {
           </details>
         </section>
       )}
-
-      <PrayerCard rows={prayerRows} onTimeCount={onTimeCount} />
 
       {hasNotes && (
         <section className="card flex items-center gap-3 border-accent/50">

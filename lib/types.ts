@@ -27,6 +27,7 @@ export interface Profile {
   locale: string;
   target_exam: string | null;
   target_exam_date: string | null;
+  theme: string;
 }
 
 export interface Subject {

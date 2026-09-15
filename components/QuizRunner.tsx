@@ -14,7 +14,8 @@ export interface RunnerQuestion {
 const LETTERS = ["A", "B", "C", "D"];
 
 export function QuizRunner({
-  attemptId,
+  attemptId: initialAttemptId,
+  quizId,
   questions,
   passage,
   paceSeconds,
@@ -22,7 +23,8 @@ export function QuizRunner({
   backHref,
   title,
 }: {
-  attemptId: string;
+  attemptId: string | null;
+  quizId?: string;
   questions: RunnerQuestion[];
   passage: string | null;
   paceSeconds: number | null;
@@ -30,6 +32,7 @@ export function QuizRunner({
   backHref: string;
   title: string;
 }) {
+  const [attemptId, setAttemptId] = useState<string | null>(initialAttemptId);
   const [index, setIndex] = useState(0);
   const [chosen, setChosen] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<AnswerResult | null>(null);
@@ -62,7 +65,8 @@ export function QuizRunner({
     setError(null);
     try {
       const seconds = (Date.now() - startRef.current) / 1000;
-      const r = await answerQuestionAction(attemptId, q.id, i, seconds);
+      const r = await answerQuestionAction(attemptId, q.id, i, seconds, quizId);
+      setAttemptId(r.attemptId);
       if (r.correct) correctCount.current += 1;
       setChosen(i);
       setFeedback(r);
@@ -84,6 +88,7 @@ export function QuizRunner({
     }
     setBusy(true);
     try {
+      if (!attemptId) throw new Error("No answers recorded.");
       setResult(await finishAttemptAction(attemptId, tabSwitches.current, questions.length));
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not finish.");

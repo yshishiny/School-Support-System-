@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ensureAttempt } from "@/lib/actions/learning";
 import { secondsPerQuestion } from "@/lib/exams";
 import { QuizRunner } from "@/components/QuizRunner";
 import type { Quiz, QuizQuestion } from "@/lib/types";
@@ -23,13 +22,13 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       </main>
     );
   }
-  const attemptId = await ensureAttempt(id);
   const backHref = q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
 
   return (
     <main className="space-y-3">
       <QuizRunner
-        attemptId={attemptId}
+        attemptId={null}
+        quizId={id}
         questions={((questions ?? []) as QuizQuestion[]).map((x) => ({ id: x.id, prompt: x.prompt, choices: x.choices }))}
         passage={q.passage}
         paceSeconds={q.act_section ? secondsPerQuestion(q.act_section) : null}

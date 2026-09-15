@@ -1,10 +1,13 @@
 import { requireStudent } from "@/lib/auth";
 import { BottomNav } from "@/components/Nav";
+import { themeById, themeStyle } from "@/lib/themes";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
-  await requireStudent();
+  const { profile } = await requireStudent();
+  const theme = themeById(profile.theme);
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-4 pb-24">
+    <div className="theme-root" style={themeStyle(theme) as React.CSSProperties} data-theme={theme.id}>
+      <div className="mx-auto max-w-3xl px-4 pt-4 pb-24">
       {children}
       <BottomNav
         items={[
@@ -15,6 +18,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
           { href: "/me", label: "Me", emoji: "🧑‍🚀" },
         ]}
       />
+      </div>
     </div>
   );
 }

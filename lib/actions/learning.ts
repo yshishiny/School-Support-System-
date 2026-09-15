@@ -153,9 +153,19 @@ export interface AnswerResult {
   explanation: string;
 }
 
-export async function answerQuestionAction(attemptId: string, questionId: string, chosenIndex: number, seconds: number): Promise<AnswerResult> {
+export async function answerQuestionAction(
+  attemptId: string | null,
+  questionId: string,
+  chosenIndex: number,
+  seconds: number,
+  quizId?: string,
+): Promise<AnswerResult & { attemptId: string }> {
   const { profile } = await requireStudent();
   const admin = createAdminClient();
+  if (!attemptId) {
+    if (!quizId) throw new Error("Missing quiz.");
+    attemptId = await ensureAttempt(quizId);
+  }
   const { data: attempt } = await admin.from("attempts").select("id, submitted_at").eq("id", attemptId).eq("student_id", profile.id).single();
   if (!attempt || attempt.submitted_at) throw new Error("This attempt is closed.");
   const { data: key } = await admin.from("quiz_answer_keys").select("*").eq("question_id", questionId).single();
@@ -164,7 +174,7 @@ export async function answerQuestionAction(attemptId: string, questionId: string
   await admin
     .from("attempt_answers")
     .upsert({ attempt_id: attemptId, question_id: questionId, chosen_index: chosenIndex, correct, seconds: Math.max(0, Math.round(seconds)) }, { onConflict: "attempt_id,question_id" });
-  return { correct, correct_index: key.correct_index, explanation: key.explanation };
+  return { attemptId, correct, correct_index: key.correct_index, explanation: key.explanation };
 }
 
 export interface FinishResult {

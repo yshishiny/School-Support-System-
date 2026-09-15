@@ -25,7 +25,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   const stuckOn = String(formData.get("stuck_on") ?? "").trim() || null;
 
   if (!learned || learned.length < 10) {
-    return { error: "Write at least one sentence about what you learned today." };
+    return { error: "Almost there: write at least one sentence in “What did you learn today?” (10+ characters), then submit again." };
   }
 
   // Items are posted as item_<assignmentId> = done|partial|not_done
