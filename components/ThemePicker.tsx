@@ -37,7 +37,7 @@ export function ThemePicker({ current }: { current: string }) {
                 className={`rounded-xl border p-2 text-left transition ${selected === t.id ? "border-accent ring-2 ring-accent/40" : "border-line hover:border-accent/60"}`}
                 style={{ background: `linear-gradient(135deg, ${t.vars.panel2}, ${t.vars.bg})`, color: t.vars.ink }}
               >
-                <div className="text-2xl">{t.emoji}</div>
+                <div className="text-2xl">{t.emoji} <span className="text-sm opacity-80">{(t.stickers ?? []).slice(1, 3).join(" ")}</span></div>
                 <div className="text-xs font-bold leading-tight mt-1">{t.name}</div>
                 <div className="flex gap-1 mt-1.5">
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.vars.accent }} />

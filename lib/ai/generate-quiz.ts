@@ -55,6 +55,7 @@ export interface QuizSpec {
   language?: "en" | "ar"; // Arabic for the Egyptian Ministry subjects
   interests?: string | null; // "Real Madrid, gaming, cars" — used to flavour word problems and passages
   themeName?: string | null; // the app theme the student chose, e.g. "Los Blancos"
+  learner?: string | null; // learnerPromptLine(): how they like explanations
 }
 
 const SYSTEM = `You write practice questions for a student at an American-curriculum international school in Egypt. Output multiple-choice questions with exactly four choices (never three, never five) and one correct answer.
@@ -88,6 +89,7 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
     `Language: ${spec.language === "ar" ? "Arabic (Modern Standard, Egyptian curriculum)" : "English"}`,
     `Difficulty: ${spec.difficulty}${spec.difficulty === "hard" ? " (the student is strong here: stretch with multi-step and transfer questions)" : spec.difficulty === "easy" ? " (build foundations: one idea per question, scaffolded)" : ""}`,
     spec.interests ? `Student's interests: ${spec.interests}${spec.themeName ? ` (app theme: ${spec.themeName})` : ""}` : null,
+    spec.learner ? `${spec.learner} Shape the explanations to this (length, tone), not the difficulty.` : null,
     `Number of questions: ${spec.count}`,
     spec.weakSkills.length ? `Give extra weight to these weak skills: ${spec.weakSkills.join("; ")}` : null,
     spec.recallNotes?.length ? `Covered at school today:\n- ${spec.recallNotes.join("\n- ")}` : null,

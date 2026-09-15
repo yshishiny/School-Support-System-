@@ -21,6 +21,7 @@ export interface ExplainSpec {
   topic: string;
   track: "school" | "act" | "sat";
   language?: "en" | "ar";
+  learner?: string | null;
 }
 
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
@@ -39,6 +40,7 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
           spec.unit ? `Unit: ${spec.unit}` : "",
           `Topic: ${spec.topic}`,
           spec.language === "ar" ? "Language: Arabic (write the whole lesson in Arabic)" : "",
+          spec.learner ? `${spec.learner} Adapt the style (analogies vs steps vs examples, length) to this.` : "",
         ]
           .filter(Boolean)
           .join("\n"),

@@ -30,6 +30,7 @@ export interface Profile {
   theme: string;
   interests: string | null;
   favourite_subjects: string[];
+  learner_profile: { answers: Record<string, string>; completed_at: string } | null;
 }
 
 export interface Subject {

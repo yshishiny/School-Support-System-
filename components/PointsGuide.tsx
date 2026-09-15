@@ -48,9 +48,9 @@ export function PointsGuide({ compact = false }: { compact?: boolean }) {
 
 function Tile({ emoji, title, pts, note }: { emoji: string; title: string; pts: string; note: string }) {
   return (
-    <div className="rounded-xl border border-line p-2.5">
-      <div className="flex items-center justify-between">
-        <span>{emoji} <b>{title}</b></span>
+    <div className="tile">
+      <div className="flex items-center justify-between gap-2">
+        <span className="flex items-center gap-2"><span className="text-2xl sticker-still">{emoji}</span> <b>{title}</b></span>
         <span className="text-accent-2 font-bold whitespace-nowrap">{pts}</span>
       </div>
       <div className="text-xs muted mt-0.5">{note}</div>

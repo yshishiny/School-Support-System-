@@ -11,6 +11,7 @@ import { integrityFlag, nextReview, quizPoints, QUIZ_POINTS } from "@/lib/learni
 import { EXAM_SECTIONS, secondsPerQuestion } from "@/lib/exams";
 import { todayIn } from "@/lib/dates";
 import { themeById } from "@/lib/themes";
+import { learnerPromptLine } from "@/lib/learner";
 import type { Topic } from "@/lib/types";
 
 const QUESTIONS_PER_SET = 8;
@@ -29,7 +30,7 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
   if (existing) return {};
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   try {
-    const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language });
+    const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner: learnerPromptLine(profile.learner_profile) });
     await admin.from("lessons").upsert({ topic_id: topicId, grade, content_md: content, model }, { onConflict: "topic_id,grade" });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not write the lesson." };
@@ -103,6 +104,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       language: topic?.language ?? "en",
       interests: profile.interests,
       themeName: themeById(profile.theme).name,
+      learner: learnerPromptLine(profile.learner_profile),
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not generate the quiz." };

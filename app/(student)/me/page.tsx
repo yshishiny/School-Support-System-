@@ -4,6 +4,8 @@ import { logoutAction } from "@/lib/actions/auth";
 import { ThemePicker } from "@/components/ThemePicker";
 import { PointsGuide } from "@/components/PointsGuide";
 import { InterestsForm } from "@/components/InterestsForm";
+import Link from "next/link";
+import { learnerTags, type LearnerProfile } from "@/lib/learner";
 import type { Checkin } from "@/lib/types";
 
 export default async function MePage() {
@@ -26,6 +28,20 @@ export default async function MePage() {
           <p className="muted text-sm">Grade {profile.grade}</p>
         </div>
       </header>
+
+      {(() => {
+        const tags = learnerTags((profile as { learner_profile?: LearnerProfile | null }).learner_profile);
+        return (
+          <Link href="/me/about-me" className="card flex items-center gap-3 border-accent/50">
+            <span className="text-4xl sticker-still">🦸</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold">{tags.length ? "How I learn" : "Tell your coach about you"}</div>
+              <div className="text-xs muted truncate">{tags.length ? tags.slice(0, 3).join(" · ") : "10 quick questions so lessons and quizzes fit you · +15 pts"}</div>
+            </div>
+            <span className="btn-ghost btn-sm">{tags.length ? "Edit" : "Start"}</span>
+          </Link>
+        );
+      })()}
 
       <ThemePicker current={profile.theme} />
 

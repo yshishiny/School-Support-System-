@@ -93,29 +93,42 @@ export default async function TodayPage() {
 
   return (
     <main className="space-y-4">
-      <header className="card space-y-3">
+      <header className="card space-y-3 relative overflow-hidden">
+        <div className="pointer-events-none absolute -right-2 -bottom-3 text-6xl opacity-25 select-none sticker-still" aria-hidden>{(theme.stickers ?? [theme.emoji])[1] ?? theme.emoji}</div>
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="ring h-14 w-14 shrink-0 rounded-full p-[3px]" style={{ ["--pct" as string]: (lvl.into / lvl.span) * 100 }}>
-              <div className="h-full w-full rounded-full bg-panel flex items-center justify-center text-2xl">{profile.avatar_emoji}</div>
+            <div className="ring h-16 w-16 shrink-0 rounded-full p-[3px]" style={{ ["--pct" as string]: (lvl.into / lvl.span) * 100 }}>
+              <div className="h-full w-full rounded-full bg-panel flex items-center justify-center text-3xl">{profile.avatar_emoji}</div>
             </div>
             <div className="min-w-0">
-              <div className="font-extrabold text-lg truncate">Hey {profile.full_name.split(" ")[0]} {theme.emoji}</div>
+              <div className="h1 truncate leading-tight">Hey {profile.full_name.split(" ")[0]} <span className="sticker text-2xl align-middle">{theme.emoji}</span></div>
               <div className="text-xs muted truncate">{theme.tagline} · Level {lvl.level} · {lvl.into}/{lvl.span} XP</div>
             </div>
           </div>
           <PrayerPill rows={prayerRows} onTimeCount={onTimeCount} />
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <span className="badge"><b className="text-accent-2">{balance}</b> ⭐ points</span>
-          <span className="badge">{streak} 🔥 streak</span>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="badge text-base"><b className="text-accent-2">{balance}</b> ⭐</span>
+          <span className="badge text-base">{streak} 🔥</span>
+          <span className="badge"><b className="text-accent-2">{lvl.level}</b> 🏅 level</span>
           {daysToExam !== null && <span className="badge muted">{profile.target_exam ?? "Exam"} in {daysToExam}d</span>}
         </div>
       </header>
 
+      {!(profile as { learner_profile?: unknown }).learner_profile && (
+        <Link href="/me/about-me" className="card flex items-center gap-3 border-accent/50">
+          <span className="text-4xl sticker">🦸</span>
+          <div className="flex-1">
+            <div className="font-bold">Tell your coach about you</div>
+            <div className="text-xs muted">10 quick questions, no wrong answers. +15 pts.</div>
+          </div>
+          <span className="btn-primary btn-sm">Go</span>
+        </Link>
+      )}
+
       {balance < 100 && (
         <Link href="/me#guide" className="card flex items-center gap-3 border-accent-2/50">
-          <span className="text-3xl">🏆</span>
+          <span className="text-4xl sticker-still">🏆</span>
           <div className="flex-1">
             <div className="font-bold">How to win points fast</div>
             <div className="text-xs muted">Prayers +25, check-in +35, practice up to +60, streaks up to +250. See the routine.</div>
@@ -164,7 +177,7 @@ export default async function TodayPage() {
 
       {hasNotes && (
         <section className="card flex items-center gap-3 border-accent/50">
-          <span className="text-3xl">🧠</span>
+          <span className="text-4xl sticker-still">🤔</span>
           <div className="flex-1">
             <div className="font-bold">Recall quiz on today's lessons</div>
             <div className="text-xs muted">{Object.keys(existingNotes).join(", ")}</div>
@@ -188,7 +201,7 @@ export default async function TodayPage() {
       )}
 
       <Link href={(dueReviews ?? 0) > 0 ? "/review" : "/learn"} className="card flex items-center gap-3">
-        <span className="text-3xl">🧠</span>
+        <span className="text-4xl sticker-still">🧠</span>
         <div className="flex-1">
           <div className="font-bold">{(dueReviews ?? 0) > 0 ? `${dueReviews} questions to review` : "Practise 10 minutes"}</div>
           <div className="text-xs muted">

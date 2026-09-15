@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { CoachStats } from "@/lib/coach/analyze";
+import { learnerPromptLine } from "@/lib/learner";
 
 const Schema = z.object({
   headline: z.string().describe("One line for the parent's daily report, max 20 words, e.g. 'Omar: strong in Math, needs foundations in Arabic grammar'"),
@@ -24,6 +25,7 @@ Judge like a good teacher, not a dashboard:
 - Routine counts: check-in streak, class notes written, planned quizzes done vs skipped, prayers on time. Praise real effort specifically.
 - Levels: "hard" only when strong as defined; "easy" when weak; else "medium". Subjects not measured stay "medium".
 - The student's note is in their own words, cheerful and specific, in the voice of their theme (a Real Madrid fan gets a locker-room captain; a future cybersecurity engineer gets a mission briefing), never cheesy, never mentioning grades as threats. Use their first name. Write Arabic subject names in Arabic.
+- If a learner profile is given, match it: the praise style they asked for, their preferred explanation length, and gentle handling when they say mistakes make them feel bad or stress is high (then lead with what went right and make the next step small).
 - Numbers: quote percentages only where they help. Never invent data.`;
 
 export async function runCoach(stats: CoachStats): Promise<CoachOutput & { model: string }> {
@@ -38,6 +40,7 @@ export async function runCoach(stats: CoachStats): Promise<CoachOutput & { model
         `- ${x.subject} (${x.label}): ${x.sets} sets, avg ${x.pct === null ? "not measured" : x.pct + "%"}${x.trend ? `, trend ${x.trend}` : ""}; weakest topics: ${x.weakest.join("; ") || "none"}; strongest: ${x.strongest.join("; ") || "none"}; class notes written: ${x.notesLogged}; planned quizzes done ${x.plannedDone}/${x.planned}.`,
     ),
     stats.exam.sets ? `Exam prep (SAT/ACT): ${stats.exam.sets} sets, avg ${stats.exam.pct}%; sections: ${stats.exam.sections.map((x) => `${x.key} ${x.pct}%`).join(", ")}.` : "Exam prep: no sets yet.",
+    learnerPromptLine(s.learner_profile),
     stats.stuckOn.length ? `Student said they were stuck on: ${stats.stuckOn.join(" | ")}` : null,
     stats.religionNotes.length ? `Religion class notes: ${stats.religionNotes.join(" | ")}` : null,
   ].filter(Boolean);

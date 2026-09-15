@@ -21,8 +21,8 @@ export function BottomNav({ items }: { items: NavItem[] }) {
             (it.href === "/learn" && (path.startsWith("/quiz") || path.startsWith("/review")));
           return (
             <li key={it.href} className="flex-1">
-              <Link href={it.href} className={`flex flex-col items-center gap-0.5 py-2 text-[11px] ${active ? "text-accent-2 font-semibold" : "text-muted"}`}>
-                <span className="text-xl leading-none">{it.emoji}</span>
+              <Link href={it.href} className={`flex flex-col items-center gap-0.5 py-1.5 text-[11px] font-semibold transition ${active ? "text-accent-2" : "text-muted"}`} style={{ fontFamily: "var(--font-display)" }}>
+                <span className={`text-2xl leading-none rounded-2xl px-3 py-1 transition ${active ? "bg-accent/20 -translate-y-0.5 pop" : ""}`}>{it.emoji}</span>
                 {it.label}
               </Link>
             </li>

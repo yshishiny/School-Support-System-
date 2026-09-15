@@ -34,7 +34,7 @@ export function WeekPlanCard({ quizzes, today }: { quizzes: PlannedQuiz[]; today
           return (
             <div key={d} className={`flex flex-col items-center rounded-xl border px-2 py-1.5 min-w-[3.2rem] text-xs ${cls}`}>
               <span className="font-semibold">{d === today ? "Today" : SHORT[wd(d)]}</span>
-              <span className="text-base leading-tight">{state === "done" ? "✅" : state === "today" ? "▶️" : state === "missed" ? "⏰" : "🔒"}</span>
+              <span className="text-xl leading-tight">{state === "done" ? "✅" : state === "today" ? "▶️" : state === "missed" ? "⏰" : "🔒"}</span>
               <span className="muted">{done}/{mine.length}</span>
             </div>
           );
@@ -46,7 +46,7 @@ export function WeekPlanCard({ quizzes, today }: { quizzes: PlannedQuiz[]; today
             const a = q.attempts.find((x) => x.submitted_at);
             return (
               <li key={q.id} className="flex items-center gap-2 text-sm">
-                <span className="text-xl">{q.plan_slot === "school" ? "📘" : q.plan_slot === "arabic" ? "📗" : "🎓"}</span>
+                <span className="text-3xl sticker-still">{q.plan_slot === "school" ? "📘" : q.plan_slot === "arabic" ? "📗" : "🎓"}</span>
                 <span className="flex-1 truncate">{q.title}</span>
                 {a ? <span className="badge text-good">✓ {a.score}/{a.total}</span> : <Link href={`/quiz/${q.id}`} className="btn-primary btn-sm">Start</Link>}
               </li>

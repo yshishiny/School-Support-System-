@@ -6,6 +6,7 @@ import { shiftDate, todayIn } from "@/lib/dates";
 import { masteryMaps, type AttemptWithQuiz } from "@/lib/mastery";
 import type { Profile, Topic } from "@/lib/types";
 import { themeById } from "@/lib/themes";
+import { learnerPromptLine } from "@/lib/learner";
 import type { Level } from "@/lib/plan";
 
 const SCHOOL_SET_SIZE = 8;
@@ -110,6 +111,7 @@ export async function prepareNextPlannedQuiz(studentId: string): Promise<Prepare
       language: topic?.language ?? "en",
       interests: plan.profile.interests,
       themeName: themeById(plan.profile.theme).name,
+      learner: learnerPromptLine(plan.profile.learner_profile),
     });
   } catch (err) {
     return { made: null, remaining: plan.missing.length, error: err instanceof Error ? err.message : "Could not generate the quiz." };
