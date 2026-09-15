@@ -6,6 +6,7 @@ import { generateAndSendReport } from "@/lib/reports/generate";
 
 export async function sendReportNowAction(_prev: { error?: string; ok?: string } | undefined) {
   const { family } = await requireParent();
+  console.log("[daily-report] manual send requested for family", family.id);
   try {
     const r = await generateAndSendReport(family.id, { force: true });
     revalidatePath("/parent/reports");

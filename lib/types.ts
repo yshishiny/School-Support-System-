@@ -124,6 +124,7 @@ export interface DailyReport {
   status: "pending" | "sent" | "failed";
   error: string | null;
   sent_at: string | null;
+  created_at: string;
 }
 
 export const KIND_LABEL: Record<AssignmentKind, string> = {
