@@ -29,7 +29,7 @@ Next.js 15 (App Router, server actions), Supabase (Postgres, Auth, RLS), Claude 
 
 ## Setup
 
-1. **Supabase**: the project `kids-study-portal` already exists and the schema in `supabase/migrations/0001_init.sql` is applied. In the dashboard:
+1. **Supabase**: the project `kids-study-portal` already exists and the schema in `supabase/migrations/` is applied. In the dashboard:
    - Authentication → Providers → Email: turn **off** "Confirm email" (or keep it on and confirm the parent's email once).
    - Project Settings → API: copy the anon key and the service role key.
 2. **Environment**: copy `.env.example` to `.env.local` and fill in the values.
