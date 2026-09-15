@@ -76,7 +76,10 @@ export default async function ProgressPage() {
             <div className="rounded-xl border border-accent/40 p-3 space-y-2">
               <div className="flex items-center justify-between gap-2">
                 <span className="font-semibold">🦸 Coach&apos;s analysis</span>
-                <CoachButton studentId={s.id} hasReport={!!coach} />
+                <div className="flex items-center gap-2">
+                  <a href={`/parent/clinician/${s.id}`} className="text-xs muted underline" title="Summary for a psychiatrist or psychologist">For a professional</a>
+                  <CoachButton studentId={s.id} hasReport={!!coach} />
+                </div>
               </div>
               {coach ? (
                 <>

@@ -14,10 +14,11 @@ export default async function CoachPage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
-  const [{ data: checks }, { data: messages }, { data: report }] = await Promise.all([
+  const [{ data: checks }, { data: messages }, { data: report }, { data: shared }] = await Promise.all([
     supabase.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", profile.id).order("taken_on", { ascending: false }).limit(60),
     supabase.from("coach_messages").select("role, content").eq("student_id", profile.id).order("created_at", { ascending: true }).limit(40),
     supabase.from("coach_reports").select("kid_md, created_at").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("clinician_reports").select("created_at").eq("student_id", profile.id).eq("scope", "with_chat_themes").order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const history = (checks ?? []) as CheckHistoryRow[];
   const due = dueInstruments(today, history);
@@ -72,6 +73,11 @@ export default async function CoachPage() {
           <p className="text-xs muted">Talk, check in, get a plan. {theme.tagline}.</p>
         </div>
       </header>
+      {shared && (
+        <section className="card border-warn/50 text-sm">
+          <b>For your information:</b> on {String(shared.created_at).slice(0, 10)} your parents shared a summary with a doctor that included themes from this chat, as you agreed. Themes only, no quotes. Your chat here stays private otherwise.
+        </section>
+      )}
       <Tabs
         storageKey="coach"
         defaultId={due.length ? "check" : "chat"}
