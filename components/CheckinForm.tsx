@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
-import { submitCheckinAction } from "@/lib/actions/checkin";
+import { useRef, useState, useTransition } from "react";
+import { submitCheckinAction, type CheckinResult } from "@/lib/actions/checkin";
 import { KIND_EMOJI, type Assignment, type Checkin, type ItemStatus } from "@/lib/types";
 import { relativeLabel } from "@/lib/dates";
-import { Notice, SubmitButton } from "./ui";
+import { Notice } from "./ui";
 
 const MOODS = [
   { v: 1, e: "😞" },
@@ -29,7 +29,23 @@ export function CheckinForm({
   todaySubjects: string[];
   existingNotes: Record<string, string>;
 }) {
-  const [state, action] = useActionState(submitCheckinAction, undefined);
+  const [state, setState] = useState<CheckinResult | undefined>(undefined);
+  const [pending, start] = useTransition();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  function submit() {
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    setState(undefined);
+    start(async () => {
+      try {
+        setState(await submitCheckinAction(undefined, fd));
+      } catch (err) {
+        setState({ error: `Could not save (${err instanceof Error ? err.message : String(err)}). Reload the page and try again; what you typed is still here.` });
+      }
+    });
+  }
 
   if (state?.earned !== undefined) {
     return (
@@ -44,7 +60,15 @@ export function CheckinForm({
   }
 
   return (
-    <form action={action} className="card space-y-5" noValidate>
+    <form
+      ref={formRef}
+      className="card space-y-5"
+      noValidate
+      onSubmit={(e) => {
+        e.preventDefault();
+        submit();
+      }}
+    >
       <div className="flex items-center justify-between">
         <h2 className="h2">{existing ? "Update today's check-in" : "Today's check-in"}</h2>
         {existing && <span className="badge text-good">✓ submitted</span>}
@@ -122,9 +146,9 @@ export function CheckinForm({
       </div>
 
       <Notice error={state?.error} />
-      <SubmitButton className="btn-primary w-full text-base" pendingText="Saving…">
-        {existing ? "Update check-in" : "Submit check-in  ·  +10 pts"}
-      </SubmitButton>
+      <button type="submit" className="btn-primary w-full text-base" disabled={pending}>
+        {pending ? "Saving…" : existing ? "Update check-in" : "Submit check-in  ·  +10 pts"}
+      </button>
     </form>
   );
 }

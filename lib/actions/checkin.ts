@@ -16,6 +16,7 @@ export interface CheckinResult {
 
 export async function submitCheckinAction(_prev: CheckinResult | undefined, formData: FormData): Promise<CheckinResult> {
   const { profile, family } = await requireStudent();
+  console.log("[checkin] submit from", profile.id);
   const supabase = await createClient();
   const today = todayIn(family.timezone);
 

@@ -1,6 +1,7 @@
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RedeemButton } from "@/components/RedeemButton";
+import { PointsGuide } from "@/components/PointsGuide";
 import type { PointsEntry, Redemption, Reward } from "@/lib/types";
 
 export default async function RewardsPage() {
@@ -29,6 +30,8 @@ export default async function RewardsPage() {
           <div className="text-xs muted">points available</div>
         </div>
       </header>
+
+      <PointsGuide compact />
 
       <section className="grid grid-cols-2 gap-3">
         {((rewards ?? []) as Reward[]).map((r) => (

@@ -99,6 +99,17 @@ export default async function TodayPage() {
         </div>
       </header>
 
+      {balance < 100 && (
+        <Link href="/me#guide" className="card flex items-center gap-3 border-accent-2/50">
+          <span className="text-3xl">🏆</span>
+          <div className="flex-1">
+            <div className="font-bold">How to win points fast</div>
+            <div className="text-xs muted">Prayers +25, check-in +35, practice up to +60, streaks up to +250. See the routine.</div>
+          </div>
+          <span className="btn-ghost btn-sm">Guide</span>
+        </Link>
+      )}
+
       {week.length > 0 && (
         <section className="card">
           <h2 className="h2 mb-2">{todayRows.length ? `Today at school · ${prettyDate(today)}` : `No classes today (${DAY_NAMES[todayWd]})`}</h2>

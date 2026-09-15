@@ -1,8 +1,8 @@
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/lib/actions/auth";
-import { POINTS } from "@/lib/points";
 import { ThemePicker } from "@/components/ThemePicker";
+import { PointsGuide } from "@/components/PointsGuide";
 import type { Checkin } from "@/lib/types";
 
 export default async function MePage() {
@@ -33,15 +33,7 @@ export default async function MePage() {
         </div>
       </section>
 
-      <section className="card">
-        <h2 className="h2 mb-2">How points work</h2>
-        <ul className="text-sm space-y-1 muted">
-          <li>Daily check-in: <b className="text-ink">+{POINTS.CHECKIN}</b></li>
-          <li>Homework done on time: <b className="text-ink">+{POINTS.HOMEWORK_ON_TIME}</b> each (late: +{POINTS.HOMEWORK_LATE})</li>
-          <li>Everything due today done: <b className="text-ink">+{POINTS.ALL_DONE_BONUS}</b> bonus</li>
-          <li>Streaks: 3 days +20 · 7 days +50 · 14 days +100 · 30 days +250</li>
-        </ul>
-      </section>
+      <PointsGuide />
 
       <form action={logoutAction}>
         <button className="btn-ghost w-full">Sign out</button>
