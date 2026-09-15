@@ -7,6 +7,7 @@ export const QUIZ_POINTS = {
   PER_CORRECT: 1,
   HIGH_SCORE_BONUS: 5, // 80% or better
   REVIEW_COMPLETE: 5,
+  PLANNED_ON_DAY: 5, // finishing a pre-prepared quiz on the day it was planned for
   DAILY_CAP: 60, // practice points per day, so grinding does not outpay real work
 } as const;
 

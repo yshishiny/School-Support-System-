@@ -45,7 +45,10 @@ export default async function ParentHome() {
     <main className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="h1">{prettyDate(today)}</h1>
-        <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
+        <div className="flex gap-2">
+          <Link href="/parent/plan" className="btn-ghost btn-sm">📅 Quiz plan</Link>
+          <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
+        </div>
       </div>
 
       {students.map((s) => {

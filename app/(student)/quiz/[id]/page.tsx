@@ -2,16 +2,28 @@ import { notFound } from "next/navigation";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { secondsPerQuestion } from "@/lib/exams";
+import { prettyDate, todayIn } from "@/lib/dates";
 import { QuizRunner } from "@/components/QuizRunner";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 
 export default async function QuizPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { profile } = await requireStudent();
+  const { profile, family } = await requireStudent();
   const supabase = await createClient();
   const { data: quiz } = await supabase.from("quizzes").select("*").eq("id", id).eq("student_id", profile.id).single();
   if (!quiz) notFound();
   const q = quiz as Quiz;
+  const today = todayIn(family.timezone);
+  if (q.scheduled_for && q.scheduled_for > today) {
+    return (
+      <main className="card space-y-2 text-center">
+        <div className="text-5xl">🔒</div>
+        <p className="h2">Unlocks {prettyDate(q.scheduled_for)}</p>
+        <p className="text-sm muted">One planned quiz per day keeps the streak honest. Today&apos;s quiz is on your home page.</p>
+        <a href="/today" className="btn-primary">Back to today</a>
+      </main>
+    );
+  }
   const { data: questions } = await supabase.from("quiz_questions").select("id, quiz_id, position, prompt, choices, skill_tag").eq("quiz_id", id).order("position");
   if (!questions || questions.length === 0) {
     return (
@@ -22,7 +34,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       </main>
     );
   }
-  const backHref = q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
+  const backHref = q.scheduled_for ? "/today" : q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
 
   return (
     <main className="space-y-3">

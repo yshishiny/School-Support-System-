@@ -8,6 +8,7 @@ A family study portal for Youssef (grade 10) and Omar (grade 8). Each boy logs i
 - **Lessons on demand**: any topic can be explained in plain English with worked examples and a self-check. Cached after the first request.
 - **Practice sets**: 8 fresh multiple-choice questions per set, instant feedback with an explanation after every answer. New sets weight the skills the student got wrong before and never repeat a prompt.
 - **Review queue**: missed questions come back on a spaced schedule (1 day, then 3, then longer).
+- **Weekly quiz plan**: `/parent/plan` shows the next 7 days for each child: one school quiz per school day (subject taken from that day's timetable, topic chosen from the weakest or not-yet-practised ones) plus a daily SAT/ACT set in high school. "Prepare" writes the missing quizzes one by one so nothing waits on the AI when a kid sits down; the `/api/cron/prepare-plan` cron (00:30 UTC) tops the plan up every night. Kids see a day strip on Today, future days are locked, a planned quiz done on its day earns +5 on top of the normal practice points, and missed days stay available as catch-up.
 - **Prayers**: the Today page lists the five prayers with real Cairo times. Tapping "Prayed" while the prayer's window is open counts as on time (+3), after it as late (+1), and all five on time adds +10. The window is enforced on the server, so it cannot be back-dated.
 - **Daily recall**: the check-in lists today's classes from the timetable and asks what each covered. Those notes earn points, go into the evening report, and power a "recall quiz" on exactly that material.
 - **ACT and SAT tracks**: mixed timed sets per section with real pacing (enhanced ACT and Digital SAT), plus skill-by-skill practice. The parent sets the target exam and date per child.
@@ -40,7 +41,7 @@ Next.js 15 (App Router, server actions), Supabase (Postgres, Auth, RLS), Claude 
    npm install --legacy-peer-deps
    npm run dev
    ```
-4. **Deploy**: import the repo in Vercel, add the same environment variables, and set `CRON_SECRET` to a long random string. `vercel.json` schedules the report at 18:00 UTC (20:00/21:00 Cairo).
+4. **Deploy**: import the repo in Vercel, add the same environment variables, and set `CRON_SECRET` to a long random string. `vercel.json` schedules the report at 18:00 UTC (20:00/21:00 Cairo) and the quiz-plan top-up at 00:30 UTC.
 
 ## Report delivery
 

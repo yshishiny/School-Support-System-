@@ -170,6 +170,8 @@ export interface Quiz {
   title: string;
   passage: string | null;
   difficulty: string;
+  scheduled_for: string | null; // set when the quiz belongs to the weekly plan
+  plan_slot: "school" | "exam" | null;
   created_at: string;
 }
 

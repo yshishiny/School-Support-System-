@@ -24,6 +24,7 @@ export function PointsGuide({ compact = false }: { compact?: boolean }) {
         <Tile emoji="📝" title="Homework on time" pts={`+${POINTS.HOMEWORK_ON_TIME} each`} note={`late +${POINTS.HOMEWORK_LATE}, all done +${POINTS.ALL_DONE_BONUS}`} />
         <Tile emoji="🕌" title="Prayers on time" pts={`+${PRAYER_POINTS.ON_TIME} × 5`} note={`all five on time +${PRAYER_POINTS.ALL_ON_TIME_BONUS}`} />
         <Tile emoji="🧠" title="Practice sets" pts={`+${QUIZ_POINTS.COMPLETE} +1/correct`} note={`80%+ adds +${QUIZ_POINTS.HIGH_SCORE_BONUS}, max ${QUIZ_POINTS.DAILY_CAP}/day`} />
+        <Tile emoji="📅" title="Planned quiz on its day" pts={`+${QUIZ_POINTS.PLANNED_ON_DAY} extra`} note="Your week's quizzes are ready on the home page" />
         <Tile emoji="🔥" title="Streaks" pts="+20 / +50 / +100 / +250" note="3, 7, 14, 30 days in a row" />
       </div>
 

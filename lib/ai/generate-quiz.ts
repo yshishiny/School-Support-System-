@@ -4,7 +4,8 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 const QuestionSchema = z.object({
   prompt: z.string(),
-  choices: z.array(z.string()).length(4),
+  // Lenient on purpose: the model occasionally returns 3 or 5 choices; normaliseQuestions() repairs or drops those.
+  choices: z.array(z.string()),
   correct_index: z.number().int().min(0).max(3),
   explanation: z.string().describe("Why the right answer is right and why the tempting wrong one is wrong, in 2-3 short sentences"),
   skill_tag: z.string().describe("Short skill label, e.g. 'slope from two points'"),
@@ -15,6 +16,29 @@ const QuizSchema = z.object({
   questions: z.array(QuestionSchema),
 });
 export type GeneratedQuiz = z.infer<typeof QuizSchema>;
+
+/**
+ * Repairs questions that do not have exactly four choices: extra wrong choices are dropped
+ * (the correct one is always kept) and questions with fewer than four, or a bad correct_index, are removed.
+ */
+export function normaliseQuestions<T extends { choices: string[]; correct_index: number }>(questions: T[]): T[] {
+  const out: T[] = [];
+  for (const q of questions) {
+    const choices = q.choices.map((c) => String(c).trim()).filter((c) => c.length > 0);
+    if (q.correct_index < 0 || q.correct_index >= choices.length) continue;
+    if (choices.length < 4) continue;
+    if (choices.length === 4) {
+      out.push({ ...q, choices });
+      continue;
+    }
+    const correct = choices[q.correct_index];
+    const others = choices.filter((_, i) => i !== q.correct_index).slice(0, 3);
+    const trimmed = [...others];
+    trimmed.splice(Math.min(q.correct_index, 3), 0, correct);
+    out.push({ ...q, choices: trimmed, correct_index: trimmed.indexOf(correct) });
+  }
+  return out;
+}
 
 export interface QuizSpec {
   track: "school" | "act" | "sat";
@@ -30,7 +54,7 @@ export interface QuizSpec {
   recallNotes?: string[]; // "Subject: what was covered today" lines for a daily recall set
 }
 
-const SYSTEM = `You write practice questions for a student at an American-curriculum international school in Egypt. Output multiple-choice questions with exactly four choices and one correct answer.
+const SYSTEM = `You write practice questions for a student at an American-curriculum international school in Egypt. Output multiple-choice questions with exactly four choices (never three, never five) and one correct answer.
 
 Quality rules:
 - Match the grade level and the specific topic. Questions test understanding, not trivia.
@@ -72,7 +96,8 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
   const message = await stream.finalMessage();
   if (message.stop_reason === "refusal") throw new Error("The model declined to generate this quiz.");
   const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  const quiz = QuizSchema.parse(JSON.parse(text));
+  const raw = QuizSchema.parse(JSON.parse(text));
+  const quiz = { ...raw, questions: normaliseQuestions(raw.questions) };
   if (quiz.questions.length === 0) throw new Error("No questions were generated.");
   return quiz;
 }

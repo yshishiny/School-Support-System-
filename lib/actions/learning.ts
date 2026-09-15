@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
 import { explainTopic } from "@/lib/ai/explain-topic";
-import { integrityFlag, nextReview, quizPoints } from "@/lib/learning";
+import { integrityFlag, nextReview, quizPoints, QUIZ_POINTS } from "@/lib/learning";
 import { EXAM_SECTIONS, secondsPerQuestion } from "@/lib/exams";
 import { todayIn } from "@/lib/dates";
 import type { Topic } from "@/lib/types";
@@ -188,7 +188,7 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   const { profile, family } = await requireStudent();
   const admin = createAdminClient();
   const today = todayIn(family.timezone);
-  const { data: attempt } = await admin.from("attempts").select("*, quizzes(act_section)").eq("id", attemptId).eq("student_id", profile.id).single();
+  const { data: attempt } = await admin.from("attempts").select("*, quizzes(act_section, scheduled_for)").eq("id", attemptId).eq("student_id", profile.id).single();
   if (!attempt) throw new Error("Attempt not found.");
   if (attempt.submitted_at) return { score: attempt.score, total: attempt.total, earned: 0, flag: attempt.flag_reason };
 
@@ -196,7 +196,8 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   const list = answers ?? [];
   const score = list.filter((a) => a.correct).length;
   const seconds = list.reduce((s, a) => s + a.seconds, 0);
-  const section = (attempt as { quizzes?: { act_section?: string | null } | null }).quizzes?.act_section ?? null;
+  const quizMeta = (attempt as { quizzes?: { act_section?: string | null; scheduled_for?: string | null } | null }).quizzes ?? null;
+  const section = quizMeta?.act_section ?? null;
   const flag = integrityFlag({
     secondsPerAnswer: list.map((a) => a.seconds),
     score,
@@ -237,8 +238,19 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
       });
       if (error) earned = 0;
     }
+    // Weekly plan: a small extra for doing the planned quiz on its day (outside the daily cap, once per quiz).
+    if (quizMeta?.scheduled_for === today && attempt.quiz_id) {
+      const { error } = await admin.from("points_ledger").insert({
+        student_id: profile.id,
+        delta: QUIZ_POINTS.PLANNED_ON_DAY,
+        reason: "Planned quiz done on its day",
+        ref_type: "planned",
+        ref_id: attempt.quiz_id,
+      });
+      if (!error) earned += QUIZ_POINTS.PLANNED_ON_DAY;
+    }
   }
-  ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress"].forEach((p) => revalidatePath(p));
+  ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
 }
 

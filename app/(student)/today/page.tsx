@@ -6,6 +6,8 @@ import { CheckinForm } from "@/components/CheckinForm";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
 import { PracticeButton } from "@/components/LearnButtons";
 import { PrayerPill, type PrayerRow } from "@/components/PrayerPill";
+import { WeekPlanCard } from "@/components/WeekPlanCard";
+import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { themeById } from "@/lib/themes";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
@@ -22,7 +24,7 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
@@ -31,6 +33,14 @@ export default async function TodayPage() {
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("lesson_logs").select("subject_name, note").eq("student_id", profile.id).eq("log_date", today),
     supabase.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today),
+    supabase
+      .from("quizzes")
+      .select("id, title, scheduled_for, plan_slot, topic_id, act_section, attempts(score, total, submitted_at)")
+      .eq("student_id", profile.id)
+      .not("scheduled_for", "is", null)
+      .gte("scheduled_for", shiftDate(today, -6))
+      .lte("scheduled_for", shiftDate(today, 6))
+      .order("scheduled_for"),
   ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
@@ -135,6 +145,8 @@ export default async function TodayPage() {
           </details>
         </section>
       )}
+
+      <WeekPlanCard quizzes={(planned ?? []) as PlannedQuiz[]} today={today} />
 
       {hasNotes && (
         <section className="card flex items-center gap-3 border-accent/50">
