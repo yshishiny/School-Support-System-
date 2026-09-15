@@ -7,6 +7,7 @@ import { ExplainButton, PracticeButton } from "@/components/LearnButtons";
 import { masteryFor } from "@/lib/learning";
 import type { Topic } from "@/lib/types";
 import { subjectLabel } from "@/lib/plan";
+import { Tabs } from "@/components/Tabs";
 
 export const maxDuration = 300;
 
@@ -41,50 +42,75 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
         </div>
       </header>
 
-      <section className="card space-y-2">
-        <h2 className="h2">Practice</h2>
-        <p className="text-xs muted">8 fresh questions each time, with an explanation after every answer. New sets focus on what you got wrong before.</p>
-        <div className="grid grid-cols-3 gap-2">
-          <PracticeButton topicId={t.id} difficulty="easy" label="Easy" className="btn-ghost w-full" />
-          <PracticeButton topicId={t.id} difficulty="medium" label="Medium" className="btn-primary w-full" />
-          <PracticeButton topicId={t.id} difficulty="hard" label="Hard" className="btn-ghost w-full" />
-        </div>
-      </section>
-
-      <section className="card space-y-3">
-        <h2 className="h2">Lesson</h2>
-        {lesson ? (
-          <article className="prose-lesson text-sm leading-relaxed space-y-2">
-            <ReactMarkdown>{lesson.content_md}</ReactMarkdown>
-          </article>
-        ) : (
-          <>
-            <p className="text-sm muted">Missed this at school, or did not get it? Get a plain-English explanation with worked examples.</p>
-            <ExplainButton topicId={t.id} />
-          </>
-        )}
-      </section>
-
-      {list.length > 0 && (
-        <section className="card">
-          <h2 className="h2 mb-2">Your sets</h2>
-          <ul className="text-sm divide-y divide-line">
-            {list.map((q) => {
-              const a = q.attempts.find((x) => x.submitted_at);
-              return (
-                <li key={q.id} className="py-2 flex items-center justify-between gap-2">
-                  <span className="flex-1">{q.title}</span>
-                  {a ? (
-                    <span className={`badge ${a.flagged ? "text-warn" : ""}`}>{a.score}/{a.total}{a.flagged ? " ⚠️" : ""}</span>
-                  ) : (
-                    <Link href={`/quiz/${q.id}`} className="btn-ghost btn-sm">Continue</Link>
-                  )}
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
+      <Tabs
+        storageKey={`topic-${t.id}`}
+        defaultId={lesson ? "practice" : "lesson"}
+        tabs={[
+          {
+            id: "practice",
+            label: "Practice",
+            emoji: "🧠",
+            content: (
+              <section className="card space-y-2">
+                <p className="text-xs muted">8 fresh questions each time, with an explanation after every answer. New sets focus on what you got wrong before.</p>
+                <div className="grid grid-cols-3 gap-2">
+                  <PracticeButton topicId={t.id} difficulty="easy" label="Easy" className="btn-ghost w-full" />
+                  <PracticeButton topicId={t.id} difficulty="medium" label="Medium" className="btn-primary w-full" />
+                  <PracticeButton topicId={t.id} difficulty="hard" label="Hard" className="btn-ghost w-full" />
+                </div>
+              </section>
+            ),
+          },
+          {
+            id: "lesson",
+            label: "Lesson",
+            emoji: "📖",
+            content: (
+              <section className="card space-y-3">
+                {lesson ? (
+                  <article className="prose-lesson text-sm leading-relaxed space-y-2">
+                    <ReactMarkdown>{lesson.content_md}</ReactMarkdown>
+                  </article>
+                ) : (
+                  <>
+                    <p className="text-sm muted">Missed this at school, or did not get it? Get an explanation with worked examples, written the way you like to learn.</p>
+                    <ExplainButton topicId={t.id} />
+                  </>
+                )}
+              </section>
+            ),
+          },
+          {
+            id: "history",
+            label: "My sets",
+            emoji: "📈",
+            badge: list.length,
+            content: (
+              <section className="card">
+                {list.length === 0 ? (
+                  <p className="text-sm muted">No sets on this topic yet. Your first one shows up here with its score.</p>
+                ) : (
+                  <ul className="text-sm divide-y divide-line">
+                    {list.map((q) => {
+                      const a = q.attempts.find((x) => x.submitted_at);
+                      return (
+                        <li key={q.id} className="py-2 flex items-center justify-between gap-2">
+                          <span className="flex-1">{q.title}</span>
+                          {a ? (
+                            <span className={`badge ${a.flagged ? "text-warn" : ""}`}>{a.score}/{a.total}{a.flagged ? " ⚠️" : ""}</span>
+                          ) : (
+                            <Link href={`/quiz/${q.id}`} className="btn-ghost btn-sm">Continue</Link>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </section>
+            ),
+          },
+        ]}
+      />
     </main>
   );
 }

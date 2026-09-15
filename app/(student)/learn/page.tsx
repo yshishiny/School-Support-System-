@@ -5,10 +5,13 @@ import { todayIn } from "@/lib/dates";
 import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
+import { Tabs } from "@/components/Tabs";
+import { isArabicSubject, subjectLabel, ARABIC_SUBJECTS } from "@/lib/plan";
 import type { Topic } from "@/lib/types";
-import { isArabicSubject, subjectLabel } from "@/lib/plan";
 
 export const maxDuration = 300;
+
+const SUBJECT_EMOJI: Record<string, string> = { Math: "🧮", English: "📚", Science: "🔬", Biology: "🧬", Physics: "⚡", Chemistry: "⚗️", "Social Studies": "🌍", Arabic: "✍️", Religion: "🕌", "Arabic Social Studies": "🏺" };
 
 export default async function LearnPage() {
   const { profile, family } = await requireStudent();
@@ -17,29 +20,28 @@ export default async function LearnPage() {
   const exams = examsFor(profile.target_exam, profile.grade);
   const examTracks = new Set(exams.map(trackFor));
 
-  const [{ data: topics }, { data: attempts }, { count: dueCount }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }] = await Promise.all([
     supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort"),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
+    supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
   ]);
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
   const examTopics = all.filter((t) => examTracks.has(t.track as "act" | "sat"));
   const { topic: mastery, section: sectionMastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);
-  const subjects = [...new Set(school.map((t) => t.subject))];
+  const subjects = [...new Set(school.map((t) => t.subject))].sort((a, b) => Number(isArabicSubject(a)) - Number(isArabicSubject(b)) || a.localeCompare(b));
   const weakest = school
     .filter((t) => mastery.has(t.id) && (mastery.get(t.id) ?? 0) < 70)
     .sort((a, b) => (mastery.get(a.id) ?? 0) - (mastery.get(b.id) ?? 0))
     .slice(0, 3);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
-  return (
-    <main className="space-y-4">
-      <h1 className="h1">Learn</h1>
-
+  const forMe = (
+    <>
       {(dueCount ?? 0) > 0 && (
         <Link href="/review" className="card flex items-center gap-3 border-accent/50">
-          <span className="text-3xl">🔁</span>
+          <span className="text-4xl sticker-still">🔁</span>
           <div className="flex-1">
             <div className="font-bold">{dueCount} question{dueCount === 1 ? "" : "s"} to review</div>
             <div className="text-xs muted">Questions you missed, back at the right time. Quick points.</div>
@@ -47,17 +49,7 @@ export default async function LearnPage() {
           <span className="btn-primary btn-sm">Start</span>
         </Link>
       )}
-
-      <Link href="/learn/memorize" className="card flex items-center gap-3 border-good/40">
-        <span className="text-3xl">📿</span>
-        <div className="flex-1">
-          <div className="font-bold">القرآن والحديث · memorise</div>
-          <div className="text-xs muted">Exact ayahs from any surah, or a hadith from your book. Read, hide, recite. Points every day.</div>
-        </div>
-        <span className="btn-ghost btn-sm">Open</span>
-      </Link>
-
-      {weakest.length > 0 && (
+      {weakest.length > 0 ? (
         <section className="card">
           <h2 className="h2 mb-2">🎯 Work on these</h2>
           <ul className="space-y-1 text-sm">
@@ -69,8 +61,67 @@ export default async function LearnPage() {
             ))}
           </ul>
         </section>
+      ) : (
+        <section className="card flex items-center gap-3">
+          <span className="text-4xl sticker-still">🌱</span>
+          <div className="text-sm"><b>No weak spots found yet.</b> <span className="muted">Do a few sets and this tab fills with what to fix first.</span></div>
+        </section>
       )}
+      <Link href="/today" className="card flex items-center gap-3">
+        <span className="text-4xl sticker-still">📅</span>
+        <div className="flex-1">
+          <div className="font-bold">Today&apos;s planned quizzes</div>
+          <div className="text-xs muted">They are on your home page, ready to go.</div>
+        </div>
+        <span className="btn-ghost btn-sm">Open</span>
+      </Link>
+    </>
+  );
 
+  const subjectTabs = (
+    <Tabs
+      storageKey="learn-subject"
+      size="sm"
+      tabs={subjects.map((subject) => {
+        const list = school.filter((t) => t.subject === subject);
+        const scores = list.map((t) => mastery.get(t.id)).filter((m): m is number => m !== undefined);
+        const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
+        const units = [...new Set(list.map((t) => t.unit ?? ""))];
+        return {
+          id: subject,
+          label: subjectLabel(subject),
+          emoji: SUBJECT_EMOJI[subject] ?? "📘",
+          content: (
+            <section className="card" dir={isArabicSubject(subject) ? "rtl" : undefined}>
+              <div className="flex items-center justify-between mb-2">
+                <h2 className="h2">{SUBJECT_EMOJI[subject] ?? "📘"} {subjectLabel(subject)}</h2>
+                <span className="text-xs muted">{scores.length}/{list.length} practised{avg !== null ? ` · avg ${avg}%` : ""}</span>
+              </div>
+              {units.map((unit) => (
+                <div key={unit} className="mb-2">
+                  {unit && units.length > 1 && <div className="text-xs font-bold muted mt-2 mb-1">{unit}</div>}
+                  <ul className="divide-y divide-line">
+                    {list.filter((t) => (t.unit ?? "") === unit).map((t) => (
+                      <li key={t.id}>
+                        <Link href={`/learn/topic/${t.id}`} className="py-2 flex items-center gap-3 hover:text-accent-2">
+                          <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${masteryColor(mastery.get(t.id))}`} />
+                          <span className="flex-1 text-sm">{t.name}</span>
+                          {mastery.has(t.id) && <span className="text-xs font-semibold">{mastery.get(t.id)}%</span>}
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </section>
+          ),
+        };
+      })}
+    />
+  );
+
+  const examTab = (
+    <>
       {exams.map((exam) => (
         <section key={exam} className="card space-y-3">
           <div className="flex items-center justify-between">
@@ -83,7 +134,7 @@ export default async function LearnPage() {
               const m = sectionMastery.get(key);
               const est = scaledEstimate(exam, m ?? null);
               return (
-                <div key={key} className="rounded-xl border border-line p-3 space-y-2">
+                <div key={key} className="tile space-y-2">
                   <div className="flex justify-between items-baseline">
                     <span className="font-semibold">{s.label}{s.optional ? "*" : ""}</span>
                     <span className="text-xs muted">{est !== null ? `~${est}` : "no data"}</span>
@@ -96,10 +147,9 @@ export default async function LearnPage() {
           </div>
         </section>
       ))}
-
       {exams.length === 2 && (
         <section className="card flex items-center gap-3">
-          <span className="text-3xl">🔀</span>
+          <span className="text-4xl sticker-still">🔀</span>
           <div className="flex-1">
             <div className="font-bold">{EXAM_SECTIONS.mixed.label}</div>
             <div className="text-xs muted">
@@ -110,7 +160,6 @@ export default async function LearnPage() {
           <PracticeButton actSection="mixed" label="Start" className="btn-primary btn-sm" />
         </section>
       )}
-
       {exams.length > 0 && (
         <section className="card">
           <details>
@@ -128,33 +177,34 @@ export default async function LearnPage() {
           </details>
         </section>
       )}
+      {exams.length === 0 && <p className="card muted text-sm">Exam prep opens in grade 9, or when your parent sets a target exam.</p>}
+    </>
+  );
 
-      {subjects.map((subject) => {
-        const list = school.filter((t) => t.subject === subject);
-        const scores = list.map((t) => mastery.get(t.id)).filter((m): m is number => m !== undefined);
-        const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
-        return (
-          <section key={subject} className="card" dir={isArabicSubject(subject) ? "rtl" : undefined}>
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="h2">{subjectLabel(subject)}</h2>
-              <span className="text-xs muted">{scores.length}/{list.length} practised{avg !== null ? ` · avg ${avg}%` : ""}</span>
-            </div>
-            <ul className="divide-y divide-line">
-              {list.map((t) => (
-                <li key={t.id}>
-                  <Link href={`/learn/topic/${t.id}`} className="py-2 flex items-center gap-3 hover:text-accent-2">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${masteryColor(mastery.get(t.id))}`} />
-                    <span className="flex-1 text-sm">{t.name}</span>
-                    {t.unit && <span className="text-xs muted hidden sm:inline">{t.unit}</span>}
-                    {mastery.has(t.id) && <span className="text-xs font-semibold">{mastery.get(t.id)}%</span>}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-        );
-      })}
-      {subjects.length === 0 && <p className="card muted">No curriculum loaded for grade {profile.grade}. Ask your parent to add topics.</p>}
+  const quranTab = (
+    <Link href="/learn/memorize" className="card flex items-center gap-3 border-good/40">
+      <span className="text-4xl sticker-still">📿</span>
+      <div className="flex-1">
+        <div className="font-bold">القرآن والحديث · memorise</div>
+        <div className="text-xs muted">{memorizeCount ? `${memorizeCount} item${memorizeCount === 1 ? "" : "s"} in your list. ` : ""}Exact ayahs from any surah, or a hadith from your book. Read, hide, recite. Points every day.</div>
+      </div>
+      <span className="btn-primary btn-sm">Open</span>
+    </Link>
+  );
+
+  const arabicCount = subjects.filter((s) => ARABIC_SUBJECTS.includes(s)).length;
+  return (
+    <main className="space-y-4">
+      <h1 className="h1">Learn</h1>
+      <Tabs
+        storageKey="learn"
+        tabs={[
+          { id: "me", label: "For me", emoji: "⭐", badge: dueCount ?? 0, content: forMe },
+          { id: "subjects", label: "Subjects", emoji: "📚", badge: null, content: subjects.length ? subjectTabs : <p className="card muted">No curriculum loaded for grade {profile.grade}.</p> },
+          ...(exams.length ? [{ id: "exams", label: exams.join(" & "), emoji: "🎓", badge: null, content: examTab }] : []),
+          { id: "quran", label: arabicCount ? "القرآن" : "Quran", emoji: "📿", badge: memorizeCount ?? 0, content: quranTab },
+        ]}
+      />
     </main>
   );
 }
