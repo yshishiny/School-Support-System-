@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
 import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
+import { snapshotAttention } from "@/lib/coach/signals-run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
   }
   const started = Date.now();
   const admin = createAdminClient();
-  const { data: students } = await admin.from("profiles").select("id, full_name").eq("role", "student");
+  const { data: students } = await admin.from("profiles").select("id, full_name, family_id").eq("role", "student");
   const results: Record<string, string[]> = {};
   const pending = new Set((students ?? []).map((s) => s.id));
   // Round-robin so both kids get quizzes even when the budget runs out.
@@ -31,6 +32,15 @@ export async function GET(request: Request) {
         (results[id] ??= []).push(`error: ${err instanceof Error ? err.message : String(err)}`);
         pending.delete(id);
       }
+    }
+  }
+  // Early-warning signals: cheap, deterministic, every night.
+  for (const s of students ?? []) {
+    try {
+      const r = await snapshotAttention(s.id, s.family_id);
+      (results[s.id] ??= []).push(`signals: ${r.tier} (${r.score})`);
+    } catch (err) {
+      (results[s.id] ??= []).push(`signals error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   // Weekly coach analysis per student, when time remains.

@@ -4,6 +4,7 @@ import { draftClinicianSummary } from "@/lib/ai/clinician";
 import { INSTRUMENTS, type Instrument } from "@/lib/wellbeing";
 import { learnerPromptLine } from "@/lib/learner";
 import { shiftDate } from "@/lib/dates";
+import { computeAttention } from "./signals-run";
 
 export type ClinicianScope = "standard" | "with_chat_themes";
 
@@ -46,7 +47,12 @@ export async function generateClinicianReport(studentId: string, familyId: strin
       : "Private chat with the app coach: EXCLUDED at the family's choice. State this.",
   ].join("\n\n");
 
-  const { content, model } = await draftClinicianSummary(payload);
+  const attention = await computeAttention(studentId);
+  const { data: snapshots } = await admin.from("attention_snapshots").select("taken_on, tier, score, signals").eq("student_id", studentId).gte("taken_on", periodStart).order("taken_on");
+  const signalsBlock = `
+
+Rule-based early-warning signals (deterministic, non-clinical, sensitive by design). Today: tier ${attention.tier}, score ${attention.score}: ${attention.signals.map((x) => `${x.label} [${x.pillar}]`).join("; ") || "none"}. Nightly history: ${(snapshots ?? []).map((r) => `${r.taken_on} ${r.tier} (${r.score})`).join(", ") || "none yet"}.`;
+  const { content, model } = await draftClinicianSummary(payload + signalsBlock);
   const { data, error } = await admin
     .from("clinician_reports")
     .insert({

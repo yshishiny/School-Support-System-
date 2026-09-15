@@ -23,7 +23,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
     const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
-    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }, { data: covered }, { data: prayers }, { data: coach }] = await Promise.all([
+    const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }, { data: covered }, { data: prayers }, { data: coach }, { data: attention }] = await Promise.all([
       admin.from("checkins").select("*, checkin_items(status, assignments(title, kind))").eq("student_id", s.id).eq("checkin_date", today).maybeSingle(),
       admin.from("checkins").select("checkin_date").eq("student_id", s.id),
       admin.from("points_ledger").select("delta, created_at").eq("student_id", s.id),
@@ -34,6 +34,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       admin.from("lesson_logs").select("subject_name, note").eq("student_id", s.id).eq("log_date", today),
       admin.from("prayer_logs").select("prayer, status").eq("student_id", s.id).eq("log_date", today),
       admin.from("coach_reports").select("headline").eq("student_id", s.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+      admin.from("attention_snapshots").select("tier, signals").eq("student_id", s.id).order("taken_on", { ascending: false }).limit(1).maybeSingle(),
     ]);
     const done = (attempts ?? []) as unknown as { score: number | null; total: number | null; flagged: boolean; flag_reason: string | null; quizzes: { title: string } | null }[];
     const open = (assignments ?? []) as Assignment[];
@@ -72,6 +73,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       covered: (covered ?? []).map((l) => ({ subject: l.subject_name, note: l.note })),
       prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       coach: coach?.headline ?? null,
+      attention: attention ? { tier: attention.tier as string, labels: ((attention.signals ?? []) as { label: string }[]).map((x) => x.label) } : null,
       practice: {
         sets: done.length,
         correct: done.reduce((a, d) => a + (d.score ?? 0), 0),

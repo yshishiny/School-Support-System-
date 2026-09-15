@@ -55,7 +55,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
       .lte("scheduled_for", windowEnd)
       .order("scheduled_for"),
     admin.from("lesson_logs").select("topic_id").eq("student_id", studentId).not("topic_id", "is", null).gte("log_date", shiftDate(today, -14)),
-    admin.from("coach_reports").select("levels").eq("student_id", studentId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
+    admin.from("coach_reports").select("levels, data").eq("student_id", studentId).order("created_at", { ascending: false }).limit(1).maybeSingle(),
   ]);
   const allTopics = (topics ?? []) as Topic[];
   const { topic: mastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);
@@ -69,6 +69,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
     existing: planned.filter((q) => q.scheduled_for >= today),
     covered: new Set((covered ?? []).map((c) => c.topic_id as string)),
     levels: ((coach?.levels as Record<string, Level> | null) ?? {}),
+    priority: new Set(((coach?.data as { priority_topic_ids?: string[] } | null)?.priority_topic_ids ?? [])),
     favourites: p.favourite_subjects ?? [],
   });
   return { today, profile: p, wanted, missing, quizzes: planned, topicsById: new Map(allTopics.map((t) => [t.id, t])) };

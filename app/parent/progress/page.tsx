@@ -11,6 +11,7 @@ import { CoachButton } from "@/components/CoachButton";
 import type { CoachReport } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { wellbeingStatus, type CheckHistoryRow } from "@/lib/wellbeing";
+import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
 export default async function ProgressPage() {
   const { family } = await requireParent();
@@ -30,6 +31,8 @@ export default async function ProgressPage() {
   const { data: wbRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, instrument, taken_on, band, score").in("student_id", ids).order("taken_on", { ascending: false }).limit(300) : { data: [] };
   const wellbeingByStudent = new Map<string, ReturnType<typeof wellbeingStatus>>();
   for (const s of students) wellbeingByStudent.set(s.id, wellbeingStatus(((wbRows ?? []) as (CheckHistoryRow & { student_id: string })[]).filter((r) => r.student_id === s.id), today));
+  const attentionByStudent = new Map<string, AttentionResult>();
+  await Promise.all(students.map(async (s) => attentionByStudent.set(s.id, await computeAttention(s.id).catch(() => ({ today, score: 0, tier: "none" as const, signals: [] })))));
   const coachByStudent = new Map<string, CoachReport>();
   for (const r of (coachRows ?? []) as CoachReport[]) if (!coachByStudent.has(r.student_id)) coachByStudent.set(r.student_id, r);
   const allTopics = (topics ?? []) as Topic[];
@@ -69,6 +72,30 @@ export default async function ProgressPage() {
                     <div className="font-semibold">Wellbeing check-ins <span className="muted font-normal">· {w.checks} in the last 5 weeks</span></div>
                     <div className="muted text-xs">{w.note} You see this light only; his answers and his chat with the coach stay private unless there is danger.</div>
                   </div>
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const a = attentionByStudent.get(s.id)!;
+              const icon = a.tier === "red" ? "🚨" : a.tier === "amber" ? "🟡" : a.tier === "watch" ? "👀" : "🟢";
+              const pillars = { wellbeing: "Wellbeing", mindset: "Mindset", body: "Body & habits", engagement: "Engagement", safety: "Safety" } as const;
+              return (
+                <div className={`rounded-xl border p-3 text-sm space-y-1 ${a.tier === "none" ? "border-line" : a.tier === "watch" ? "border-accent/50" : a.tier === "amber" ? "border-warn/60" : "border-bad"}`}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{icon}</span>
+                    <div className="flex-1">
+                      <div className="font-semibold">Early signals <span className="muted font-normal">· last 14 days · {a.tier === "none" ? "nothing to watch" : a.tier === "watch" ? "worth a look, not urgent" : a.tier === "amber" ? "talk this week" : "needs attention now"}</span></div>
+                      <div className="muted text-xs">Rule-based and deliberately sensitive. Labels only; it never shows his answers. You and, if it persists, a professional decide what it means.</div>
+                    </div>
+                  </div>
+                  {a.signals.length > 0 && (
+                    <ul className="text-xs space-y-0.5 pl-1">
+                      {a.signals.map((x) => (
+                        <li key={x.code}><span className="badge mr-1">{pillars[x.pillar]}</span>{x.label}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               );
             })()}

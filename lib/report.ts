@@ -23,6 +23,7 @@ export interface ReportChild {
   covered?: { subject: string; note: string }[];
   prayers?: { prayer: string; status: "on_time" | "late" }[];
   coach?: string | null; // latest coach headline
+  attention?: { tier: string; labels: string[] } | null; // early-warning signals, labels only
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -71,6 +72,10 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
     }
     lines.push(`⭐ +${c.pointsToday} today · balance ${c.balance} · streak ${c.streak}🔥`);
     if (c.coach) lines.push(`🦸 Coach: ${c.coach}`);
+    if (c.attention && c.attention.tier !== "none") {
+      const icon = c.attention.tier === "red" ? "🚨" : c.attention.tier === "amber" ? "🟡" : "👀";
+      lines.push(`${icon} Signals to watch: ${c.attention.labels.slice(0, 3).join("; ")}${c.attention.tier === "watch" ? " (not urgent, worth a look)" : ""}`);
+    }
     if (c.overdue.length) {
       lines.push(`⏰ Overdue: ${c.overdue.map((o) => `${o.title} (${prettyDate(o.due_date)})`).join("; ")}`);
     }

@@ -42,6 +42,9 @@ describe("pickTopic", () => {
     const mastery = new Map([["m1", 90], ["m2", 40]]);
     expect(pickTopic(topics, "Math", mastery, new Set())?.id).toBe("m2");
   });
+  it("schedules a coach-named foundation topic before anything else", () => {
+    expect(pickTopic(topics, "Math", new Map([["m1", 40]]), new Set(), new Set(["m1"]), new Set(["m2"]))?.id).toBe("m2");
+  });
   it("prefers a topic the student logged as taken at school, unless already mastered", () => {
     expect(pickTopic(topics, "Math", new Map(), new Set(), new Set(["m2"]))?.id).toBe("m2");
     expect(pickTopic(topics, "Math", new Map([["m2", 90]]), new Set(), new Set(["m2"]))?.id).toBe("m1");

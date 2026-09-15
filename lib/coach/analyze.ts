@@ -37,6 +37,8 @@ export interface CoachStats {
   religionNotes: string[];
   wellbeing: { instrument: string; band: string | null; score: number | null; taken_on: string }[];
   privateNotes: string[];
+  attention?: { tier: string; score: number; labels: string[] };
+  topicNames: { id: string; subject: string; name: string }[];
 }
 
 interface AttemptRow {
@@ -148,5 +150,6 @@ export async function collectCoachStats(studentId: string, days = 14): Promise<C
     religionNotes: religionNotes.slice(-5),
     wellbeing: (wellbeing ?? []) as { instrument: string; band: string | null; score: number | null; taken_on: string }[],
     privateNotes: (privateNotes ?? []).map((n) => n.note).reverse(),
+    topicNames: allTopics.map((t) => ({ id: t.id, subject: t.subject, name: t.name })),
   };
 }
