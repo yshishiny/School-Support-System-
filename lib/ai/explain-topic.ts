@@ -10,7 +10,7 @@ Structure every lesson as:
 5. **Quick self-check** (3 questions with answers hidden below a "Answers" heading)
 6. **Where to go deeper**: name the matching Khan Academy unit or a typical textbook chapter title, without inventing URLs.
 
-Length: 500-900 words.`;
+Length: 450-700 words.`;
 
 export interface ExplainSpec {
   grade: number | null;
@@ -24,7 +24,8 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
   const client = new Anthropic();
   const stream = client.messages.stream({
     model: "claude-opus-5",
-    max_tokens: 16000,
+    max_tokens: 8000,
+    output_config: { effort: "medium" },
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [
       {

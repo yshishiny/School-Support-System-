@@ -7,6 +7,8 @@ export const POINTS = {
   HOMEWORK_ON_TIME: 5, // each homework/project marked done on or before its due date
   HOMEWORK_LATE: 2, // marked done after the due date
   ALL_DONE_BONUS: 15, // every item due today marked done
+  LESSON_NOTE: 2, // each subject the student describes in "what did you take today"
+  LESSON_NOTE_MAX: 5, // per day
   STREAK_MILESTONES: { 3: 20, 7: 50, 14: 100, 30: 250 } as Record<number, number>,
 } as const;
 

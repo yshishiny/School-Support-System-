@@ -1,7 +1,7 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
-import { EXAM_INFO, scaledEstimate, sectionsFor } from "@/lib/exams";
+import { EXAM_INFO, examsFor, scaledEstimate, sectionsFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
 import type { Profile, Topic } from "@/lib/types";
@@ -33,7 +33,7 @@ export default async function ProgressPage() {
         const thisWeek = mine.filter((a) => a.submitted_at! >= weekAgo);
         const flagged = mine.filter((a) => a.flagged).slice(0, 5);
         const dueCount = (due ?? []).filter((d) => d.student_id === s.id).length;
-        const exam: "ACT" | "SAT" | null = s.target_exam === "SAT" ? "SAT" : s.target_exam === "ACT" || (s.grade ?? 0) >= 9 ? "ACT" : null;
+        const exams = examsFor(s.target_exam, s.grade);
         return (
           <section key={s.id} className="card space-y-4">
             <div className="flex items-center gap-3">
@@ -44,8 +44,8 @@ export default async function ProgressPage() {
               </div>
             </div>
 
-            {exam && (
-              <div className="rounded-xl border border-line p-3 space-y-2">
+            {exams.map((exam) => (
+              <div key={exam} className="rounded-xl border border-line p-3 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="font-semibold">🎓 {exam} readiness</span>
                   {s.target_exam_date && <span className="text-xs muted">target {s.target_exam_date}</span>}
@@ -63,7 +63,8 @@ export default async function ProgressPage() {
                 </div>
                 <p className="text-[11px] muted">Estimates from practice sets ({EXAM_INFO[exam].scale}). Real scores depend on full timed tests.</p>
               </div>
-            )}
+            ))}
+            {section.has("mixed") && <p className="text-xs muted">SAT + ACT mixed sets: {section.get("mixed")}% correct.</p>}
 
             <div className="space-y-2">
               {subjects.map((subject) => {
@@ -99,6 +100,7 @@ export default async function ProgressPage() {
                   <option value="">None</option>
                   <option value="ACT">ACT</option>
                   <option value="SAT">SAT</option>
+                  <option value="BOTH">Both SAT and ACT</option>
                 </select>
               </div>
               <div className="col-span-2">

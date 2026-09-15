@@ -8,6 +8,7 @@ A family study portal for Youssef (grade 10) and Omar (grade 8). Each boy logs i
 - **Lessons on demand**: any topic can be explained in plain English with worked examples and a self-check. Cached after the first request.
 - **Practice sets**: 8 fresh multiple-choice questions per set, instant feedback with an explanation after every answer. New sets weight the skills the student got wrong before and never repeat a prompt.
 - **Review queue**: missed questions come back on a spaced schedule (1 day, then 3, then longer).
+- **Daily recall**: the check-in lists today's classes from the timetable and asks what each covered. Those notes earn points, go into the evening report, and power a "recall quiz" on exactly that material.
 - **ACT and SAT tracks**: mixed timed sets per section with real pacing (enhanced ACT and Digital SAT), plus skill-by-skill practice. The parent sets the target exam and date per child.
 - **Integrity signals**: answering far faster than plausible with a high score, or leaving the tab repeatedly, flags the attempt, pays no points, and shows on the parent's Progress page and in the evening report.
 - **Photo import**: homework, announcements and supply lists shared as photos are read by the AI (English and Arabic). A timetable photo can be read straight into a child's timetable. The real 2026/2027 KIS timetables for grade 8 and grade 10 are built in and loaded automatically when a child account is created.
