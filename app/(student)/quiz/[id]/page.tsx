@@ -14,6 +14,15 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   if (!quiz) notFound();
   const q = quiz as Quiz;
   const { data: questions } = await supabase.from("quiz_questions").select("id, quiz_id, position, prompt, choices, skill_tag").eq("quiz_id", id).order("position");
+  if (!questions || questions.length === 0) {
+    return (
+      <main className="card space-y-2">
+        <p className="h2">This set has no questions</p>
+        <p className="text-sm muted">Generation was interrupted. Go back and start a new set.</p>
+        <a href={q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn"} className="btn-primary">Back</a>
+      </main>
+    );
+  }
   const attemptId = await ensureAttempt(id);
   const backHref = q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
 

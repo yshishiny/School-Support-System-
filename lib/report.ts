@@ -20,6 +20,7 @@ export interface ReportChild {
   overdue: { title: string; kind: AssignmentKind; due_date: string }[];
   pendingRedemptions: { title: string; points: number }[];
   practice?: { sets: number; correct: number; total: number; reviewsDue: number; flags: string[] };
+  covered?: { subject: string; note: string }[];
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -47,6 +48,9 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
       for (const i of ck.items) lines.push(`  ${statusMark(i.status)} ${KIND_EMOJI[i.kind]} ${i.title}`);
       if (ck.learned) lines.push(`💡 Learned: ${ck.learned.trim()}`);
       if (ck.stuckOn) lines.push(`❓ Stuck on: ${ck.stuckOn.trim()}`);
+    }
+    if (c.covered && c.covered.length) {
+      lines.push(`📖 Covered today: ${c.covered.map((l) => `${l.subject}: ${l.note}`).join(" · ")}`);
     }
     if (c.practice) {
       const p = c.practice;

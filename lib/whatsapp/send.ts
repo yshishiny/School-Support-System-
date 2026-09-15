@@ -17,8 +17,10 @@ export async function sendWhatsApp(toPhone: string | null, text: string): Promis
       const key = process.env.CALLMEBOT_API_KEY;
       if (!key) return { channel: provider, ok: false, error: "CALLMEBOT_API_KEY missing" };
       const url = `https://api.callmebot.com/whatsapp.php?phone=${encodeURIComponent(to)}&apikey=${encodeURIComponent(key)}&text=${encodeURIComponent(text)}`;
-      const res = await fetch(url);
-      if (!res.ok) return { channel: provider, ok: false, error: `HTTP ${res.status}` };
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      const reply = (await res.text()).slice(0, 200);
+      if (!res.ok) return { channel: provider, ok: false, error: `CallMeBot HTTP ${res.status}: ${reply}` };
+      if (/error|invalid|not registered/i.test(reply)) return { channel: provider, ok: false, error: `CallMeBot: ${reply}` };
       return { channel: provider, ok: true };
     }
     if (provider === "meta") {
@@ -27,6 +29,7 @@ export async function sendWhatsApp(toPhone: string | null, text: string): Promis
       if (!token || !phoneId) return { channel: provider, ok: false, error: "META_WA_TOKEN / META_WA_PHONE_NUMBER_ID missing" };
       const res = await fetch(`https://graph.facebook.com/v21.0/${phoneId}/messages`, {
         method: "POST",
+        signal: AbortSignal.timeout(20000),
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
         body: JSON.stringify({ messaging_product: "whatsapp", to, type: "text", text: { body: text } }),
       });

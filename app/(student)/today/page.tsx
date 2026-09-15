@@ -4,8 +4,14 @@ import { todayIn, shiftDate, weekdayOf, prettyDate } from "@/lib/dates";
 import { computeStreak, levelFor } from "@/lib/points";
 import { CheckinForm } from "@/components/CheckinForm";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
+import { PracticeButton } from "@/components/LearnButtons";
 import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
+
+export const maxDuration = 300;
+
+const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const SKIP_SUBJECTS = /^(p\.?e\.?|music|art|line)$/i;
 
 export default async function TodayPage() {
   const { profile, family } = await requireStudent();
@@ -13,15 +19,31 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
     supabase.from("subjects").select("*").eq("student_id", profile.id).order("name"),
-    supabase.from("timetable_entries").select("*").eq("student_id", profile.id).eq("weekday", weekdayOf(today)).order("start_time"),
+    supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
+    supabase.from("lesson_logs").select("subject_name, note").eq("student_id", profile.id).eq("log_date", today),
   ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
+
+  // Timetable: today's classes, or the next school day when today is free.
+  const week = (timetable ?? []) as TimetableEntry[];
+  const todayWd = weekdayOf(today);
+  const todayRows = week.filter((t) => t.weekday === todayWd);
+  let nextDay: { name: string; rows: TimetableEntry[] } | null = null;
+  for (let i = 1; i <= 7 && !nextDay; i++) {
+    const wd = (todayWd + i) % 7;
+    const rows = week.filter((t) => t.weekday === wd);
+    if (rows.length) nextDay = { name: i === 1 ? "Tomorrow" : DAY_NAMES[wd], rows };
+  }
+  const todaySubjects = [...new Set(todayRows.map((t) => t.subject_name))].filter((n) => !SKIP_SUBJECTS.test(n.trim()));
+  const existingNotes: Record<string, string> = {};
+  (logs ?? []).forEach((l) => (existingNotes[l.subject_name] = l.note));
+  const hasNotes = Object.keys(existingNotes).length > 0;
 
   const assignments = (open ?? []) as Assignment[];
   const dueNow = assignments.filter((a) => a.due_date !== null && a.due_date <= today);
@@ -56,18 +78,40 @@ export default async function TodayPage() {
         </div>
       </header>
 
-      {(timetable ?? []).length > 0 && (
+      {week.length > 0 && (
         <section className="card">
-          <h2 className="h2 mb-2">Today at school · {prettyDate(today)}</h2>
-          <ul className="space-y-1 text-sm">
-            {(timetable as TimetableEntry[]).map((t) => (
-              <li key={t.id} className="flex gap-3">
-                <span className="muted w-24 shrink-0">{t.start_time.slice(0, 5)}{t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}</span>
-                <span className="font-medium">{t.subject_name}</span>
-                {t.room && <span className="muted">{t.room}</span>}
-              </li>
-            ))}
-          </ul>
+          <h2 className="h2 mb-2">{todayRows.length ? `Today at school · ${prettyDate(today)}` : `No classes today (${DAY_NAMES[todayWd]})`}</h2>
+          {todayRows.length > 0 && <TimetableList rows={todayRows} />}
+          {!todayRows.length && nextDay && (
+            <>
+              <p className="text-sm muted mb-1">{nextDay.name}:</p>
+              <TimetableList rows={nextDay.rows} />
+            </>
+          )}
+          <details className="mt-2">
+            <summary className="cursor-pointer text-sm muted">Full week</summary>
+            <div className="mt-2 space-y-2">
+              {[0, 1, 2, 3, 4, 5, 6]
+                .filter((wd) => week.some((t) => t.weekday === wd))
+                .map((wd) => (
+                  <div key={wd}>
+                    <div className={`text-sm font-semibold ${wd === todayWd ? "text-accent-2" : ""}`}>{DAY_NAMES[wd]}</div>
+                    <TimetableList rows={week.filter((t) => t.weekday === wd)} />
+                  </div>
+                ))}
+            </div>
+          </details>
+        </section>
+      )}
+
+      {hasNotes && (
+        <section className="card flex items-center gap-3 border-accent/50">
+          <span className="text-3xl">🧠</span>
+          <div className="flex-1">
+            <div className="font-bold">Recall quiz on today's lessons</div>
+            <div className="text-xs muted">{Object.keys(existingNotes).join(", ")}</div>
+          </div>
+          <PracticeButton recall label="Start" className="btn-primary btn-sm" />
         </section>
       )}
 
@@ -97,7 +141,7 @@ export default async function TodayPage() {
         <span className="btn-ghost btn-sm">Go</span>
       </Link>
 
-      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} />
+      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} todaySubjects={todaySubjects} existingNotes={existingNotes} />
 
       <details className="card">
         <summary className="cursor-pointer font-semibold">➕ Teacher gave new homework? Add it</summary>
@@ -106,5 +150,19 @@ export default async function TodayPage() {
         </div>
       </details>
     </main>
+  );
+}
+
+function TimetableList({ rows }: { rows: TimetableEntry[] }) {
+  return (
+    <ul className="space-y-1 text-sm">
+      {rows.map((t) => (
+        <li key={t.id} className="flex gap-3">
+          <span className="muted w-24 shrink-0">{t.start_time.slice(0, 5)}{t.end_time ? `–${t.end_time.slice(0, 5)}` : ""}</span>
+          <span className="font-medium">{t.subject_name}</span>
+          {t.room && <span className="muted truncate">{t.room}</span>}
+        </li>
+      ))}
+    </ul>
   );
 }

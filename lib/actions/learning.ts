@@ -39,11 +39,12 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
 
 /** Generates a practice set for a topic or a mixed ACT section and sends the student to it. */
 export async function createQuizAction(_prev: { error?: string } | undefined, formData: FormData) {
-  const { profile } = await requireStudent();
+  const { profile, family } = await requireStudent();
   const topicId = String(formData.get("topic_id") ?? "") || null;
   const actSection = String(formData.get("act_section") ?? "") || null;
+  const recall = String(formData.get("recall") ?? "") === "1";
   const difficulty = (String(formData.get("difficulty") ?? "medium") as "easy" | "medium" | "hard") || "medium";
-  if (!topicId && !actSection) return { error: "Choose a topic or an ACT section." };
+  if (!topicId && !actSection && !recall) return { error: "Choose a topic or an exam section." };
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
 
   const supabase = await createClient();
@@ -55,9 +56,18 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
     if (!topic) return { error: "Topic not found." };
   }
 
+  // Daily recall: questions on what the student wrote they covered at school today.
+  const today = todayIn(family.timezone);
+  let recallNotes: string[] = [];
+  if (recall) {
+    const { data: logs } = await admin.from("lesson_logs").select("subject_name, note").eq("student_id", profile.id).eq("log_date", today);
+    recallNotes = (logs ?? []).map((l) => `${l.subject_name}: ${l.note}`);
+    if (recallNotes.length === 0) return { error: "Write what you covered today in the check-in first." };
+  }
+
   // Weak skills and previously seen prompts, so sets adapt and do not repeat.
   const scope = admin.from("quizzes").select("id").eq("student_id", profile.id);
-  const { data: priorQuizzes } = topicId ? await scope.eq("topic_id", topicId) : await scope.eq("act_section", actSection!);
+  const { data: priorQuizzes } = topicId ? await scope.eq("topic_id", topicId) : recall ? await scope.eq("recall_date", today) : await scope.eq("act_section", actSection!);
   const priorIds = (priorQuizzes ?? []).map((q) => q.id);
   let avoid: string[] = [];
   let weak: string[] = [];
@@ -74,20 +84,21 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
   }
 
   const sectionInfo = actSection ? EXAM_SECTIONS[actSection] : null;
-  const track: "school" | "act" | "sat" = topic ? topic.track : sectionInfo?.exam === "SAT" ? "sat" : "act";
+  const track: "school" | "act" | "sat" = topic ? topic.track : recall ? "school" : sectionInfo?.exam === "SAT" ? "sat" : "act";
   let generated;
   try {
     generated = await generateQuiz({
       track,
       grade: track === "school" ? (topic?.grade ?? profile.grade) : null,
-      subject: topic?.subject ?? `${sectionInfo?.exam ?? "ACT"} ${sectionInfo?.label ?? actSection}`,
+      subject: recall ? "Today's lessons (daily recall)" : topic?.subject ?? `${sectionInfo?.exam === "BOTH" ? "SAT and ACT" : sectionInfo?.exam ?? "ACT"} ${sectionInfo?.label ?? actSection}`,
       unit: topic?.unit ?? null,
-      topic: topic?.name ?? "mixed skills across the whole section",
+      topic: recall ? "what the student covered at school today" : topic?.name ?? (actSection === "mixed" ? "mixed SAT + ACT set across all sections" : "mixed skills across the whole section"),
       actSection: topic?.act_section ?? actSection,
       difficulty,
-      count: QUESTIONS_PER_SET,
+      count: topic ? QUESTIONS_PER_SET : sectionInfo?.setSize ?? QUESTIONS_PER_SET,
       weakSkills: weak,
       avoidPrompts: avoid,
+      recallNotes,
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not generate the quiz." };
@@ -100,6 +111,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       topic_id: topicId,
       track,
       act_section: topic?.act_section ?? actSection,
+      recall_date: recall ? today : null,
       title: generated.title,
       passage: generated.passage,
       difficulty,
@@ -112,7 +124,10 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
     .from("quiz_questions")
     .insert(generated.questions.map((q, i) => ({ quiz_id: quiz.id, position: i + 1, prompt: q.prompt, choices: q.choices, skill_tag: q.skill_tag })))
     .select("id, position");
-  if (qErr || !questions) return { error: qErr?.message ?? "Could not save the questions." };
+  if (qErr || !questions) {
+    await admin.from("quizzes").delete().eq("id", quiz.id);
+    return { error: qErr?.message ?? "Could not save the questions." };
+  }
   await admin.from("quiz_answer_keys").insert(
     questions.map((row) => {
       const src = generated.questions[row.position - 1];
@@ -240,7 +255,7 @@ export async function setTargetExamAction(formData: FormData) {
   const supabase = await createClient();
   const studentId = String(formData.get("student_id"));
   const raw = String(formData.get("target_exam") ?? "").trim();
-  const exam = raw === "ACT" || raw === "SAT" ? raw : null;
+  const exam = raw === "ACT" || raw === "SAT" || raw === "BOTH" ? raw : null;
   const date = String(formData.get("target_exam_date") ?? "") || null;
   await supabase.from("profiles").update({ target_exam: exam, target_exam_date: date }).eq("id", studentId);
   revalidatePath("/parent/progress");

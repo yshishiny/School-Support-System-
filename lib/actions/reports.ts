@@ -13,6 +13,7 @@ export async function sendReportNowAction(_prev: { error?: string; ok?: string }
     if (r.skipped) return { ok: "Already generated." };
     return r.sent ? { ok: `Sent via ${r.channel}.` } : { ok: `Report generated. Not sent: ${r.error}` };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Failed." };
+    console.error("[daily-report] generation failed", err);
+    return { error: `Report failed: ${err instanceof Error ? err.message : String(err)}` };
   }
 }

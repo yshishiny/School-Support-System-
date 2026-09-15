@@ -4,7 +4,7 @@ import { ImportWizard } from "@/components/ImportWizard";
 import { TimetablePhotoWizard } from "@/components/TimetablePhotoWizard";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function ImportPage() {
   const { family } = await requireParent();

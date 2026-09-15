@@ -2,19 +2,19 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
-import { EXAM_INFO, scaledEstimate, sectionsFor, trackFor } from "@/lib/exams";
+import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import type { Topic } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function LearnPage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
-  const exam: "ACT" | "SAT" | null = profile.target_exam === "SAT" ? "SAT" : profile.target_exam === "ACT" || (profile.grade ?? 0) >= 9 ? "ACT" : null;
-  const examTrack = exam ? trackFor(exam) : null;
+  const exams = examsFor(profile.target_exam, profile.grade);
+  const examTracks = new Set(exams.map(trackFor));
 
   const [{ data: topics }, { data: attempts }, { count: dueCount }] = await Promise.all([
     supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort"),
@@ -23,7 +23,7 @@ export default async function LearnPage() {
   ]);
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
-  const examTopics = all.filter((t) => t.track === examTrack);
+  const examTopics = all.filter((t) => examTracks.has(t.track as "act" | "sat"));
   const { topic: mastery, section: sectionMastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);
   const subjects = [...new Set(school.map((t) => t.subject))];
   const weakest = school
@@ -61,13 +61,13 @@ export default async function LearnPage() {
         </section>
       )}
 
-      {exam && (
-        <section className="card space-y-3">
+      {exams.map((exam) => (
+        <section key={exam} className="card space-y-3">
           <div className="flex items-center justify-between">
             <h2 className="h2">🎓 {exam} prep</h2>
-            {daysToExam !== null && <span className="badge text-accent-2">{daysToExam} days to go</span>}
+            {daysToExam !== null && exam === exams[0] && <span className="badge text-accent-2">{daysToExam} days to go</span>}
           </div>
-          <p className="text-xs muted">{EXAM_INFO[exam].blurb} Each set here is 8 timed questions.</p>
+          <p className="text-xs muted">{EXAM_INFO[exam].blurb} Sets are 5 to 8 timed questions.</p>
           <div className="grid grid-cols-2 gap-2">
             {sectionsFor(exam).map(([key, s]) => {
               const m = sectionMastery.get(key);
@@ -84,13 +84,32 @@ export default async function LearnPage() {
               );
             })}
           </div>
+        </section>
+      ))}
+
+      {exams.length === 2 && (
+        <section className="card flex items-center gap-3">
+          <span className="text-3xl">🔀</span>
+          <div className="flex-1">
+            <div className="font-bold">{EXAM_SECTIONS.mixed.label}</div>
+            <div className="text-xs muted">
+              One set alternating SAT and ACT style across all sections.
+              {sectionMastery.has("mixed") ? ` Last: ${sectionMastery.get("mixed")}%` : ""}
+            </div>
+          </div>
+          <PracticeButton actSection="mixed" label="Start" className="btn-primary btn-sm" />
+        </section>
+      )}
+
+      {exams.length > 0 && (
+        <section className="card">
           <details>
-            <summary className="cursor-pointer text-sm muted">Practice one {exam} skill at a time</summary>
+            <summary className="cursor-pointer text-sm muted">Practice one exam skill at a time</summary>
             <ul className="mt-2 divide-y divide-line">
               {examTopics.map((t) => (
                 <li key={t.id} className="py-2 flex items-center gap-2 text-sm">
                   <Link href={`/learn/topic/${t.id}`} className="flex-1 hover:text-accent-2">
-                    <span className="muted">{t.subject.replace(`${exam} `, "")} · </span>{t.name}
+                    <span className="muted">{t.subject} · </span>{t.name}
                   </Link>
                   {mastery.has(t.id) && <span className={`w-2 h-2 rounded-full ${masteryColor(mastery.get(t.id))}`} />}
                 </li>

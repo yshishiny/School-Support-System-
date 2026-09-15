@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { computeAwards, computeStreak } from "@/lib/points";
+import { computeAwards, computeStreak, POINTS } from "@/lib/points";
 import { todayIn } from "@/lib/dates";
 import type { Assignment, ItemStatus } from "@/lib/types";
 
@@ -33,6 +33,15 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   for (const [key, value] of formData.entries()) {
     if (key.startsWith("item_")) itemStatuses[key.slice(5)] = String(value) as ItemStatus;
   }
+  // Lesson notes are posted as lesson_<subject> = what was covered today
+  const lessonNotes: { subject: string; note: string }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (key.startsWith("lesson_")) {
+      const note = String(value).trim();
+      if (note.length >= 3) lessonNotes.push({ subject: key.slice(7), note: note.slice(0, 500) });
+    }
+  }
+
   const ids = Object.keys(itemStatuses);
   const { data: assignments } = ids.length
     ? await supabase.from("assignments").select("*").in("id", ids).eq("student_id", profile.id)
@@ -64,6 +73,13 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     }
   }
 
+  if (lessonNotes.length) {
+    await supabase.from("lesson_logs").upsert(
+      lessonNotes.map((l) => ({ student_id: profile.id, log_date: today, subject_name: l.subject, note: l.note })),
+      { onConflict: "student_id,log_date,subject_name" },
+    );
+  }
+
   // Points: written with the service role because students cannot insert into the ledger.
   const admin = createAdminClient();
   const { data: past } = await admin.from("checkins").select("checkin_date").eq("student_id", profile.id);
@@ -80,6 +96,12 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     })),
   });
   let earned = 0;
+  if (lessonNotes.length) {
+    const { data: logRows } = await admin.from("lesson_logs").select("id").eq("student_id", profile.id).eq("log_date", today);
+    for (const row of (logRows ?? []).slice(0, POINTS.LESSON_NOTE_MAX)) {
+      awards.push({ delta: POINTS.LESSON_NOTE, reason: "Wrote what today's lesson covered", ref_type: "lesson_log", ref_id: row.id });
+    }
+  }
   for (const award of awards) {
     // Unique index on (student, ref_type, ref_id) makes re-submits idempotent.
     const { error: insertError } = await admin.from("points_ledger").insert({ student_id: profile.id, ...award });

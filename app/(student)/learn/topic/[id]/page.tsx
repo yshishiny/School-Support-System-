@@ -7,7 +7,7 @@ import { ExplainButton, PracticeButton } from "@/components/LearnButtons";
 import { masteryFor } from "@/lib/learning";
 import type { Topic } from "@/lib/types";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 export default async function TopicPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -23,6 +23,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   ]);
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };
   const list = (quizzes ?? []) as QZ[];
+  // (sets that failed mid-generation are deleted by the action; nothing else to filter)
   const done = list.flatMap((q) => q.attempts).filter((a) => a.submitted_at && a.total && !a.flagged) as { score: number; total: number; submitted_at: string }[];
   const mastery = masteryFor(done);
 

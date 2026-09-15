@@ -19,11 +19,15 @@ export function CheckinForm({
   today,
   existing,
   existingItems,
+  todaySubjects,
+  existingNotes,
 }: {
   items: Assignment[];
   today: string;
   existing: Checkin | null;
   existingItems: Record<string, ItemStatus>;
+  todaySubjects: string[];
+  existingNotes: Record<string, string>;
 }) {
   const [state, action] = useActionState(submitCheckinAction, undefined);
 
@@ -74,6 +78,19 @@ export function CheckinForm({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {todaySubjects.length > 0 && (
+        <div className="space-y-2">
+          <label className="label">What did you take in each class today? One line each · +2 pts per subject</label>
+          {todaySubjects.map((subject) => (
+            <div key={subject} className="flex items-center gap-2">
+              <span className="w-28 shrink-0 text-sm font-medium truncate" title={subject}>{subject}</span>
+              <input name={`lesson_${subject}`} className="input py-2 text-sm" placeholder="e.g. quadratic formula, chapter 3" defaultValue={existingNotes[subject] ?? ""} maxLength={500} />
+            </div>
+          ))}
+          <p className="text-xs muted">After you submit, you can take a quick recall quiz on exactly these lessons.</p>
         </div>
       )}
 
