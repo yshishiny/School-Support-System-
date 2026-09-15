@@ -37,7 +37,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
   const today = todayIn(family?.timezone ?? "Africa/Cairo");
   const windowEnd = shiftDate(today, 6);
 
-  const [{ data: timetable }, { data: topics }, { data: attempts }, { data: quizzes }] = await Promise.all([
+  const [{ data: timetable }, { data: topics }, { data: attempts }, { data: quizzes }, { data: covered }] = await Promise.all([
     admin.from("timetable_entries").select("weekday, subject_name").eq("student_id", studentId).order("weekday").order("start_time"),
     admin.from("topics").select("*").eq("track", "school").eq("grade", p.grade ?? 0).order("subject").order("sort"),
     admin.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", studentId).not("submitted_at", "is", null),
@@ -49,6 +49,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
       .gte("scheduled_for", shiftDate(today, -6))
       .lte("scheduled_for", windowEnd)
       .order("scheduled_for"),
+    admin.from("lesson_logs").select("topic_id").eq("student_id", studentId).not("topic_id", "is", null).gte("log_date", shiftDate(today, -14)),
   ]);
   const allTopics = (topics ?? []) as Topic[];
   const { topic: mastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);
@@ -60,6 +61,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
     exams: examsFor(p.target_exam, p.grade),
     mastery,
     existing: planned.filter((q) => q.scheduled_for >= today),
+    covered: new Set((covered ?? []).map((c) => c.topic_id as string)),
   });
   return { today, profile: p, wanted, missing, quizzes: planned, topicsById: new Map(allTopics.map((t) => [t.id, t])) };
 }

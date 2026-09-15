@@ -50,6 +50,7 @@ export interface PlanInput {
   exams: ("SAT" | "ACT")[];
   mastery: Map<string, number>; // topic id -> % from past attempts
   existing: ExistingPlanned[];
+  covered?: Set<string>; // topic ids the student logged as taken at school recently
   days?: number;
 }
 
@@ -78,10 +79,15 @@ function dayNumber(isoDate: string): number {
   return Math.floor(Date.parse(isoDate + "T00:00:00Z") / 86400000);
 }
 
-/** Picks the topic to quiz for a subject: weakest practised topic under 70%, else the first unpractised one, else the weakest overall. */
-export function pickTopic(topics: PlanTopic[], subject: string, mastery: Map<string, number>, exclude: Set<string>): PlanTopic | null {
+/**
+ * Picks the topic to quiz for a subject: a recently covered class topic that is not yet mastered (80%+),
+ * else the weakest practised topic under 70%, else the first unpractised one, else the weakest overall.
+ */
+export function pickTopic(topics: PlanTopic[], subject: string, mastery: Map<string, number>, exclude: Set<string>, covered: Set<string> = new Set()): PlanTopic | null {
   const list = topics.filter((t) => t.subject === subject && !exclude.has(t.id)).sort((a, b) => a.sort - b.sort);
   if (list.length === 0) return null;
+  const taught = list.filter((t) => covered.has(t.id) && (mastery.get(t.id) ?? 0) < 80).sort((a, b) => (mastery.get(a.id) ?? -1) - (mastery.get(b.id) ?? -1));
+  if (taught.length) return taught[0];
   const weak = list.filter((t) => mastery.has(t.id) && (mastery.get(t.id) ?? 0) < 70).sort((a, b) => (mastery.get(a.id) ?? 0) - (mastery.get(b.id) ?? 0));
   if (weak.length) return weak[0];
   const fresh = list.find((t) => !mastery.has(t.id));
@@ -115,7 +121,8 @@ export function planSlots(input: PlanInput): { wanted: PlanSlot[]; missing: Plan
       // Prefer a subject not yet used this window so the week covers different subjects.
       const subject = subjects.find((s) => !usedSubjects.includes(s)) ?? subjects[usedSubjects.filter((u) => subjects.includes(u)).length % subjects.length];
       // Reuse a topic only when the subject has nothing else left (a new set is still generated).
-      const topic = pickTopic(input.topics, subject, input.mastery, usedTopics) ?? pickTopic(input.topics, subject, input.mastery, new Set());
+      const covered = input.covered ?? new Set<string>();
+      const topic = pickTopic(input.topics, subject, input.mastery, usedTopics, covered) ?? pickTopic(input.topics, subject, input.mastery, new Set(), covered);
       if (topic) {
         usedTopics.add(topic.id);
         usedSubjects.push(subject);

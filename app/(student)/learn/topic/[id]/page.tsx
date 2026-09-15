@@ -18,7 +18,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
   const [{ data: lesson }, { data: quizzes }] = await Promise.all([
-    supabase.from("lessons").select("content_md").eq("topic_id", id).is("grade", grade).maybeSingle(),
+    supabase.from("lessons").select("content_md").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle(),
     supabase.from("quizzes").select("id, title, created_at, attempts(score, total, submitted_at, flagged)").eq("topic_id", id).eq("student_id", profile.id).order("created_at", { ascending: false }),
   ]);
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };

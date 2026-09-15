@@ -5,7 +5,8 @@ import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { computeAwards, computeStreak, POINTS } from "@/lib/points";
-import { todayIn } from "@/lib/dates";
+import { shiftDate, todayIn } from "@/lib/dates";
+import { parseLessonFieldKey } from "@/lib/lessons";
 import type { Assignment, ItemStatus } from "@/lib/types";
 
 export interface CheckinResult {
@@ -34,13 +35,18 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   for (const [key, value] of formData.entries()) {
     if (key.startsWith("item_")) itemStatuses[key.slice(5)] = String(value) as ItemStatus;
   }
-  // Lesson notes are posted as lesson_<subject> = what was covered today
-  const lessonNotes: { subject: string; note: string }[] = [];
+  // Lesson notes are posted as lesson_<subject> (today) or lesson_<date>__<subject> (a previous day),
+  // with lessontopic_<same key> carrying the curriculum topic id when one was picked.
+  const earliest = shiftDate(today, -7);
+  const lessonNotes: { date: string; subject: string; note: string; topicId: string | null }[] = [];
   for (const [key, value] of formData.entries()) {
-    if (key.startsWith("lesson_")) {
-      const note = String(value).trim();
-      if (note.length >= 3) lessonNotes.push({ subject: key.slice(7), note: note.slice(0, 500) });
-    }
+    if (!key.startsWith("lesson_")) continue;
+    const note = String(value).trim();
+    if (note.length < 2) continue;
+    const { date, subject } = parseLessonFieldKey(key.slice(7), today);
+    if (date > today || date < earliest) continue;
+    const topicId = String(formData.get(`lessontopic_${key.slice(7)}`) ?? "").trim() || null;
+    lessonNotes.push({ date, subject, note: note.slice(0, 500), topicId });
   }
 
   const ids = Object.keys(itemStatuses);
@@ -74,11 +80,16 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     }
   }
 
+  let savedLogs: { id: string; log_date: string }[] = [];
   if (lessonNotes.length) {
-    await supabase.from("lesson_logs").upsert(
-      lessonNotes.map((l) => ({ student_id: profile.id, log_date: today, subject_name: l.subject, note: l.note })),
-      { onConflict: "student_id,log_date,subject_name" },
-    );
+    const { data } = await supabase
+      .from("lesson_logs")
+      .upsert(
+        lessonNotes.map((l) => ({ student_id: profile.id, log_date: l.date, subject_name: l.subject, note: l.note, topic_id: l.topicId })),
+        { onConflict: "student_id,log_date,subject_name" },
+      )
+      .select("id, log_date");
+    savedLogs = data ?? [];
   }
 
   // Points: written with the service role because students cannot insert into the ledger.
@@ -97,11 +108,12 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     })),
   });
   let earned = 0;
-  if (lessonNotes.length) {
-    const { data: logRows } = await admin.from("lesson_logs").select("id").eq("student_id", profile.id).eq("log_date", today);
-    for (const row of (logRows ?? []).slice(0, POINTS.LESSON_NOTE_MAX)) {
-      awards.push({ delta: POINTS.LESSON_NOTE, reason: "Wrote what today's lesson covered", ref_type: "lesson_log", ref_id: row.id });
-    }
+  if (savedLogs.length) {
+    // Today's classes pay full; a previous day filled in later pays less. Each row pays once (unique ref).
+    const todayRows = savedLogs.filter((r) => r.log_date === today).slice(0, POINTS.LESSON_NOTE_MAX);
+    const lateRows = savedLogs.filter((r) => r.log_date !== today).slice(0, POINTS.LESSON_NOTE_MAX);
+    for (const row of todayRows) awards.push({ delta: POINTS.LESSON_NOTE, reason: "Wrote what today's lesson covered", ref_type: "lesson_log", ref_id: row.id });
+    for (const row of lateRows) awards.push({ delta: POINTS.LESSON_NOTE_LATE, reason: "Filled in a previous day's lesson", ref_type: "lesson_log", ref_id: row.id });
   }
   for (const award of awards) {
     // Unique index on (student, ref_type, ref_id) makes re-submits idempotent.

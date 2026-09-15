@@ -5,6 +5,8 @@ import { submitCheckinAction, type CheckinResult } from "@/lib/actions/checkin";
 import { KIND_EMOJI, type Assignment, type Checkin, type ItemStatus } from "@/lib/types";
 import { relativeLabel } from "@/lib/dates";
 import { Notice } from "./ui";
+import { LessonPicker } from "./LessonPicker";
+import { lessonFieldKey, type LessonDay } from "@/lib/lessons";
 
 const MOODS = [
   { v: 1, e: "😞" },
@@ -19,15 +21,13 @@ export function CheckinForm({
   today,
   existing,
   existingItems,
-  todaySubjects,
-  existingNotes,
+  lessonDays,
 }: {
   items: Assignment[];
   today: string;
   existing: Checkin | null;
   existingItems: Record<string, ItemStatus>;
-  todaySubjects: string[];
-  existingNotes: Record<string, string>;
+  lessonDays: LessonDay[];
 }) {
   const [state, setState] = useState<CheckinResult | undefined>(undefined);
   const [pending, start] = useTransition();
@@ -105,18 +105,18 @@ export function CheckinForm({
         </div>
       )}
 
-      {todaySubjects.length > 0 && (
-        <div className="space-y-2">
-          <label className="label">What did you take in each class today? One line each · +2 pts per subject</label>
-          {todaySubjects.map((subject) => (
-            <div key={subject} className="flex items-center gap-2">
-              <span className="w-28 shrink-0 text-sm font-medium truncate" title={subject}>{subject}</span>
-              <input name={`lesson_${subject}`} className="input py-2 text-sm" placeholder="e.g. quadratic formula, chapter 3" defaultValue={existingNotes[subject] ?? ""} maxLength={500} />
-            </div>
+      {lessonDays.map((day) => (
+        <div key={day.date} className="space-y-2">
+          <label className="label">
+            {day.date === today ? "What did you take in each class today?" : `${day.label}: you did not say what you took in these classes`}
+            {day.date === today ? " · +2 pts per class" : " · +1 pt each"}
+          </label>
+          {day.subjects.map((subject) => (
+            <LessonPicker key={`${day.date}-${subject.subject}`} fieldKey={lessonFieldKey(day.date, today, subject.subject)} input={subject} />
           ))}
-          <p className="text-xs muted">After you submit, you can take a quick recall quiz on exactly these lessons.</p>
+          {day.date === today && <p className="text-xs muted">Tap the lesson title. Not sure? The 🤖 helper guesses it from a hint. After you submit you can take a quick recall quiz on these lessons.</p>}
         </div>
-      )}
+      ))}
 
       <div>
         <label className="label">How was today?</label>

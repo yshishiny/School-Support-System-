@@ -24,10 +24,31 @@ body {
   min-height: 100dvh;
 }
 .theme-root {
+  position: relative;
+  isolation: isolate;
   min-height: 100dvh;
   background: radial-gradient(1200px 600px at 20% -10%, var(--theme-glow) 0%, var(--color-bg) 55%);
   color: var(--color-ink);
   font-family: var(--font-sans);
+}
+/* Soft scene behind the page (a football pitch for club themes): blurred, faded and lit by fluffy accent clouds. */
+.theme-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    radial-gradient(420px 320px at 15% 20%, color-mix(in srgb, var(--color-accent) 22%, transparent) 0%, transparent 70%),
+    radial-gradient(520px 380px at 85% 75%, color-mix(in srgb, var(--color-accent-2) 16%, transparent) 0%, transparent 70%),
+    var(--theme-scene, none);
+  background-repeat: no-repeat;
+  background-position: center, center, center 4rem;
+  background-size: auto, auto, min(92vw, 520px) auto;
+  opacity: 0.55;
+  filter: blur(1.6px);
+  mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.55) 60%, rgba(0,0,0,.25));
+  -webkit-mask-image: linear-gradient(to bottom, rgba(0,0,0,.9), rgba(0,0,0,.55) 60%, rgba(0,0,0,.25));
 }
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }
 .pulse { animation: pulse-ring 1.6s ease-out infinite; }
@@ -47,6 +68,8 @@ body {
   .h1 { @apply text-2xl font-extrabold tracking-tight; }
   .h2 { @apply text-lg font-bold; }
   .muted { @apply text-muted; }
+  .chip { @apply rounded-full border border-line bg-panel px-3 py-1 text-xs font-medium text-ink transition hover:border-accent active:scale-95; }
+  .chip-on { @apply border-accent bg-accent/20 text-accent-2; }
   .seg { @apply grid grid-cols-3 gap-1 rounded-xl bg-panel-2 p-1; }
   .seg label { @apply text-center text-sm rounded-lg cursor-pointer select-none text-muted; }
   .seg input { @apply sr-only; }

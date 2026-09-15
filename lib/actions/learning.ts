@@ -24,7 +24,7 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
   const admin = createAdminClient();
-  const { data: existing } = await admin.from("lessons").select("id").eq("topic_id", topicId).is("grade", grade).maybeSingle();
+  const { data: existing } = await admin.from("lessons").select("id").eq("topic_id", topicId).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
   if (existing) return {};
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   try {

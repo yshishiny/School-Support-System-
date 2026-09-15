@@ -8,6 +8,7 @@ import { PracticeButton } from "@/components/LearnButtons";
 import { PrayerPill, type PrayerRow } from "@/components/PrayerPill";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
+import { buildLessonDays } from "@/lib/lessons";
 import { themeById } from "@/lib/themes";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
@@ -16,7 +17,6 @@ import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemS
 export const maxDuration = 300;
 
 const DAY_NAMES = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const SKIP_SUBJECTS = /^(p\.?e\.?|music|art|line)$/i;
 
 export default async function TodayPage() {
   const { profile, family } = await requireStudent();
@@ -24,14 +24,14 @@ export default async function TodayPage() {
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
 
-  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: ledger }, { data: subjects }, { data: timetable }, { count: dueReviews }, { data: logs }, { data: prayers }, { data: planned }, { data: topics }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).order("checkin_date", { ascending: false }),
     supabase.from("points_ledger").select("delta").eq("student_id", profile.id),
     supabase.from("subjects").select("*").eq("student_id", profile.id).order("name"),
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
-    supabase.from("lesson_logs").select("subject_name, note").eq("student_id", profile.id).eq("log_date", today),
+    supabase.from("lesson_logs").select("log_date, subject_name, note, topic_id").eq("student_id", profile.id).gte("log_date", shiftDate(today, -30)).order("log_date"),
     supabase.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today),
     supabase
       .from("quizzes")
@@ -41,6 +41,7 @@ export default async function TodayPage() {
       .gte("scheduled_for", shiftDate(today, -6))
       .lte("scheduled_for", shiftDate(today, 6))
       .order("scheduled_for"),
+    supabase.from("topics").select("id, subject, name, unit, sort").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
   ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
@@ -54,9 +55,10 @@ export default async function TodayPage() {
     const rows = week.filter((t) => t.weekday === wd);
     if (rows.length) nextDay = { name: i === 1 ? "Tomorrow" : DAY_NAMES[wd], rows };
   }
-  const todaySubjects = [...new Set(todayRows.map((t) => t.subject_name))].filter((n) => !SKIP_SUBJECTS.test(n.trim()));
+  const allLogs = (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null }[];
+  const lessonDays = buildLessonDays({ today, timetable: week, topics: topics ?? [], logs: allLogs });
   const existingNotes: Record<string, string> = {};
-  (logs ?? []).forEach((l) => (existingNotes[l.subject_name] = l.note));
+  allLogs.filter((l) => l.log_date === today).forEach((l) => (existingNotes[l.subject_name] = l.note));
   const hasNotes = Object.keys(existingNotes).length > 0;
 
   // Prayers: real Cairo times, on-time window enforced server-side when logging.
@@ -185,7 +187,7 @@ export default async function TodayPage() {
         <span className="btn-ghost btn-sm">Go</span>
       </Link>
 
-      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} todaySubjects={todaySubjects} existingNotes={existingNotes} />
+      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} lessonDays={lessonDays} />
 
       <details className="card">
         <summary className="cursor-pointer font-semibold">➕ Teacher gave new homework? Add it</summary>

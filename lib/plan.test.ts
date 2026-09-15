@@ -36,6 +36,10 @@ describe("pickTopic", () => {
     const mastery = new Map([["m1", 90], ["m2", 40]]);
     expect(pickTopic(topics, "Math", mastery, new Set())?.id).toBe("m2");
   });
+  it("prefers a topic the student logged as taken at school, unless already mastered", () => {
+    expect(pickTopic(topics, "Math", new Map(), new Set(), new Set(["m2"]))?.id).toBe("m2");
+    expect(pickTopic(topics, "Math", new Map([["m2", 90]]), new Set(), new Set(["m2"]))?.id).toBe("m1");
+  });
   it("then the first unpractised topic, skipping excluded ones", () => {
     expect(pickTopic(topics, "Math", new Map(), new Set(["m1"]))?.id).toBe("m2");
   });
