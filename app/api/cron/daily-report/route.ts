@@ -27,5 +27,6 @@ export async function GET(request: Request) {
       results[f.id] = `error: ${err instanceof Error ? err.message : String(err)}`;
     }
   }
+  console.log("[daily-report] cron results", JSON.stringify(results));
   return NextResponse.json({ ok: true, results });
 }

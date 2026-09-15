@@ -8,8 +8,8 @@ import type { Assignment, AssignmentKind, ItemStatus } from "@/lib/types";
 /** Builds today's report for one family, stores it, and tries to send it. */
 export async function generateAndSendReport(familyId: string, opts: { force?: boolean } = {}) {
   const admin = createAdminClient();
-  const { data: family } = await admin.from("families").select("*").eq("id", familyId).single();
-  if (!family) throw new Error("family not found");
+  const { data: family, error: familyError } = await admin.from("families").select("*").eq("id", familyId).single();
+  if (familyError || !family) throw new Error(`Could not load the family: ${familyError?.message ?? "not found"}`);
   const today = todayIn(family.timezone);
   const tomorrow = shiftDate(today, 1);
   const weekAhead = shiftDate(today, 7);
@@ -87,6 +87,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     error: send.ok ? null : send.error ?? null,
     sent_at: send.ok ? new Date().toISOString() : null,
   };
-  await admin.from("daily_reports").upsert(row, { onConflict: "family_id,report_date" });
+  const { error: saveError } = await admin.from("daily_reports").upsert(row, { onConflict: "family_id,report_date" });
+  if (saveError) throw new Error(`Could not save the report: ${saveError.message}`);
   return { skipped: false as const, sent: send.ok, channel: send.channel, error: send.error, body };
 }
