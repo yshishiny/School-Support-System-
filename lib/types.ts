@@ -159,6 +159,7 @@ export interface Topic {
   description: string | null;
   act_section: string | null;
   sort: number;
+  language: "en" | "ar";
 }
 
 export interface Quiz {
@@ -172,6 +173,7 @@ export interface Quiz {
   difficulty: string;
   scheduled_for: string | null; // set when the quiz belongs to the weekly plan
   plan_slot: "school" | "exam" | null;
+  language: "en" | "ar";
   created_at: string;
 }
 

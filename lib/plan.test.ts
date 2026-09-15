@@ -1,19 +1,25 @@
 import { describe, expect, it } from "vitest";
 import { curriculumSubject, pickTopic, planSlots } from "./plan";
 
-const g10 = ["Math", "English", "Biology", "Physics", "Social Studies"];
-const g8 = ["Math", "English", "Science", "Social Studies"];
+const g10 = ["Math", "English", "Biology", "Physics", "Social Studies", "Arabic", "Religion", "Arabic Social Studies"];
+const g8 = ["Math", "English", "Science", "Social Studies", "Arabic", "Religion", "Arabic Social Studies"];
 
 describe("curriculumSubject", () => {
   it("maps timetable names to curriculum subjects", () => {
     expect(curriculumSubject("Math (GPA)", g10)).toBe("Math");
     expect(curriculumSubject("English Pre-SAT", g10)).toBe("English");
     expect(curriculumSubject("History", g10)).toBe("Social Studies");
-    expect(curriculumSubject("Social Studies (M.O.E.)", g8)).toBe("Social Studies");
+    expect(curriculumSubject("Social English", g8)).toBe("Social Studies");
     expect(curriculumSubject("Science", g8)).toBe("Science");
   });
-  it("skips languages, religion, P.E., art and music", () => {
-    for (const n of ["Arabic", "Arabic Social Studies", "Religion", "French / German", "P.E.", "Art", "Music"]) {
+  it("maps the Ministry subjects taught in Arabic", () => {
+    expect(curriculumSubject("Arabic", g10)).toBe("Arabic");
+    expect(curriculumSubject("Arabic Social Studies", g10)).toBe("Arabic Social Studies");
+    expect(curriculumSubject("Social Studies (M.O.E.)", g8)).toBe("Arabic Social Studies");
+    expect(curriculumSubject("Religion", g8)).toBe("Religion");
+  });
+  it("skips foreign languages, P.E., art and music", () => {
+    for (const n of ["French / German", "P.E.", "Art", "Music"]) {
       expect(curriculumSubject(n, g10)).toBeNull();
     }
   });

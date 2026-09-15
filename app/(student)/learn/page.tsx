@@ -6,6 +6,7 @@ import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackF
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import type { Topic } from "@/lib/types";
+import { isArabicSubject, subjectLabel } from "@/lib/plan";
 
 export const maxDuration = 300;
 
@@ -53,7 +54,7 @@ export default async function LearnPage() {
           <ul className="space-y-1 text-sm">
             {weakest.map((t) => (
               <li key={t.id} className="flex items-center justify-between gap-2">
-                <Link href={`/learn/topic/${t.id}`} className="flex-1 hover:text-accent-2">{t.subject}: {t.name}</Link>
+                <Link href={`/learn/topic/${t.id}`} className="flex-1 hover:text-accent-2">{subjectLabel(t.subject)}: {t.name}</Link>
                 <span className="badge text-warn">{mastery.get(t.id)}%</span>
               </li>
             ))}
@@ -124,9 +125,9 @@ export default async function LearnPage() {
         const scores = list.map((t) => mastery.get(t.id)).filter((m): m is number => m !== undefined);
         const avg = scores.length ? Math.round(scores.reduce((a, b) => a + b, 0) / scores.length) : null;
         return (
-          <section key={subject} className="card">
+          <section key={subject} className="card" dir={isArabicSubject(subject) ? "rtl" : undefined}>
             <div className="flex items-center justify-between mb-2">
-              <h2 className="h2">{subject}</h2>
+              <h2 className="h2">{subjectLabel(subject)}</h2>
               <span className="text-xs muted">{scores.length}/{list.length} practised{avg !== null ? ` · avg ${avg}%` : ""}</span>
             </div>
             <ul className="divide-y divide-line">

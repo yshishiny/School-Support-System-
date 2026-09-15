@@ -5,6 +5,7 @@ import { EXAM_INFO, examsFor, scaledEstimate, sectionsFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
 import type { Profile, Topic } from "@/lib/types";
+import { subjectLabel } from "@/lib/plan";
 
 export default async function ProgressPage() {
   const { family } = await requireParent();
@@ -71,7 +72,7 @@ export default async function ProgressPage() {
                 const list = school.filter((t) => t.subject === subject);
                 return (
                   <div key={subject}>
-                    <div className="text-sm font-semibold mb-1">{subject}</div>
+                    <div className="text-sm font-semibold mb-1">{subjectLabel(subject)}</div>
                     <div className="flex flex-wrap gap-1">
                       {list.map((t) => (
                         <span key={t.id} title={`${t.name}: ${mastery.has(t.id) ? mastery.get(t.id) + "%" : "not practised"}`} className={`h-4 w-4 rounded ${masteryColor(mastery.get(t.id))}`} />

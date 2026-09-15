@@ -28,6 +28,7 @@ export function PreparePlanButton({ studentId, missing }: { studentId: string; m
         }
         if (r.made) made += 1;
         setDone(made);
+        if (r.remaining >= left && !r.made) break; // no progress: stop rather than spin
         left = r.remaining;
         router.refresh();
       }

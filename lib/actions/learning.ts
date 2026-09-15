@@ -28,7 +28,7 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
   if (existing) return {};
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   try {
-    const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track });
+    const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language });
     await admin.from("lessons").upsert({ topic_id: topicId, grade, content_md: content, model }, { onConflict: "topic_id,grade" });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not write the lesson." };
@@ -99,6 +99,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       weakSkills: weak,
       avoidPrompts: avoid,
       recallNotes,
+      language: topic?.language ?? "en",
     });
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Could not generate the quiz." };
@@ -115,6 +116,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       title: generated.title,
       passage: generated.passage,
       difficulty,
+      language: topic?.language ?? "en",
     })
     .select()
     .single();

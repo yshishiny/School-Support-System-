@@ -44,7 +44,7 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
   }
 
   return (
-    <div className="rounded-xl border border-line bg-panel-2/40 p-2.5 space-y-2">
+    <div className="rounded-xl border border-line bg-panel-2/40 p-2.5 space-y-2" dir={/[\u0600-\u06FF]/.test(input.topics[0]?.name ?? "") ? "rtl" : undefined}>
       <input type="hidden" name={`lesson_${fieldKey}`} value={note} />
       <input type="hidden" name={`lessontopic_${fieldKey}`} value={topicId ?? ""} />
       <div className="flex items-center justify-between gap-2">

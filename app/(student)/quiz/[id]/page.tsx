@@ -37,7 +37,7 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
   const backHref = q.scheduled_for ? "/today" : q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
 
   return (
-    <main className="space-y-3">
+    <main className="space-y-3" dir={q.language === "ar" ? "rtl" : undefined} lang={q.language === "ar" ? "ar" : undefined}>
       <QuizRunner
         attemptId={null}
         quizId={id}

@@ -56,14 +56,20 @@ export interface PlanInput {
 
 /** Maps a timetable subject name ("Math (GPA)", "English Pre-SAT", "History") to a curriculum subject, or null for subjects we do not quiz. */
 export function curriculumSubject(timetableName: string, available: string[]): string | null {
-  const n = timetableName.toLowerCase().replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
-  if (/arabic|religion|french|german|\bp\.?e\b|\bart\b|music|line|library|advisory|homeroom/.test(n)) return null;
+  const raw = timetableName.toLowerCase().replace(/\s+/g, " ").trim();
+  const n = raw.replace(/\(.*?\)/g, " ").replace(/\s+/g, " ").trim();
+  if (/french|german|\bp\.?e\b|\bart\b|music|line|library|advisory|homeroom/.test(n)) return null;
   let wanted: string | null = null;
-  if (/math|algebra|geometry|calculus/.test(n)) wanted = "Math";
+  // Egyptian Ministry (M.O.E.) subjects, taught in Arabic.
+  if (/arabic social|m\.?o\.?e/.test(raw)) wanted = "Arabic Social Studies";
+  else if (/religion|islamic|deen/.test(n)) wanted = "Religion";
+  else if (/arabic/.test(n)) wanted = "Arabic";
+  else if (/math|algebra|geometry|calculus/.test(n)) wanted = "Math";
   else if (/physics/.test(n)) wanted = "Physics";
   else if (/biolog/.test(n)) wanted = "Biology";
   else if (/chem/.test(n)) wanted = "Chemistry";
   else if (/science/.test(n)) wanted = "Science";
+  else if (/social english/.test(n)) wanted = "Social Studies";
   else if (/english|ela|literature|writing/.test(n)) wanted = "English";
   else if (/history|social|geograph|civics|economics/.test(n)) wanted = "Social Studies";
   if (!wanted) return null;
@@ -136,4 +142,13 @@ export function planSlots(input: PlanInput): { wanted: PlanSlot[]; missing: Plan
   }
   const missing = wanted.filter((w) => !existingKey.has(`${w.date}:${w.slot}`));
   return { wanted, missing };
+}
+
+/** Display name for a curriculum subject; Ministry subjects show their Arabic names. */
+export function subjectLabel(subject: string): string {
+  return { Arabic: "اللغة العربية", Religion: "التربية الدينية", "Arabic Social Studies": "الدراسات الاجتماعية" }[subject] ?? subject;
+}
+
+export function isArabicSubject(subject: string): boolean {
+  return subject === "Arabic" || subject === "Religion" || subject === "Arabic Social Studies";
 }

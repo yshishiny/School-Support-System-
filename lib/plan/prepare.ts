@@ -102,6 +102,7 @@ export async function prepareNextPlannedQuiz(studentId: string): Promise<Prepare
       count: topic ? SCHOOL_SET_SIZE : section?.setSize ?? SCHOOL_SET_SIZE,
       weakSkills: [],
       avoidPrompts: (priorQs ?? []).map((q) => q.prompt),
+      language: topic?.language ?? "en",
     });
   } catch (err) {
     return { made: null, remaining: plan.missing.length, error: err instanceof Error ? err.message : "Could not generate the quiz." };
@@ -119,9 +120,14 @@ export async function prepareNextPlannedQuiz(studentId: string): Promise<Prepare
       difficulty: "medium",
       scheduled_for: slot.date,
       plan_slot: slot.slot,
+      language: topic?.language ?? "en",
     })
     .select("id")
     .single();
+  if (error?.code === "23505") {
+    // Another Prepare loop (a second tab, or the nightly cron) wrote this slot first; move on to the next one.
+    return { made: null, remaining: Math.max(0, plan.missing.length - 1) };
+  }
   if (error || !quiz) return { made: null, remaining: plan.missing.length, error: error?.message ?? "Could not save the quiz." };
   const { data: rows, error: qErr } = await admin
     .from("quiz_questions")

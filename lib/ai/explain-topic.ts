@@ -10,7 +10,9 @@ Structure every lesson as:
 5. **Quick self-check** (3 questions with answers hidden below a "Answers" heading)
 6. **Where to go deeper**: name the matching Khan Academy unit or a typical textbook chapter title, without inventing URLs.
 
-Length: 450-700 words.`;
+Length: 450-700 words.
+
+If the request says the language is Arabic, write the whole lesson in clear Modern Standard Arabic (Egyptian Ministry of Education style), keep the same six-part structure with Arabic headings, and use Arabic examples.`;
 
 export interface ExplainSpec {
   grade: number | null;
@@ -18,6 +20,7 @@ export interface ExplainSpec {
   unit: string | null;
   topic: string;
   track: "school" | "act" | "sat";
+  language?: "en" | "ar";
 }
 
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
@@ -35,6 +38,7 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
           `Subject: ${spec.subject}`,
           spec.unit ? `Unit: ${spec.unit}` : "",
           `Topic: ${spec.topic}`,
+          spec.language === "ar" ? "Language: Arabic (write the whole lesson in Arabic)" : "",
         ]
           .filter(Boolean)
           .join("\n"),
