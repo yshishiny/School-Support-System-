@@ -5,6 +5,7 @@ import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
 import { snapshotAttention } from "@/lib/coach/signals-run";
 import { closeAllowanceWeek } from "@/lib/allowance/week";
 import { sendTelegram } from "@/lib/whatsapp/send";
+import { checkDueSources } from "@/lib/sources/check";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -72,6 +73,15 @@ export async function GET(request: Request) {
       }
     } catch (err) {
       (results[s.id] ??= []).push(`coach error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  // School websites: any source not checked in six days.
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await checkDueSources();
+      if (Object.keys(r).length) results.sources = Object.entries(r).map(([k, v]) => `${k}: ${v}`);
+    } catch (err) {
+      results.sources = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));

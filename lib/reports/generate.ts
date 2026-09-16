@@ -5,6 +5,7 @@ import { computeStreak } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { describeAccess } from "@/lib/device";
 import { formatInTimeZone } from "date-fns-tz";
+import { classifyPosition, type Place } from "@/lib/places";
 import type { Assignment, AssignmentKind, ItemStatus } from "@/lib/types";
 
 /** Builds today's report for one family, stores it, and tries to send it. */
@@ -37,9 +38,11 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     .filter((r) => r.user_id === id)
     .map((r) => ({ time: formatInTimeZone(new Date(r.created_at), family.timezone, "HH:mm"), event: r.event, where: describeAccess(r), ip: r.ip }));
   const { data: pingRows } = memberIds.length ? await admin.from("location_pings").select("user_id, latitude, longitude, source, created_at").in("user_id", memberIds).gte("created_at", dayStartIso).order("created_at", { ascending: false }) : { data: [] };
+  const { data: placeRows } = await admin.from("places").select("id, kind, label, latitude, longitude, radius_m, student_id").eq("family_id", familyId);
+  const places = (placeRows ?? []) as Place[];
   const lastLocationFor = (id: string) => {
     const p = (pingRows ?? []).find((r) => r.user_id === id);
-    return p ? { time: formatInTimeZone(new Date(p.created_at), family.timezone, "HH:mm"), lat: p.latitude as number, lng: p.longitude as number, source: p.source as string } : null;
+    return p ? { time: formatInTimeZone(new Date(p.created_at), family.timezone, "HH:mm"), lat: p.latitude as number, lng: p.longitude as number, source: p.source as string, place: places.length ? classifyPosition(p.latitude as number, p.longitude as number, places, id).label : null } : null;
   };
   const children: ReportChild[] = [];
   for (const s of students ?? []) {

@@ -3,6 +3,7 @@ import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { ImportWizard } from "@/components/ImportWizard";
 import { TimetablePhotoWizard } from "@/components/TimetablePhotoWizard";
+import { SourcesPanel, type FindingRow, type SourceRow } from "@/components/SourcesPanel";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 
 export const maxDuration = 300;
@@ -11,9 +12,11 @@ export default async function ImportPage() {
   const { family } = await requireParent();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
-  const [{ data: kids }, { data: imports }] = await Promise.all([
+  const [{ data: kids }, { data: imports }, { data: sources }, { data: findings }] = await Promise.all([
     supabase.from("profiles").select("id, full_name").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
     supabase.from("whatsapp_imports").select("*, profiles!whatsapp_imports_student_id_fkey(full_name)").eq("family_id", family.id).order("imported_at", { ascending: false }).limit(5),
+    supabase.from("sources").select("id, label, url, last_checked_at, last_error, student_id").eq("family_id", family.id).order("created_at"),
+    supabase.from("source_findings").select("id, source_id, found_at, summary, items, status").eq("family_id", family.id).order("found_at", { ascending: false }).limit(10),
   ]);
   const last = imports?.[0]?.imported_at ? String(imports[0].imported_at).slice(0, 10) : shiftDate(today, -14);
 
@@ -35,6 +38,7 @@ export default async function ImportPage() {
         <>
           <ImportWizard students={kids ?? []} defaultSince={last} />
           <TimetablePhotoWizard students={kids ?? []} />
+          <SourcesPanel sources={(sources ?? []) as SourceRow[]} findings={(findings ?? []) as FindingRow[]} students={kids ?? []} />
         </>
       )}
       {(imports ?? []).length > 0 && (

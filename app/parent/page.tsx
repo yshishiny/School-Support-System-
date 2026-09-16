@@ -9,6 +9,7 @@ import { acknowledgeAlertAction } from "@/lib/actions/wellbeing";
 import { KpiTicks } from "@/components/KpiTicks";
 import { mergeKpis } from "@/lib/allowance";
 import { allowanceWeekStatus } from "@/lib/allowance/week";
+import { classifyPosition, type Place } from "@/lib/places";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type Redemption } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -44,6 +45,8 @@ export default async function ParentHome() {
   ]);
   const { data: pings } = await supabase.from("location_pings").select("user_id, latitude, longitude, accuracy_m, source, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(50);
   const lastPing = (id: string) => (pings ?? []).find((p) => p.user_id === id) ?? null;
+  const { data: placeRows } = await supabase.from("places").select("id, kind, label, latitude, longitude, radius_m, student_id").eq("family_id", family.id);
+  const places = (placeRows ?? []) as Place[];
   const kpis = mergeKpis(family.allowance_kpis);
   const { data: todayTicks } = await supabase.from("kpi_ticks").select("student_id, code, value").in("student_id", ids).eq("tick_date", today);
   const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
@@ -117,7 +120,7 @@ export default async function ParentHome() {
               return (
                 <a href={`https://maps.google.com/?q=${lp.latitude},${lp.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs rounded-xl border border-line px-2.5 py-1.5">
                   <span>📍</span>
-                  <span className="flex-1">Last seen {ago} at his {lp.source}{lp.accuracy_m ? ` · ±${lp.accuracy_m} m` : ""}</span>
+                  <span className="flex-1">Last seen {ago}: <b>{places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : "location"}</b> (at his {lp.source}){lp.accuracy_m ? ` · ±${lp.accuracy_m} m` : ""}</span>
                   <span className="underline">map</span>
                 </a>
               );
