@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
+import { logAccess } from "@/lib/access/log";
 
 const CHILD_DOMAIN = process.env.CHILD_LOGIN_DOMAIN ?? "study.local";
 
@@ -15,8 +17,12 @@ export async function loginAction(_prev: { error?: string } | undefined, formDat
   const email = await normalizeLogin(String(formData.get("login") ?? ""));
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) return { error: "Wrong username or password." };
+  if (data.user) {
+    const h = await headers();
+    await logAccess(data.user.id, "login", (n) => h.get(n), "/login");
+  }
   redirect("/");
 }
 

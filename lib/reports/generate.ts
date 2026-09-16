@@ -3,6 +3,8 @@ import { buildDailyReport, type ReportChild } from "@/lib/report";
 import { deliverReport } from "@/lib/whatsapp/send";
 import { computeStreak } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
+import { describeAccess } from "@/lib/device";
+import { formatInTimeZone } from "date-fns-tz";
 import type { Assignment, AssignmentKind, ItemStatus } from "@/lib/types";
 
 /** Builds today's report for one family, stores it, and tries to send it. */
@@ -20,6 +22,14 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   }
 
   const { data: students } = await admin.from("profiles").select("*").eq("family_id", familyId).eq("role", "student").order("grade", { ascending: false });
+  const { data: parents } = await admin.from("profiles").select("id").eq("family_id", familyId).eq("role", "parent");
+  // Entries today (family-local day) for every account in the family.
+  const dayStartIso = new Date(`${today}T00:00:00${formatInTimeZone(new Date(), family.timezone, "xxx")}`).toISOString();
+  const memberIds = [...(students ?? []).map((s) => s.id), ...(parents ?? []).map((p) => p.id)];
+  const { data: accessRows } = memberIds.length ? await admin.from("access_logs").select("user_id, event, ip, city, country, device_os, device_browser, created_at").in("user_id", memberIds).gte("created_at", dayStartIso).order("created_at") : { data: [] };
+  const accessFor = (id: string) => ((accessRows ?? []) as { user_id: string; event: "login" | "visit"; ip: string | null; city: string | null; country: string | null; device_os: string | null; device_browser: string | null; created_at: string }[])
+    .filter((r) => r.user_id === id)
+    .map((r) => ({ time: formatInTimeZone(new Date(r.created_at), family.timezone, "HH:mm"), event: r.event, where: describeAccess(r), ip: r.ip }));
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
     const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -73,6 +83,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       covered: (covered ?? []).map((l) => ({ subject: l.subject_name, note: l.note })),
       prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       coach: coach?.headline ?? null,
+      access: accessFor(s.id),
       attention: attention ? { tier: attention.tier as string, labels: ((attention.signals ?? []) as { label: string }[]).map((x) => x.label) } : null,
       practice: {
         sets: done.length,
@@ -84,7 +95,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     });
   }
 
-  const body = buildDailyReport(today, children);
+  const body = buildDailyReport(today, children, (parents ?? []).flatMap((p) => accessFor(p.id)));
   const send = await deliverReport(family, body);
   const row = {
     family_id: familyId,

@@ -285,3 +285,21 @@ export interface MemorizeItem {
   last_practised: string | null;
   created_at: string;
 }
+
+export interface AccessLog {
+  id: string;
+  user_id: string;
+  event: "login" | "visit";
+  ip: string | null;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  device_type: string | null;
+  device_os: string | null;
+  device_browser: string | null;
+  user_agent: string | null;
+  path: string | null;
+  created_at: string;
+}

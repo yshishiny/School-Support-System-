@@ -1,3 +1,5 @@
+import { describeAccess } from "@/lib/device";
+import { formatInTimeZone } from "date-fns-tz";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SendReportButton } from "@/components/SendReportButton";
@@ -11,6 +13,9 @@ export default async function ReportsPage() {
   const { family } = await requireParent();
   const supabase = await createClient();
   const { data } = await supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(14);
+  const { data: members } = await supabase.from("profiles").select("id, full_name, role").eq("family_id", family.id);
+  const { data: entries } = await supabase.from("access_logs").select("*").in("user_id", (members ?? []).map((x) => x.id)).order("created_at", { ascending: false }).limit(40);
+  const nameOf = (id: string) => (members ?? []).find((x) => x.id === id)?.full_name?.split(" ")[0] ?? "?";
   const reports = (data ?? []) as DailyReport[];
 
   return (
@@ -36,6 +41,22 @@ export default async function ReportsPage() {
         </section>
       ))}
       {reports.length === 0 && <p className="card muted">No reports yet.</p>}
-    </main>
+          <section className="card">
+        <h2 className="h2 mb-2">📱 Entries to the system</h2>
+        <p className="text-xs muted mb-2">Every login, and the first page of the day on each device: time, who, where (from the network address) and the device. Today&apos;s entries go into the daily report automatically.</p>
+        <ul className="text-sm divide-y divide-line">
+          {(entries ?? []).map((e) => (
+            <li key={e.id} className="py-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+              <span className="muted w-24 shrink-0">{formatInTimeZone(new Date(e.created_at), family.timezone, "d MMM HH:mm")}</span>
+              <b>{nameOf(e.user_id)}</b>
+              <span className="badge">{e.event}</span>
+              <span className="muted">{describeAccess(e)}</span>
+              {e.ip && <span className="text-[11px] muted">{e.ip}</span>}
+            </li>
+          ))}
+          {(entries ?? []).length === 0 && <li className="muted text-sm">No entries yet.</li>}
+        </ul>
+      </section>
+</main>
   );
 }

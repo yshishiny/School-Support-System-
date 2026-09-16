@@ -24,6 +24,7 @@ export interface ReportChild {
   prayers?: { prayer: string; status: "on_time" | "late" }[];
   coach?: string | null; // latest coach headline
   attention?: { tier: string; labels: string[] } | null; // early-warning signals, labels only
+  access?: { time: string; event: "login" | "visit"; where: string; ip: string | null }[]; // today's entries
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -32,8 +33,13 @@ function statusMark(s: ItemStatus): string {
   return s === "done" ? "✅" : s === "partial" ? "🟡" : "❌";
 }
 
+function accessLines(list: NonNullable<ReportChild["access"]>): string[] {
+  if (list.length === 0) return ["📱 No entries today."];
+  return [`📱 Entries today (${list.length}):`, ...list.slice(0, 6).map((a) => `  ${a.time} ${a.event === "login" ? "login" : "visit"} · ${a.where}${a.ip ? ` · ${a.ip}` : ""}`), ...(list.length > 6 ? [`  … and ${list.length - 6} more`] : [])];
+}
+
 /** Plain-text daily report, formatted for WhatsApp (bold with *asterisks*). */
-export function buildDailyReport(date: string, children: ReportChild[]): string {
+export function buildDailyReport(date: string, children: ReportChild[], parentAccess?: NonNullable<ReportChild["access"]>): string {
   const lines: string[] = [`📚 *Study report, ${prettyDate(date)}*`];
 
   for (const c of children) {
@@ -88,6 +94,12 @@ export function buildDailyReport(date: string, children: ReportChild[]): string 
     if (c.pendingRedemptions.length) {
       lines.push(`🎁 Wants to redeem: ${c.pendingRedemptions.map((r) => `${r.title} (${r.points} pts)`).join("; ")}`);
     }
+    if (c.access) lines.push(...accessLines(c.access));
+  }
+  if (parentAccess) {
+    lines.push("");
+    lines.push("*Parent account*");
+    lines.push(...accessLines(parentAccess));
   }
   return lines.join("\n");
 }
