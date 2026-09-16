@@ -85,7 +85,7 @@ export default async function TodayPage() {
     avatarEmoji: profile.avatar_emoji,
     avatarUrl: hero.avatar,
     bannerUrl: hero.banner,
-    banner: { zoom: Number(profile.banner_zoom ?? 1) || 1, x: profile.banner_x ?? 50, y: profile.banner_y ?? 30 },
+    banner: { fit: profile.banner_fit ?? "full", zoom: Number(profile.banner_zoom ?? 1) || 1, x: profile.banner_x ?? 50, y: profile.banner_y ?? 30 },
     balance,
     level: levelFor(balance),
     streak,

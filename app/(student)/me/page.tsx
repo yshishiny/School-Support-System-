@@ -69,7 +69,7 @@ export default async function MePage() {
         {banner && (
           <div className="space-y-1 pt-1">
             <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-display)" }}>Frame your banner</div>
-            <BannerAdjuster url={banner} zoom={Number(profile.banner_zoom ?? 1) || 1} x={profile.banner_x ?? 50} y={profile.banner_y ?? 30} />
+            <BannerAdjuster url={banner} fit={profile.banner_fit ?? "full"} zoom={Number(profile.banner_zoom ?? 1) || 1} x={profile.banner_x ?? 50} y={profile.banner_y ?? 30} />
           </div>
         )}
       </section>

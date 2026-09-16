@@ -4,6 +4,7 @@ import { ConsequenceCard } from "@/components/ConsequenceCard";
 import { PrayButton } from "./PrayButton";
 import { PrayerDots } from "./PrayerDots";
 import { subjectEmoji } from "@/lib/plan";
+import { HeroBanner } from "./HeroBanner";
 import type { TodayData } from "./types";
 
 /** Option C: the hero picture full-bleed with the name over it, a "Do now" bar, four bento tiles, classes as chips, the coach box. */
@@ -13,10 +14,16 @@ export function LayoutC({ d }: { d: TodayData }) {
   const missing = d.allowance ? Math.max(0, 90 - d.allowance.score) : 0;
   return (
     <main className="space-y-3 -mt-4 -mx-4">
-      <div className="relative h-[210px] overflow-hidden rounded-b-[32px]" style={d.bannerUrl ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0) 30%, var(--color-bg) 100%), url(${d.bannerUrl})`, backgroundSize: `auto, ${d.banner.zoom * 100}% auto`, backgroundPosition: `center, ${d.banner.x}% ${d.banner.y}%`, backgroundRepeat: "no-repeat", backgroundColor: "var(--color-panel-2)" } : { background: "linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-panel-2)), var(--color-bg))" }}>
-        {!d.bannerUrl && <div className="absolute inset-0 flex items-center justify-center gap-4 text-7xl opacity-25 select-none" aria-hidden>{d.stickers.slice(0, 3).join(" ")}</div>}
-        <div className="absolute top-3 right-3"><PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} /></div>
-        <div className="absolute inset-x-4 bottom-4 flex items-end gap-3">
+      <HeroBanner
+        url={d.bannerUrl}
+        fit={d.banner.fit}
+        zoom={d.banner.zoom}
+        x={d.banner.x}
+        y={d.banner.y}
+        fallback={<div className="absolute inset-0 flex items-center justify-center gap-4 text-7xl opacity-25 select-none" aria-hidden>{d.stickers.slice(0, 3).join(" ")}</div>}
+        topRight={<PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} />}
+      >
+        <div className="flex items-end gap-3">
           <Link href="/me" className="h-14 w-14 shrink-0 rounded-2xl border-[3px] border-accent bg-panel flex items-center justify-center text-2xl overflow-hidden">
             {d.avatarUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -32,7 +39,7 @@ export function LayoutC({ d }: { d: TodayData }) {
             <div className="text-[11px] text-ink/80">points</div>
           </Link>
         </div>
-      </div>
+      </HeroBanner>
 
       <div className="px-4 space-y-3">
         <ConsequenceCard items={d.consequences} />

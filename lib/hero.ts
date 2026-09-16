@@ -40,6 +40,6 @@ export interface BannerFraming {
 
 /** Background rules that honour the child's zoom and focal point. */
 export function bannerBackground(url: string, f: BannerFraming): { backgroundImage: string; backgroundSize: string; backgroundPosition: string; backgroundRepeat: string } {
-  const zoom = Math.max(1, Math.min(3, Number(f.banner_zoom ?? 1) || 1));
+  const zoom = Math.max(0.5, Math.min(3, Number(f.banner_zoom ?? 1) || 1));
   return { backgroundImage: `url(${url})`, backgroundSize: `${zoom * 100}% auto`, backgroundPosition: `${f.banner_x ?? 50}% ${f.banner_y ?? 30}%`, backgroundRepeat: "no-repeat" };
 }

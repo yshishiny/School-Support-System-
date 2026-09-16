@@ -45,12 +45,12 @@ export async function deleteHeroImageAction(imageId: string): Promise<void> {
 }
 
 /** How the banner is framed on the home page: zoom and focal point (percent). */
-export async function setBannerFramingAction(zoom: number, x: number, y: number): Promise<void> {
+export async function setBannerFramingAction(zoom: number, x: number, y: number, fit: "cover" | "full" = "cover"): Promise<void> {
   const { profile } = await requireSession();
   const supabase = await createClient();
   await supabase
     .from("profiles")
-    .update({ banner_zoom: Math.max(1, Math.min(3, Math.round(zoom * 100) / 100)), banner_x: Math.max(0, Math.min(100, Math.round(x))), banner_y: Math.max(0, Math.min(100, Math.round(y))) })
+    .update({ banner_fit: fit === "full" ? "full" : "cover", banner_zoom: Math.max(0.5, Math.min(3, Math.round(zoom * 100) / 100)), banner_x: Math.max(0, Math.min(100, Math.round(x))), banner_y: Math.max(0, Math.min(100, Math.round(y))) })
     .eq("id", profile.id);
   PATHS.forEach((p) => revalidatePath(p));
 }
