@@ -6,6 +6,9 @@ import { computeStreak } from "@/lib/points";
 import { decideRedemptionAction } from "@/lib/actions/rewards";
 import { loadPlan } from "@/lib/plan/prepare";
 import { acknowledgeAlertAction } from "@/lib/actions/wellbeing";
+import { KpiTicks } from "@/components/KpiTicks";
+import { mergeKpis } from "@/lib/allowance";
+import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type Redemption } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -39,6 +42,9 @@ export default async function ParentHome() {
     supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
     supabase.from("safety_alerts").select("*, profiles(full_name)").eq("family_id", family.id).is("acknowledged_at", null).order("created_at", { ascending: false }),
   ]);
+  const kpis = mergeKpis(family.allowance_kpis);
+  const { data: todayTicks } = await supabase.from("kpi_ticks").select("student_id, code, value").in("student_id", ids).eq("tick_date", today);
+  const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
   const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
   const planReady = plans.reduce((n, p) => n + (p ? p.quizzes.filter((q) => q.scheduled_for >= p.today).length : 0), 0);
@@ -54,6 +60,7 @@ export default async function ParentHome() {
       <div className="flex items-center justify-between">
         <h1 className="h1">{prettyDate(today)}</h1>
         <div className="flex gap-2">
+          <Link href="/parent/allowance" className="btn-ghost btn-sm">💵 Allowance</Link>
           <Link href="/parent/guide" className="btn-ghost btn-sm">❓ Guide</Link>
           <Link href="/parent/plan" className="btn-ghost btn-sm">📅 Quiz plan</Link>
           <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
@@ -94,8 +101,20 @@ export default async function ParentHome() {
         const overdue = openAll.filter((a) => a.student_id === s.id && a.due_date && a.due_date < today && (a.kind === "homework" || a.kind === "project"));
         const tests = openAll.filter((a) => a.student_id === s.id && (a.kind === "quiz" || a.kind === "exam") && a.due_date && a.due_date >= today && a.due_date <= weekAhead);
         const last7 = Array.from({ length: 7 }, (_, i) => shiftDate(today, -6 + i));
+        const ticks: Record<string, boolean> = {};
+        (todayTicks ?? []).filter((t) => t.student_id === s.id).forEach((t) => (ticks[t.code] = t.value));
+        const aw = allowanceStatus[students.indexOf(s)];
         return (
           <section key={s.id} className="card space-y-3">
+            {family.allowance_enabled && (
+              <div className="rounded-xl border border-line p-2 space-y-1.5">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold">Basics today</span>
+                  {aw && <Link href="/parent/allowance" className="muted">💵 {aw.amount} EGP · score {aw.score} · day {aw.elapsedDays}/7</Link>}
+                </div>
+                <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
+              </div>
+            )}
             <div className="flex items-center gap-3">
               <div className="text-3xl">{s.avatar_emoji}</div>
               <div className="flex-1">

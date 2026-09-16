@@ -104,3 +104,19 @@ export async function availablePoints(studentId: string): Promise<number> {
   const held = (pending ?? []).reduce((s, r) => s + r.points_spent, 0);
   return balance - held;
 }
+
+import { REWARD_TEMPLATES } from "@/lib/reward-templates";
+
+/** One-tap enable of a reward template into the family's catalog. */
+export async function enableRewardTemplateAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const key = String(formData.get("key") ?? "");
+  const t = REWARD_TEMPLATES.find((x) => x.key === key);
+  if (!t) return;
+  const supabase = await createClient();
+  const { data: dup } = await supabase.from("rewards").select("id").eq("family_id", family.id).eq("title", t.title).maybeSingle();
+  if (dup) return;
+  await supabase.from("rewards").insert({ family_id: family.id, title: t.title, description: t.description, kind: t.kind, cost_points: t.cost_points, cash_amount_egp: t.cash_amount_egp ?? null, emoji: t.emoji });
+  revalidatePath("/parent/rewards");
+  revalidatePath("/rewards");
+}

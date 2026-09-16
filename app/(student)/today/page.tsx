@@ -12,6 +12,10 @@ import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { buildLessonDays } from "@/lib/lessons";
 import ReactMarkdown from "react-markdown";
 import { INSTRUMENTS, dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
+import { AllowanceMeter } from "@/components/AllowanceMeter";
+import { ConsequenceCard } from "@/components/ConsequenceCard";
+import { allowanceWeekStatus } from "@/lib/allowance/week";
+import type { Consequence } from "@/lib/types";
 import { themeById } from "@/lib/themes";
 import { subjectEmoji } from "@/lib/plan";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
@@ -51,6 +55,10 @@ export default async function TodayPage() {
     supabase.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", profile.id).order("taken_on", { ascending: false }).limit(40),
   ]);
   const dueChecks = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
+  const [allowance, { data: consequences }] = await Promise.all([
+    family.allowance_enabled ? allowanceWeekStatus(profile.id, family).catch(() => null) : Promise.resolve(null),
+    supabase.from("consequences").select("*").eq("student_id", profile.id).is("closed_at", null).gte("ends_on", today).order("ends_on"),
+  ]);
   const daysToExam = profile.target_exam_date ? Math.ceil((new Date(profile.target_exam_date).getTime() - new Date(today).getTime()) / 86400000) : null;
 
   // Timetable: today's classes, or the next school day when today is free.
@@ -171,6 +179,9 @@ export default async function TodayPage() {
           </details>
         </section>
       )}
+
+      <ConsequenceCard items={(consequences ?? []) as Consequence[]} />
+      {allowance && <AllowanceMeter status={allowance} compact />}
 
       {dueChecks.length > 0 && (
         <Link href={`/coach/check/${dueChecks[0]}`} className="card flex items-center gap-3 border-accent/50">

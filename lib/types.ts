@@ -15,6 +15,27 @@ export interface Family {
   telegram_chat_id: string | null;
   latitude: number | null;
   longitude: number | null;
+  allowance_enabled: boolean;
+  allowance_amount: number;
+  allowance_pay_weekday: number;
+  allowance_kpis: { code: string; weight?: number; enabled?: boolean }[] | null;
+  practices_enabled: string[];
+}
+
+export interface Consequence {
+  id: string;
+  student_id: string;
+  family_id: string;
+  code: string;
+  label: string;
+  reason: string | null;
+  starts_on: string;
+  ends_on: string;
+  earn_back_task: string | null;
+  student_claimed_at: string | null;
+  earned_back_at: string | null;
+  closed_at: string | null;
+  created_at: string;
 }
 
 export interface Profile {

@@ -3,6 +3,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
 import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
 import { snapshotAttention } from "@/lib/coach/signals-run";
+import { closeAllowanceWeek } from "@/lib/allowance/week";
+import { sendTelegram } from "@/lib/whatsapp/send";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -32,6 +34,23 @@ export async function GET(request: Request) {
         (results[id] ??= []).push(`error: ${err instanceof Error ? err.message : String(err)}`);
         pending.delete(id);
       }
+    }
+  }
+  // Allowance: close last week the morning after pay day and tell the parent.
+  const { data: fams } = await admin.from("families").select("id, timezone, telegram_chat_id, allowance_enabled, allowance_amount, allowance_pay_weekday, allowance_kpis").eq("allowance_enabled", true);
+  for (const f of fams ?? []) {
+    const lines: string[] = [];
+    for (const s of (students ?? []).filter((x) => x.family_id === f.id)) {
+      try {
+        const w = await closeAllowanceWeek(s.id, f);
+        if (w) lines.push(`${s.full_name.split(" ")[0]}: score ${w.score}/100 → ${w.amount} EGP`);
+      } catch (err) {
+        (results[s.id] ??= []).push(`allowance error: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    if (lines.length) {
+      await sendTelegram(f.telegram_chat_id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`);
+      (results[f.id] ??= []).push(`allowance closed: ${lines.join("; ")}`);
     }
   }
   // Early-warning signals: cheap, deterministic, every night.

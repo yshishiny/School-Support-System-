@@ -1,7 +1,8 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddRewardForm } from "@/components/AddRewardForm";
-import { adjustPointsAction, decideRedemptionAction, toggleRewardAction } from "@/lib/actions/rewards";
+import { adjustPointsAction, decideRedemptionAction, enableRewardTemplateAction, toggleRewardAction } from "@/lib/actions/rewards";
+import { REWARD_TEMPLATES, TEMPLATE_GROUPS } from "@/lib/reward-templates";
 import { POINTS } from "@/lib/points";
 import type { Profile, Redemption, Reward } from "@/lib/types";
 
@@ -36,6 +37,33 @@ export default async function ParentRewardsPage() {
               <input name="reason" className="input w-32 py-1" placeholder="reason" required />
               <button className="btn-ghost btn-sm">Apply</button>
             </form>
+          </div>
+        ))}
+      </section>
+
+      <section className="card space-y-2">
+        <h2 className="h2">Ideas, off by default</h2>
+        <p className="text-xs muted">Tap Enable to add one to the catalog. Prices are suggestions; edit after enabling by hiding and re-adding.</p>
+        {(Object.keys(TEMPLATE_GROUPS) as (keyof typeof TEMPLATE_GROUPS)[]).map((g) => (
+          <div key={g}>
+            <div className="text-xs font-bold muted mt-2 mb-1">{TEMPLATE_GROUPS[g]}</div>
+            <ul className="divide-y divide-line">
+              {REWARD_TEMPLATES.filter((t) => t.group === g).map((t) => {
+                const on = ((rewards ?? []) as Reward[]).some((r) => r.title === t.title);
+                return (
+                  <li key={t.key} className="py-1.5 flex items-center gap-2 text-sm">
+                    <span className="text-xl">{t.emoji}</span>
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium">{t.title} <span className="muted font-normal text-xs">· {t.cost_points} pts{t.cash_amount_egp ? ` · ${t.cash_amount_egp} EGP` : ""}</span></div>
+                      <div className="text-xs muted truncate">{t.description}</div>
+                    </div>
+                    {on ? <span className="badge text-good">in catalog</span> : (
+                      <form action={enableRewardTemplateAction}><input type="hidden" name="key" value={t.key} /><button className="btn-ghost btn-sm">Enable</button></form>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
           </div>
         ))}
       </section>
