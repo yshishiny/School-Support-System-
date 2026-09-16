@@ -30,11 +30,11 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
       <main className="card space-y-2">
         <p className="h2">This set has no questions</p>
         <p className="text-sm muted">Generation was interrupted. Go back and start a new set.</p>
-        <a href={q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn"} className="btn-primary">Back</a>
+        <a href={q.topic_id ? `/learn/topic/${q.topic_id}` : q.material_id ? "/learn?tab=files" : "/learn"} className="btn-primary">Back</a>
       </main>
     );
   }
-  const backHref = q.scheduled_for ? "/today" : q.topic_id ? `/learn/topic/${q.topic_id}` : "/learn";
+  const backHref = q.scheduled_for ? "/today" : q.topic_id ? `/learn/topic/${q.topic_id}` : q.material_id ? "/learn?tab=files" : "/learn";
 
   return (
     <main className="space-y-3" dir={q.language === "ar" ? "rtl" : undefined} lang={q.language === "ar" ? "ar" : undefined}>

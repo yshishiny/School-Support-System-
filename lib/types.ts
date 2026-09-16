@@ -211,6 +211,7 @@ export interface Quiz {
   plan_slot: "school" | "exam" | null;
   language: "en" | "ar";
   created_at: string;
+  material_id?: string | null; // practice set written from a school file
 }
 
 export interface QuizQuestion {

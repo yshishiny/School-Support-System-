@@ -1,11 +1,14 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { todayIn } from "@/lib/dates";
+import { todayIn, prettyDate } from "@/lib/dates";
 import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import { Tabs } from "@/components/Tabs";
+import { MaterialUploader } from "@/components/MaterialUploader";
+import { PractiseFromFile } from "@/components/MaterialCards";
+import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { shiftDate } from "@/lib/dates";
@@ -22,13 +25,19 @@ export default async function LearnPage() {
   const exams = examsFor(profile.target_exam, profile.grade);
   const examTracks = new Set(exams.map(trackFor));
 
-  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }] = await Promise.all([
     supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort"),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
     supabase.from("quizzes").select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", shiftDate(today, -6)).lte("scheduled_for", shiftDate(today, 6)).order("scheduled_for"),
+    supabase.from("materials").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(40),
+    supabase.from("quizzes").select("material_id").eq("student_id", profile.id).not("material_id", "is", null),
+    supabase.from("subjects").select("name").eq("student_id", profile.id),
   ]);
+  const materials = (materialRows ?? []) as MaterialRow[];
+  const materialUrls = await signMaterialUrls(materials.map((m) => ({ id: m.id, path: m.path })));
+  const setsFor = (id: string) => (materialQuizzes ?? []).filter((q) => q.material_id === id).length;
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
   const examTopics = all.filter((t) => examTracks.has(t.track as "act" | "sat"));
@@ -188,6 +197,28 @@ export default async function LearnPage() {
     </Link>
   );
 
+  const filesTab = (
+    <div className="space-y-3">
+      {materials.map((m) => (
+        <section key={m.id} className="card space-y-2">
+          <div className="flex items-start gap-2">
+            <span className="text-3xl sticker-still">{m.mime === "application/pdf" ? "📄" : "🖼️"}</span>
+            <div className="flex-1 min-w-0">
+              <div className="font-bold">{m.title}</div>
+              <div className="text-xs muted">{m.subject ?? "no subject"} · {prettyDate(m.created_at.slice(0, 10))}{m.status !== "ready" ? " · not read yet" : ""}</div>
+            </div>
+            {materialUrls.get(m.id) && <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">Open</a>}
+          </div>
+          {m.instructions && <p className="text-sm"><b>Teacher says:</b> {m.instructions}</p>}
+          {m.summary && <p className="text-xs muted">{m.summary}</p>}
+          {m.status === "ready" && <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} />}
+        </section>
+      ))}
+      {materials.length === 0 && <p className="card text-sm muted">No files yet. When the teacher drops a PDF in the group, save it and add it here: the coach reads it and writes practice questions from it.</p>}
+      <MaterialUploader familyId={family.id} students={[{ id: profile.id, full_name: profile.full_name }]} subjects={[...new Set((mySubjects ?? []).map((x) => x.name))].sort()} fixedStudentId={profile.id} />
+    </div>
+  );
+
   const arabicCount = subjects.filter((s) => ARABIC_SUBJECTS.includes(s)).length;
   return (
     <main className="space-y-4">
@@ -199,6 +230,7 @@ export default async function LearnPage() {
           { id: "subjects", label: "Subjects", emoji: "📚", badge: null, content: subjects.length ? subjectTabs : <p className="card muted">No curriculum loaded for grade {profile.grade}.</p> },
           ...(exams.length ? [{ id: "exams", label: exams.join(" & "), emoji: "🎓", badge: null, content: examTab }] : []),
           { id: "quran", label: arabicCount ? "القرآن" : "Quran", emoji: "📿", badge: memorizeCount ?? 0, content: quranTab },
+          { id: "files", label: "Files", emoji: "📎", badge: materials.length || null, content: filesTab },
         ]}
       />
     </main>

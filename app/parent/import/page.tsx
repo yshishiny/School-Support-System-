@@ -27,6 +27,7 @@ export default async function ImportPage() {
         <Link href="/parent/import/archive" className="btn-ghost btn-sm">🗄️ Chat archive</Link>
       </div>
       <div className="card text-sm space-y-1 muted">
+        <p><b className="text-ink">PDFs and worksheets:</b> the files teachers drop in the group go to <Link href="/parent/materials" className="text-accent-2">School files</Link>, with the subject and the teacher&apos;s instructions. The boys practise straight from them.</p>
         <p><b className="text-ink">Photos:</b> save the homework, supply list or announcement images from the group and upload them. The AI reads English and Arabic.</p>
         <p><b className="text-ink">Chat text:</b> group name → <b className="text-ink">Export chat</b> → <b className="text-ink">Without media</b> → upload the .txt file. Only messages after the date you pick are read.</p>
         <p><b className="text-ink">Whole-year exports</b> with media go to the <Link href="/parent/import/archive" className="text-accent-2">chat archive</Link>, where the app learns how each group communicates.</p>

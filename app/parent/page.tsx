@@ -44,7 +44,7 @@ export default async function ParentHome() {
   }
   const ids = students.map((s) => s.id);
   const admin = createAdminClient();
-  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }, { data: parentRows }, { data: overrideRows }, { data: timetableRows }, { data: daysOffRows }, { count: snapsPending }] = await Promise.all([
+  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }, { data: parentRows }, { data: overrideRows }, { data: timetableRows }, { data: daysOffRows }, { count: snapsPending }, { data: materialsPending }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
@@ -63,7 +63,9 @@ export default async function ParentHome() {
     supabase.from("timetable_entries").select("student_id, weekday, subject_name, start_time, end_time").in("student_id", ids),
     supabase.from("school_days_off").select("day, label").eq("family_id", family.id).gte("day", today).lte("day", weekAhead),
     supabase.from("snaps").select("id", { count: "exact", head: true }).eq("family_id", family.id).eq("status", "pending"),
+    supabase.from("materials").select("id, items").eq("family_id", family.id).eq("status", "ready").is("items_reviewed_at", null),
   ]);
+  const filesToReview = (materialsPending ?? []).filter((m) => Array.isArray(m.items) && m.items.length > 0).length;
   const timetable = (timetableRows ?? []) as Pick<TimetableEntry, "student_id" | "weekday" | "subject_name" | "start_time" | "end_time">[];
   const daysOff = (daysOffRows ?? []) as DayOff[];
   const parents = (parentRows ?? []) as ParentLite[];
@@ -88,6 +90,7 @@ export default async function ParentHome() {
     { href: "/parent/import", label: "announcement to review", n: findingsCount ?? 0, emoji: "🏫" },
     { href: "/parent/plan", label: "quiz to prepare", n: planMissing, emoji: "📅" },
     { href: "/parent/snaps", label: "snap to approve", n: snapsPending ?? 0, emoji: "📸" },
+    { href: "/parent/materials", label: "file with tasks to confirm", n: filesToReview, emoji: "📎" },
   ].filter((x) => x.n > 0);
 
   return (
@@ -103,6 +106,7 @@ export default async function ParentHome() {
             { href: "/parent/plan", emoji: "📅", title: "Quiz plan" },
             { href: "/parent/allowance", emoji: "💵", title: "Allowance" },
             { href: "/parent/snaps", emoji: "📸", title: "Snaps" },
+            { href: "/parent/materials", emoji: "📎", title: "School files" },
             { href: "/parent/reports", emoji: "📨", title: "Reports" },
             { href: "/parent/guide", emoji: "❓", title: "Guide" },
           ].map((b) => (
