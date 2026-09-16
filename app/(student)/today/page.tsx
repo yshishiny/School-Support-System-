@@ -83,6 +83,7 @@ export default async function TodayPage() {
   const week = (timetable ?? []) as TimetableEntry[];
   const todayRows = week.filter((t) => t.weekday === weekdayOf(today));
   const checkinDates = (checkins ?? []).map((c) => c.checkin_date as string);
+  const checkinsMissed = Array.from({ length: 6 }, (_, k) => shiftDate(today, -1 - k)).filter((d) => d >= weekStart && !checkinDates.includes(d)).reverse().map((d) => ({ date: d, label: d === shiftDate(today, -1) ? "Yesterday" : SHORT[weekdayOf(d)] }));
   const due = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
   const queue = buildQueue({
     hourLocal: hour,
@@ -98,6 +99,7 @@ export default async function TodayPage() {
     learnerDone: !!profile.learner_profile,
     snapsDue,
     classLogMissing,
+    checkinsMissed,
   });
 
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);

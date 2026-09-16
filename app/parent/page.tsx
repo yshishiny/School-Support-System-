@@ -180,7 +180,7 @@ export default async function ParentHome() {
                 <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
                 <div className="text-xs muted">{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
               </div>
-              <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? "✓ checked in" : "no check-in"}</div>
+              <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
             </div>
 
             <Link href="/parent/children" className={`tile !p-2 block text-xs ${school.off ? "border-warn/60" : ""}`}>

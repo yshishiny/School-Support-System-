@@ -109,6 +109,7 @@ export interface Checkin {
   learned: string | null;
   stuck_on: string | null;
   submitted_at: string;
+  entered_late?: boolean; // filled in on a later day
 }
 
 export interface CheckinItem {

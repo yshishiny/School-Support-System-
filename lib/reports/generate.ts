@@ -109,6 +109,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
             minutes: checkin.minutes_studied,
             learned: checkin.learned,
             stuckOn: checkin.stuck_on,
+            enteredLate: !!checkin.entered_late,
             items: ((checkin.checkin_items ?? []) as { status: ItemStatus; assignments: { title: string; kind: AssignmentKind } | null }[]).map((i) => ({
               title: i.assignments?.title ?? "task",
               kind: i.assignments?.kind ?? "homework",

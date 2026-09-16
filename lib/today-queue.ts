@@ -31,6 +31,7 @@ export interface QueueInput {
   learnerDone: boolean;
   snapsDue?: { id: string; label: string; emoji: string }[]; // snap tasks open now and not yet sent today
   classLogMissing?: { count: number; line: string; deadline: string } | null; // previous days' classes still not logged this week
+  checkinsMissed?: { date: string; label: string }[]; // earlier days this week without a check-in
 }
 
 export function buildQueue(i: QueueInput): QueueItem[] {
@@ -59,6 +60,7 @@ export function buildQueue(i: QueueInput): QueueItem[] {
   }));
   if (i.classLogMissing && i.classLogMissing.count > 0) q.push({ key: "classlog", kind: "classlog", title: `${i.classLogMissing.count} class${i.classLogMissing.count === 1 ? "" : "es"} not logged yet`, subtitle: `${i.classLogMissing.line} · fill in before ${i.classLogMissing.deadline}`, href: "/checkin", cta: "Fill in", chips: ["+1 each", "keeps the allowance"] });
   if (evening && !i.checkinDone) q.push(checkin);
+  for (const m of (i.checkinsMissed ?? []).slice(0, 2)) q.push({ key: `checkin-${m.date}`, kind: "checkin", title: `${m.label}'s check-in`, subtitle: "You missed it: fill it in before the week closes", href: `/checkin?date=${m.date}`, cta: "Fill in", chips: ["+5", "streak kept"] });
   q.push(...quizzes);
   if (i.dueCheck) q.push({ key: `check-${i.dueCheck.id}`, kind: "check", title: i.dueCheck.title, subtitle: `${i.dueCheck.minutes} min · private`, href: `/coach/check/${i.dueCheck.id}`, cta: "Go", chips: ["+5"] });
   if (!evening && !i.checkinDone) q.push(checkin);

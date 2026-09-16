@@ -24,12 +24,14 @@ export function CheckinForm({
   existing,
   existingItems,
   lessonDays,
+  filledLater = false,
 }: {
   items: Assignment[];
   today: string;
   existing: Checkin | null;
   existingItems: Record<string, ItemStatus>;
   lessonDays: LessonDay[];
+  filledLater?: boolean;
 }) {
   const [state, setState] = useState<CheckinResult | undefined>(undefined);
   const [pending, start] = useTransition();
@@ -74,10 +76,12 @@ export function CheckinForm({
         submit();
       }}
     >
+      <input type="hidden" name="checkin_date" value={today} />
       <div className="flex items-center justify-between">
-        <h2 className="h2">{existing ? "Update today's check-in" : "Today's check-in"}</h2>
+        <h2 className="h2">{filledLater ? `Check-in for ${today}` : existing ? "Update today's check-in" : "Today's check-in"}</h2>
         {existing && <span className="badge text-good">✓ submitted</span>}
       </div>
+      {filledLater && <p className="text-xs text-warn">You are filling in a day you missed. Answer for that day, honestly: what you did, what you took, how it went.</p>}
 
       {items.length === 0 ? (
         <p className="muted text-sm">Nothing is due today. Add homework below if the teacher gave some.</p>
@@ -113,7 +117,7 @@ export function CheckinForm({
       {lessonDays.map((day) => (
         <div key={day.date} className="space-y-2">
           <label className="label">
-            {day.date === today ? "What did you take in each class today?" : `${day.label}: you did not say what you took in these classes`}
+            {day.date === today ? (filledLater ? "What did you take in each class that day?" : "What did you take in each class today?") : `${day.label}: you did not say what you took in these classes`}
             {day.date === today ? " · +2 pts per class" : " · +1 pt each"}
           </label>
           {day.subjects.map((subject) => (
@@ -154,7 +158,7 @@ export function CheckinForm({
       <p className="text-[11px] muted">📍 When you submit, your phone may ask to share your location. It goes with your check-in so your parents know you are safe. Saying no is fine.</p>
       <Notice error={state?.error} />
       <button type="submit" className="btn-primary w-full text-base" disabled={pending}>
-        {pending ? "Saving…" : existing ? "Update check-in" : "Submit check-in  ·  +10 pts"}
+        {pending ? "Saving…" : existing ? "Update check-in" : filledLater ? "Submit check-in  ·  +5 pts" : "Submit check-in  ·  +10 pts"}
       </button>
     </form>
   );

@@ -11,6 +11,7 @@ export interface ReportChild {
     learned: string | null;
     stuckOn: string | null;
     items: { title: string; kind: AssignmentKind; status: ItemStatus }[];
+    enteredLate?: boolean;
   } | null;
   pointsToday: number;
   balance: number;
@@ -60,7 +61,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       const ck = c.checkin;
       const done = ck.items.filter((i) => i.status === "done").length;
       lines.push(
-        `Check-in ✓  ${ck.mood ? MOOD[ck.mood] + " " : ""}${ck.minutes} min studied` +
+        `Check-in ✓${ck.enteredLate ? " (filled in later)" : ""}  ${ck.mood ? MOOD[ck.mood] + " " : ""}${ck.minutes} min studied` +
           (ck.items.length ? `, ${done}/${ck.items.length} tasks done` : ""),
       );
       for (const i of ck.items) lines.push(`  ${statusMark(i.status)} ${KIND_EMOJI[i.kind]} ${i.title}`);

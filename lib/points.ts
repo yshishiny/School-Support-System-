@@ -4,6 +4,7 @@
  */
 export const POINTS = {
   CHECKIN: 10, // submitting the daily check-in
+  CHECKIN_LATE: 5, // a missed day filled in later in the week
   HOMEWORK_ON_TIME: 5, // each homework/project marked done on or before its due date
   HOMEWORK_LATE: 2, // marked done after the due date
   ALL_DONE_BONUS: 15, // every item due today marked done
@@ -18,6 +19,7 @@ export interface AwardInput {
   today: string; // YYYY-MM-DD
   items: { assignmentId: string; status: "done" | "partial" | "not_done"; dueDate: string | null; kind: string }[];
   streak: number; // consecutive check-in days including today
+  enteredLate?: boolean; // filled in on a later day
 }
 
 export interface Award {
@@ -30,7 +32,7 @@ export interface Award {
 /** Pure function: given a submitted check-in, list the awards it earns. */
 export function computeAwards(input: AwardInput): Award[] {
   const awards: Award[] = [];
-  awards.push({ delta: POINTS.CHECKIN, reason: "Daily check-in", ref_type: "checkin", ref_id: input.checkinId });
+  awards.push({ delta: input.enteredLate ? POINTS.CHECKIN_LATE : POINTS.CHECKIN, reason: input.enteredLate ? "Check-in filled in later" : "Daily check-in", ref_type: "checkin", ref_id: input.checkinId });
 
   const workItems = input.items.filter((i) => i.kind === "homework" || i.kind === "project");
   for (const item of workItems) {

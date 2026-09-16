@@ -20,6 +20,10 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   console.log("[checkin] submit from", profile.id);
   const supabase = await createClient();
   const today = todayIn(family.timezone);
+  // The day this check-in is for: today, or a missed day earlier in the same week (filled in later).
+  const requested = String(formData.get("checkin_date") ?? "").trim();
+  const checkinDate = /^\d{4}-\d{2}-\d{2}$/.test(requested) && requested <= today && requested >= shiftDate(today, -6) ? requested : today;
+  const enteredLate = checkinDate !== today;
 
   const mood = Number(formData.get("mood") ?? 0) || null;
   const minutes = Math.max(0, Math.min(600, Number(formData.get("minutes_studied") ?? 0) || 0));
@@ -44,11 +48,11 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     if (!key.startsWith("lesson_")) continue;
     const k = key.slice(7);
     const note = String(value).trim();
-    const { date, subject } = parseLessonFieldKey(k, today);
+    const { date, subject } = parseLessonFieldKey(k, checkinDate);
     if (date > today || date < earliest) continue;
     const hwAnswer = String(formData.get(`lessonhwgiven_${k}`) ?? "");
     const homeworkGiven = hwAnswer === "yes" ? true : hwAnswer === "no" ? false : null;
-    if (date === today && (note.length < 2 || homeworkGiven === null)) todayIncomplete.push(subject);
+    if (date === checkinDate && (note.length < 2 || homeworkGiven === null)) todayIncomplete.push(subject);
     if (note.length < 2) continue;
     const topicId = String(formData.get(`lessontopic_${k}`) ?? "").trim() || null;
     const homework = homeworkGiven ? String(formData.get(`lessonhw_${k}`) ?? "").trim().slice(0, 200) || null : null;
@@ -57,7 +61,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     lessonNotes.push({ date, subject, note: note.slice(0, 500), topicId, homeworkGiven, homework, homeworkDue });
   }
   if (todayIncomplete.length) {
-    return { error: `Every class today needs the lesson title and a homework yes/no: ${todayIncomplete.join(", ")}. (Tap “No class” if it did not happen.)` };
+    return { error: `Every class ${enteredLate ? "that day" : "today"} needs the lesson title and a homework yes/no: ${todayIncomplete.join(", ")}. (Tap “No class” if it did not happen.)` };
   }
 
   const ids = Object.keys(itemStatuses);
@@ -69,7 +73,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   const { data: checkin, error } = await supabase
     .from("checkins")
     .upsert(
-      { student_id: profile.id, checkin_date: today, mood, minutes_studied: minutes, learned, stuck_on: stuckOn, submitted_at: new Date().toISOString() },
+      { student_id: profile.id, checkin_date: checkinDate, mood, minutes_studied: minutes, learned, stuck_on: stuckOn, submitted_at: new Date().toISOString(), entered_late: enteredLate },
       { onConflict: "student_id,checkin_date" },
     )
     .select()
@@ -130,11 +134,12 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   // Points: written with the service role because students cannot insert into the ledger.
   const admin = createAdminClient();
   const { data: past } = await admin.from("checkins").select("checkin_date").eq("student_id", profile.id);
-  const streak = computeStreak((past ?? []).map((r) => r.checkin_date as string), today);
+  const streak = computeStreak((past ?? []).map((r) => r.checkin_date as string), today) || computeStreak((past ?? []).map((r) => r.checkin_date as string), checkinDate);
   const awards = computeAwards({
     checkinId: checkin.id,
-    today,
+    today: checkinDate,
     streak,
+    enteredLate,
     items: ((assignments ?? []) as Assignment[]).map((a) => ({
       assignmentId: a.id,
       status: itemStatuses[a.id],

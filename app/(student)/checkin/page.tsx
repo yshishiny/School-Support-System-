@@ -10,13 +10,18 @@ import type { Assignment, Checkin, CheckinItem, ItemStatus, Subject, TimetableEn
 
 export const maxDuration = 60;
 
-export default async function CheckinPage() {
+export default async function CheckinPage({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
-  const today = todayIn(family.timezone);
-  const [{ data: open }, { data: checkins }, { data: subjects }, { data: timetable }, { data: logs }, { data: topics }, { data: offRows }] = await Promise.all([
+  const realToday = todayIn(family.timezone);
+  const { date: requested } = await searchParams;
+  // A missed day earlier this week can be filled in later: the whole form then refers to that day.
+  const today = requested && /^\d{4}-\d{2}-\d{2}$/.test(requested) && requested < realToday && requested >= shiftDate(realToday, -6) ? requested : realToday;
+  const filledLater = today !== realToday;
+  const [{ data: open }, { data: checkins }, { data: weekCheckins }, { data: subjects }, { data: timetable }, { data: logs }, { data: topics }, { data: offRows }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).eq("checkin_date", today).maybeSingle(),
+    supabase.from("checkins").select("checkin_date").eq("student_id", profile.id).gte("checkin_date", shiftDate(realToday, -6)).lte("checkin_date", realToday),
     supabase.from("subjects").select("*").eq("student_id", profile.id).order("name"),
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
     supabase.from("lesson_logs").select("log_date, subject_name, note, topic_id, homework_given, homework, homework_due").eq("student_id", profile.id).gte("log_date", shiftDate(today, -30)).order("log_date"),
@@ -25,7 +30,9 @@ export default async function CheckinPage() {
   ]);
   const week = (timetable ?? []) as TimetableEntry[];
   const todayRows = week.filter((t) => t.weekday === weekdayOf(today));
-  const lessonDays = buildLessonDays({ today, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given: boolean | null; homework: string | null; homework_due: string | null }[], daysOff: (offRows ?? []).map((d) => d.day as string) });
+  const doneDates = new Set((weekCheckins ?? []).map((c) => c.checkin_date as string));
+  const missedDays = Array.from({ length: 6 }, (_, k) => shiftDate(realToday, -6 + k)).filter((d) => !doneDates.has(d));
+  const lessonDays = buildLessonDays({ today, lookBackDays: filledLater ? 0 : undefined, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given: boolean | null; homework: string | null; homework_due: string | null }[], daysOff: (offRows ?? []).map((d) => d.day as string) });
   const todays = (checkins ?? null) as (Checkin & { checkin_items: CheckinItem[] }) | null;
   const existingItems: Record<string, ItemStatus> = {};
   todays?.checkin_items.forEach((i) => (existingItems[i.assignment_id] = i.status));
@@ -36,8 +43,17 @@ export default async function CheckinPage() {
     <main className="space-y-4">
       <div className="flex items-center justify-between">
         <Link href="/today" className="text-sm muted">← Today</Link>
-        <span className="badge">{prettyDate(today)}</span>
+        <span className="badge">{prettyDate(today)}{filledLater ? " · filled in later" : ""}</span>
       </div>
+      {missedDays.length > 0 && (
+        <div className="card !py-2 text-xs space-y-1">
+          <div className="font-semibold">Missed a day? Fill it in before the week closes · +5 instead of +10, streak kept</div>
+          <div className="flex flex-wrap gap-1.5">
+            <Link href="/checkin" className={`chip ${!filledLater ? "chip-on" : ""}`}>Today</Link>
+            {missedDays.map((d) => <Link key={d} href={`/checkin?date=${d}`} className={`chip ${today === d ? "chip-on" : ""}`}>{prettyDate(d)}</Link>)}
+          </div>
+        </div>
+      )}
       {todayRows.length > 0 && (
         <div className="flex gap-2 overflow-x-auto pb-1">
           {todayRows.map((t) => (
@@ -45,7 +61,7 @@ export default async function CheckinPage() {
           ))}
         </div>
       )}
-      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} lessonDays={lessonDays} />
+      <CheckinForm items={dueNow} today={today} existing={todays} existingItems={existingItems} lessonDays={lessonDays} filledLater={filledLater} />
       <details className="card">
         <summary className="cursor-pointer font-semibold">➕ Teacher gave new homework? Add it</summary>
         <div className="mt-3">
