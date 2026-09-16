@@ -28,4 +28,11 @@ describe("integrity signals", () => {
     const s = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-14", subject_name: "Math", note: "Linear equations" }, { log_date: "2026-09-15", subject_name: "Math", note: "linear equations " }], checkins: [{ checkin_date: "2026-09-15", submitted_at: "x", hourLocal: 1 }] });
     expect(s.map((x) => x.code).sort()).toEqual(["copy_notes", "night_checkin"]);
   });
+  it("flags 'No class' used three times in a day", () => {
+    const logs = ["Physics", "Biology", "English"].map((sub) => ({ log_date: "2026-09-16", subject_name: sub, note: "No class / absent" }));
+    const s = integritySignals({ ...base, lessonLogs: logs });
+    expect(s[0].code).toBe("no_class_overuse");
+    expect(s[0].ask).toContain("Physics, Biology, English");
+    expect(integritySignals({ ...base, lessonLogs: logs.slice(0, 2) })).toEqual([]);
+  });
 });

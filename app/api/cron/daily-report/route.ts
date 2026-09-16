@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndSendReport } from "@/lib/reports/generate";
 import { hourIn } from "@/lib/dates";
+import { sendDueNudges } from "@/lib/nudges/run";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -15,6 +16,13 @@ export async function GET(request: Request) {
   const admin = createAdminClient();
   const { data: families } = await admin.from("families").select("id, timezone, report_hour");
   const results: Record<string, unknown> = {};
+  // Kids' evening reminder rides on this cron so it works without an hourly scheduler.
+  try {
+    const n = await sendDueNudges(["evening", "catchup"]);
+    if (Object.keys(n).length) results.nudges = n;
+  } catch (err) {
+    results.nudges = `error: ${err instanceof Error ? err.message : String(err)}`;
+  }
   for (const f of families ?? []) {
     if (hourIn(f.timezone) < f.report_hour) {
       results[f.id] = "not yet";

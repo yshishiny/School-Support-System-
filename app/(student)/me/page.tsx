@@ -7,6 +7,8 @@ import { PointsGuide } from "@/components/PointsGuide";
 import { InterestsForm } from "@/components/InterestsForm";
 import Link from "next/link";
 import { learnerTags, type LearnerProfile } from "@/lib/learner";
+import { RemindersCard } from "@/components/RemindersCard";
+import { DEFAULT_NUDGES, type NudgeSettings } from "@/lib/nudges";
 import { HeroUploader } from "@/components/HeroUploader";
 import { HeroGallery } from "@/components/HeroGallery";
 import { BannerAdjuster } from "@/components/BannerAdjuster";
@@ -90,6 +92,8 @@ export default async function MePage() {
       </section>
 
       <PointsGuide />
+
+      <RemindersCard settings={{ ...DEFAULT_NUDGES, ...(((profile as { nudges?: Partial<NudgeSettings> }).nudges) ?? {}) }} />
 
       <Link href="/snaps" className="card flex items-center gap-3">
         <span className="text-4xl sticker-still">📸</span>

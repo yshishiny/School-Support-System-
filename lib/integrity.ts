@@ -64,6 +64,11 @@ export function integritySignals(i: IntegrityInput): IntegritySignal[] {
     seen.set(key, l.log_date);
   }
 
+  // 7b. "No class / absent" used to skip the class log.
+  const noClass = i.lessonLogs.filter((l) => l.log_date >= weekAgo && /^no class/i.test(l.note.trim()));
+  const noClassToday = noClass.filter((l) => l.log_date === i.today);
+  if (noClassToday.length >= 3 || noClass.length >= 5) out.push({ code: "no_class_overuse", label: `“No class” marked ${noClassToday.length >= 3 ? `${noClassToday.length} times today` : `${noClass.length} times this week`}`, ask: `Ask which classes really did not happen ${noClassToday.length >= 3 ? "today" : "this week"} (${[...new Set((noClassToday.length >= 3 ? noClassToday : noClass).map((l) => l.subject_name))].join(", ")}) and what he did in that time.` });
+
   // 7. Snaps sent back more than once.
   const rejected = i.snaps.filter((s) => s.status === "rejected" && s.taken_on >= weekAgo);
   if (rejected.length >= 2) out.push({ code: "snaps_rejected", label: `${rejected.length} snaps sent back this week`, ask: "Have a look at the bed and desk yourself tonight, without making it a thing." });

@@ -1,5 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTelegram, sendWhatsApp, type SendResult } from "@/lib/whatsapp/send";
+import { sendPush } from "@/lib/push/server";
 
 export interface ParentChannels { id: string; full_name: string; parent_label: string | null; telegram_chat_id: string | null; whatsapp: string | null }
 
@@ -16,9 +17,12 @@ function whatsappReady(): boolean {
 }
 
 /** Sends one text to a parent on every channel they connected. Success if any channel delivered. */
-export async function sendToParent(p: Pick<ParentChannels, "telegram_chat_id" | "whatsapp">, text: string): Promise<SendResult> {
+export async function sendToParent(p: Pick<ParentChannels, "id" | "telegram_chat_id" | "whatsapp">, text: string): Promise<SendResult> {
   const results: SendResult[] = [];
   if (p.telegram_chat_id) results.push(await sendTelegram(p.telegram_chat_id, text));
+  // Browser notification with the first lines; the full text lives in the app.
+  const push = await sendPush(p.id, { title: text.split("\n")[0].replace(/[*_]/g, "").slice(0, 60) || "Study Portal", body: text.split("\n").slice(1).join("\n").replace(/[*_]/g, "").slice(0, 300), url: "/parent", tag: "parent" });
+  if (push.total > 0) results.push({ channel: "push", ok: push.sent > 0, error: push.error });
   if (whatsappReady() && p.whatsapp) results.push(await sendWhatsApp(p.whatsapp, text));
   if (results.length === 0) return { channel: "none", ok: false, error: "No delivery channel connected" };
   const ok = results.filter((r) => r.ok);

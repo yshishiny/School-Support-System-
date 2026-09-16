@@ -5,6 +5,7 @@ import { logoutAction } from "@/lib/actions/auth";
 import { SettingsForm, TelegramSettings } from "@/components/SettingsForm";
 import { MyParentCard, ParentsPanel, type InviteRow, type OverrideRow, type ParentRow } from "@/components/ParentsPanel";
 import { PlacesForm, type PlaceRow } from "@/components/PlacesForm";
+import { PushToggle } from "@/components/PushToggle";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
@@ -31,6 +32,11 @@ export default async function SettingsPage() {
         <Link href="/parent/reports" className="card text-center"><div className="text-3xl">📨</div><div className="font-semibold mt-1">Daily reports</div></Link>
       </div>
       {me && <MyParentCard me={me} />}
+      <section className="card space-y-2">
+        <h2 className="h2">🔔 Notifications on this phone</h2>
+        <p className="text-xs muted">Daily report headline and safety alerts as browser notifications on this device. Telegram below stays the full-text channel.</p>
+        <PushToggle />
+      </section>
       <TelegramSettings chatId={(profile as Profile).telegram_chat_id} botUsername={process.env.TELEGRAM_BOT_USERNAME ?? null} />
       <ParentsPanel me={profile.id} parents={(parents ?? []) as ParentRow[]} invites={(invites ?? []) as InviteRow[]} pattern={family.custody_pattern ?? {}} overrides={(overrides ?? []) as OverrideRow[]} today={today} baseUrl={baseUrl} />
       <SettingsForm family={family} />
