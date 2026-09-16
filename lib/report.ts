@@ -27,6 +27,9 @@ export interface ReportChild {
   access?: { time: string; event: "login" | "visit"; where: string; ip: string | null }[]; // today's entries
   accessWeek?: { days: number; countries: string[]; logins: number } | null; // last 7 days summary
   lastLocation?: { time: string; lat: number; lng: number; source: string; place?: string | null } | null; // from the phone, with consent
+  school?: { off: boolean; reason: string | null; lessons: number } | null;
+  snaps?: { label: string; state: "approved" | "good" | "sent" | "rejected" | "missing" }[]; // show-your-win tasks due today
+  handwriting?: { score: number; before: number | null; focus: string[] } | null; // latest sample this week
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -41,12 +44,14 @@ function accessLines(list: NonNullable<ReportChild["access"]>): string[] {
 }
 
 /** Plain-text daily report, formatted for WhatsApp (bold with *asterisks*). */
-export function buildDailyReport(date: string, children: ReportChild[], parentAccess?: NonNullable<ReportChild["access"]>): string {
+export function buildDailyReport(date: string, children: ReportChild[], parentAccess?: NonNullable<ReportChild["access"]>, custodyLine?: string | null): string {
   const lines: string[] = [`📚 *Study report, ${prettyDate(date)}*`];
+  if (custodyLine) lines.push(custodyLine);
 
   for (const c of children) {
     lines.push("");
     lines.push(`*${c.name}*${c.grade ? ` (Grade ${c.grade})` : ""}`);
+    if (c.school) lines.push(c.school.off ? `🏖️ No school today${c.school.reason && c.school.reason !== "Weekend" ? ` (${c.school.reason})` : ""}.` : `🏫 School day, ${c.school.lessons} lesson${c.school.lessons === 1 ? "" : "s"}.`);
     if (!c.checkin) {
       lines.push("⚠️ No check-in today.");
     } else {
@@ -78,6 +83,11 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       }
       for (const f of p.flags) lines.push(`  ⚠️ ${f}`);
     }
+    if (c.snaps && c.snaps.length) {
+      const mark = { approved: "✅", good: "🟢", sent: "🟡", rejected: "❌", missing: "⬜" } as const;
+      lines.push(`📸 Snaps: ${c.snaps.map((x) => `${mark[x.state]} ${x.label}`).join(" · ")}${c.snaps.some((x) => x.state === "good" || x.state === "sent") ? " · waiting for your tick" : ""}`);
+    }
+    if (c.handwriting) lines.push(`✍️ Handwriting ${c.handwriting.score}/100${c.handwriting.before !== null ? ` (was ${c.handwriting.before})` : ""}${c.handwriting.focus.length ? ` · work on: ${c.handwriting.focus.join(", ")}` : ""}`);
     lines.push(`⭐ +${c.pointsToday} today · balance ${c.balance} · streak ${c.streak}🔥`);
     if (c.coach) lines.push(`🦸 Coach: ${c.coach}`);
     if (c.attention && c.attention.tier !== "none") {
@@ -102,7 +112,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
   }
   if (parentAccess) {
     lines.push("");
-    lines.push("*Parent account*");
+    lines.push("*Parent accounts*");
     lines.push(...accessLines(parentAccess));
   }
   return lines.join("\n");

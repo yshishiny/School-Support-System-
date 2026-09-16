@@ -87,6 +87,7 @@ export default async function AllowancePage() {
             })}
           </ul>
         </div>
+        <p className="text-xs muted">📸 Snap tasks (bed, desk, dish, homework page, handwriting) are basics too. Switch them on and set their weights on the <Link href="/parent/snaps" className="underline">Show your win</Link> page.</p>
         <div>
           <div className="label">Consequences you want available (off by default; never schoolwork)</div>
           <ul className="divide-y divide-line">

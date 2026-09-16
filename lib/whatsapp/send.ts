@@ -82,16 +82,3 @@ export async function findTelegramChat(): Promise<{ chatId: string; name: string
     return { error: err instanceof Error ? err.message : String(err) };
   }
 }
-
-/** Sends the report on every configured channel. Success if any channel delivered. */
-export async function deliverReport(family: { parent_whatsapp: string | null; telegram_chat_id: string | null }, text: string): Promise<SendResult> {
-  const results: SendResult[] = [];
-  if (family.telegram_chat_id) results.push(await sendTelegram(family.telegram_chat_id, text));
-  const wa = (process.env.WHATSAPP_PROVIDER ?? "").toLowerCase();
-  const waReady = (wa === "callmebot" && !!process.env.CALLMEBOT_API_KEY) || (wa === "meta" && !!process.env.META_WA_TOKEN);
-  if (waReady) results.push(await sendWhatsApp(family.parent_whatsapp, text));
-  if (results.length === 0) return { channel: "none", ok: false, error: "No delivery channel configured: connect Telegram in Settings" };
-  const ok = results.filter((r) => r.ok);
-  if (ok.length) return { channel: ok.map((r) => r.channel).join("+"), ok: true };
-  return { channel: results.map((r) => r.channel).join("+"), ok: false, error: results.map((r) => `${r.channel}: ${r.error}`).join(" | ") };
-}

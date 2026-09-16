@@ -1,0 +1,148 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { requireParent, requireStudent } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { todayIn } from "@/lib/dates";
+import { checkSnap } from "@/lib/ai/check-snap";
+import { SNAP_TEMPLATES, handwritingScore, templateByCode, type SnapKind, type SnapTask } from "@/lib/snaps";
+import { SNAP_BUCKET } from "@/lib/snaps/server";
+
+const STUDENT_PATHS = ["/snaps", "/today"];
+const PARENT_PATHS = ["/parent", "/parent/snaps", "/parent/allowance"];
+
+export interface RegisterResult {
+  error?: string;
+  id?: string;
+  verdict?: string;
+  kidNote?: string;
+  earned?: number;
+  handwriting?: { score: number; practiceLine: string; focus: string[] };
+}
+
+/**
+ * After the browser uploaded the picture, record it and let the AI give a first opinion.
+ * The child sees the AI's friendly line right away; a parent approves later.
+ */
+export async function registerSnapAction(taskId: string, path: string, sha256: string): Promise<RegisterResult> {
+  const { profile, family } = await requireStudent();
+  if (!path.startsWith(`${family.id}/${profile.id}/`)) return { error: "Bad upload path." };
+  const admin = createAdminClient();
+  const { data: task } = await admin.from("snap_tasks").select("*").eq("id", taskId).eq("family_id", family.id).eq("enabled", true).maybeSingle();
+  if (!task) return { error: "This task is not active any more." };
+  const t = task as SnapTask;
+  if (t.student_id && t.student_id !== profile.id) return { error: "Not your task." };
+  const today = todayIn(family.timezone);
+
+  // Same picture sent before (by this child): refuse, so an old photo cannot be reused.
+  if (sha256) {
+    const { data: dup } = await admin.from("snaps").select("id, taken_on").eq("student_id", profile.id).eq("sha256", sha256).maybeSingle();
+    if (dup) {
+      await admin.storage.from(SNAP_BUCKET).remove([path]);
+      return { error: `That is the same picture you sent on ${dup.taken_on}. Take a fresh one.` };
+    }
+  }
+  const { data: row, error } = await admin
+    .from("snaps")
+    .insert({ student_id: profile.id, family_id: family.id, task_id: t.id, task_code: t.code, kind: t.kind, path, sha256: sha256 || null, taken_on: today })
+    .select("id")
+    .single();
+  if (error || !row) return { error: error?.message ?? "Could not save." };
+
+  // AI first opinion. Failures never block the child: the snap stays pending for the parent.
+  let verdict = "error";
+  let kidNote = "Sent. A parent will check it.";
+  let handwriting: RegisterResult["handwriting"];
+  try {
+    const { data: file } = await admin.storage.from(SNAP_BUCKET).download(path);
+    if (!file) throw new Error("download failed");
+    const buf = Buffer.from(await file.arrayBuffer());
+    const mt = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
+    const { data: logs } = t.kind === "homework" ? await admin.from("lesson_logs").select("subject_name").eq("student_id", profile.id).eq("log_date", today) : { data: [] };
+    const check = await checkSnap({ media_type: mt, data: buf.toString("base64") }, { kind: t.kind as SnapKind, label: t.label, prompt: t.prompt }, { subjectsToday: (logs ?? []).map((l) => l.subject_name), studentFirstName: profile.full_name.split(" ")[0] });
+    const r = check.result;
+    verdict = r.verdict;
+    kidNote = r.kid_note;
+    const detail: Record<string, unknown> = { ...r };
+    delete detail.note;
+    delete detail.kid_note;
+    delete detail.verdict;
+    delete detail.score;
+    if (check.kind === "handwriting") {
+      const score = handwritingScore(check.result);
+      detail.score = score;
+      handwriting = { score, practiceLine: check.result.practice_line, focus: check.result.focus };
+    }
+    await admin.from("snaps").update({ ai_verdict: r.verdict, ai_score: Math.round(r.score * 100) / 100, ai_note: r.note, ai_detail: Object.keys(detail).length ? detail : null }).eq("id", row.id);
+  } catch (err) {
+    await admin.from("snaps").update({ ai_verdict: "error", ai_note: `AI check failed: ${err instanceof Error ? err.message : String(err)}` }).eq("id", row.id);
+  }
+
+  // Small points for showing up: once per task per day, only when the AI found it plausible.
+  let earned = 0;
+  if (verdict === "looks_good") {
+    const { data: prior } = await admin.from("points_ledger").select("id").eq("student_id", profile.id).eq("ref_type", "snap").eq("reason", `Snap: ${t.label} ${today}`).limit(1);
+    if (!prior?.length) {
+      earned = t.kind === "handwriting" ? 5 : 2;
+      await admin.from("points_ledger").insert({ student_id: profile.id, delta: earned, reason: `Snap: ${t.label} ${today}`, ref_type: "snap", ref_id: row.id });
+    }
+  }
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+  return { id: row.id, verdict, kidNote, earned, handwriting };
+}
+
+/** Parent's one tap: approve or send back. */
+export async function reviewSnapAction(snapId: string, status: "approved" | "rejected", note?: string): Promise<void> {
+  const { family, profile } = await requireParent();
+  const supabase = await createClient();
+  await supabase.from("snaps").update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString(), review_note: (note ?? "").trim().slice(0, 200) || null }).eq("id", snapId).eq("family_id", family.id);
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+}
+
+/** Adds a task from a template (for every child, or one). */
+export async function addSnapTaskAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const code = String(formData.get("code") ?? "");
+  const tpl = templateByCode(code);
+  if (!tpl) return;
+  const studentId = String(formData.get("student_id") ?? "") || null;
+  const supabase = await createClient();
+  await supabase.from("snap_tasks").insert({ family_id: family.id, student_id: studentId, code: tpl.code, kind: tpl.kind, label: tpl.label, emoji: tpl.emoji, prompt: tpl.prompt, days: tpl.days, window_start: tpl.window_start, window_end: tpl.window_end, weight: tpl.weight });
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+}
+
+/** Edits weight, days, window, enabled for one task. */
+export async function updateSnapTaskAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const id = String(formData.get("id") ?? "");
+  const supabase = await createClient();
+  const days = [0, 1, 2, 3, 4, 5, 6].filter((d) => formData.get(`day_${d}`) === "on");
+  const ws = String(formData.get("window_start") ?? "").trim();
+  const we = String(formData.get("window_end") ?? "").trim();
+  await supabase
+    .from("snap_tasks")
+    .update({
+      label: String(formData.get("label") ?? "").trim().slice(0, 60) || undefined,
+      weight: Math.max(0, Math.min(50, Number(formData.get("weight") ?? 10) || 0)),
+      enabled: formData.get("enabled") === "on",
+      days: days.length ? days : [0, 1, 2, 3, 4, 5, 6],
+      window_start: /^\d{2}:\d{2}$/.test(ws) && /^\d{2}:\d{2}$/.test(we) ? ws : null,
+      window_end: /^\d{2}:\d{2}$/.test(ws) && /^\d{2}:\d{2}$/.test(we) ? we : null,
+    })
+    .eq("id", id)
+    .eq("family_id", family.id);
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+}
+
+export async function deleteSnapTaskAction(id: string): Promise<void> {
+  const { family } = await requireParent();
+  const supabase = await createClient();
+  await supabase.from("snap_tasks").delete().eq("id", id).eq("family_id", family.id);
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+}
+
+/** The templates, for the settings UI (server-safe re-export). */
+export async function snapTemplates() {
+  return SNAP_TEMPLATES;
+}

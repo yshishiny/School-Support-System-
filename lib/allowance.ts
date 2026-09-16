@@ -4,7 +4,7 @@
  */
 import { shiftDate, weekdayOf } from "./dates";
 
-export type KpiSource = "parent" | "app";
+export type KpiSource = "parent" | "app" | "snap";
 export interface KpiDef {
   code: string;
   label: string;
@@ -13,6 +13,7 @@ export interface KpiDef {
   weight: number;
   enabled: boolean;
   hint: string;
+  days?: number[]; // snap tasks: weekdays the task is due
 }
 
 export const DEFAULT_KPIS: KpiDef[] = [
@@ -27,12 +28,17 @@ export const DEFAULT_KPIS: KpiDef[] = [
 
 export type KpiOverride = { code: string; weight?: number; enabled?: boolean };
 
-export function mergeKpis(overrides: KpiOverride[] | null | undefined): KpiDef[] {
+/** Snap tasks become KPIs too (code "snap:<task code>"), so "show your win" pays into the same score. */
+export interface SnapKpiInput { code: string; label: string; emoji: string; weight: number; enabled: boolean; days: number[]; kind: string }
+
+export function mergeKpis(overrides: KpiOverride[] | null | undefined, snapTasks: SnapKpiInput[] = []): KpiDef[] {
   const map = new Map((overrides ?? []).map((o) => [o.code, o]));
-  return DEFAULT_KPIS.map((k) => {
+  const base = DEFAULT_KPIS.map((k) => {
     const o = map.get(k.code);
     return o ? { ...k, weight: o.weight ?? k.weight, enabled: o.enabled ?? k.enabled } : k;
   });
+  const snaps = snapTasks.map<KpiDef>((t) => ({ code: `snap:${t.code}`, label: `Snap: ${t.label}`, emoji: t.emoji, source: "snap", weight: t.weight, enabled: t.enabled, days: t.days, hint: t.kind === "handwriting" ? "One sample on its day." : "A picture on each due day; the AI screens, you approve." }));
+  return [...base, ...snaps];
 }
 
 /** The allowance week ends on pay day and starts the day after the previous pay day. */
@@ -67,6 +73,7 @@ export interface WeekInput {
   plannedAttempted: number;
   wellbeingDue: boolean; // was something due in the week
   wellbeingDone: boolean;
+  snapDays?: Record<string, string[]>; // "snap:<code>" -> dates with a counting snap
 }
 
 export interface KpiResult {
@@ -139,6 +146,20 @@ export function scoreWeek(i: WeekInput): WeekResult {
         maxFraction = 1; // missed sets stay open as catch-up
         detail = `${i.plannedAttempted} of ${i.plannedTotal} attempted`;
         if (fraction < 1) hintByCode.set(k.code, "Attempt today's planned quiz (catch-up counts)");
+      }
+    } else if (k.source === "snap") {
+      const dueDays = days.filter((d) => (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d)));
+      const doneDays = (i.snapDays?.[k.code] ?? []).filter((d) => dueDays.includes(d)).length;
+      const remainingDue = Array.from({ length: remaining }, (_, n) => shiftDate(lastDay, n + 1)).filter((d) => (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d))).length;
+      if (dueDays.length === 0) {
+        fraction = 1;
+        maxFraction = 1;
+        detail = remainingDue ? "not due yet this week" : "not due this week";
+      } else {
+        fraction = doneDays / dueDays.length;
+        maxFraction = (doneDays + remainingDue) / (dueDays.length + remainingDue);
+        detail = `${doneDays} of ${dueDays.length} day${dueDays.length === 1 ? "" : "s"} snapped`;
+        if (fraction < 1 && (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(lastDay)) && !(i.snapDays?.[k.code] ?? []).includes(lastDay)) hintByCode.set(k.code, `Snap “${k.label.replace(/^Snap: /, "").toLowerCase()}” today`);
       }
     } else if (k.code === "wellbeing") {
       fraction = i.wellbeingDue && !i.wellbeingDone ? 0 : 1;

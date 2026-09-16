@@ -4,7 +4,7 @@
  */
 import type { PrayerName } from "./prayers";
 
-export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "done";
+export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "done";
 
 export interface QueueItem {
   key: string;
@@ -29,6 +29,7 @@ export interface QueueInput {
   dueCheck: { id: string; title: string; minutes: number } | null;
   reviewsDue: number;
   learnerDone: boolean;
+  snapsDue?: { id: string; label: string; emoji: string }[]; // snap tasks open now and not yet sent today
 }
 
 export function buildQueue(i: QueueInput): QueueItem[] {
@@ -62,6 +63,7 @@ export function buildQueue(i: QueueInput): QueueItem[] {
   if (i.hasNotes && !i.recallDone) q.push({ key: "recall", kind: "recall", title: "Recall quiz on today's lessons", subtitle: "Exactly what you took at school today", href: "/learn?tab=me", cta: "Start", chips: ["+5 +1/correct"] });
   if (i.reviewsDue > 0) q.push({ key: "review", kind: "review", title: `${i.reviewsDue} question${i.reviewsDue === 1 ? "" : "s"} to review`, subtitle: "Ones you missed, back at the right time", href: "/review", cta: "Go", chips: ["+5"] });
   for (const c of i.catchup.slice(0, 2)) q.push({ key: `catchup-${c.id}`, kind: "catchup", title: c.title, subtitle: "Catch-up from an earlier day", href: `/quiz/${c.id}`, cta: "Do it", chips: ["points, no day bonus"] });
+  for (const sn of (i.snapsDue ?? []).slice(0, 2)) q.push({ key: `snap-${sn.id}`, kind: "snap", title: `${sn.emoji} ${sn.label}`, subtitle: "Snap it to show your win", href: "/snaps", cta: "Snap", chips: ["counts for allowance"] });
   if (!i.learnerDone) q.push({ key: "learner", kind: "learner", title: "Tell your coach about you", subtitle: "10 quick questions, no wrong answers", href: "/me/about-me", cta: "Go", chips: ["+15 once"] });
   if (q.length === 0) q.push({ key: "done", kind: "done", title: "All done for today", subtitle: "Streak safe. Tomorrow's quizzes are ready.", href: "/learn", cta: "Practise anyway", chips: [] });
   return q;

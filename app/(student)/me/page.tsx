@@ -91,6 +91,12 @@ export default async function MePage() {
 
       <PointsGuide />
 
+      <Link href="/snaps" className="card flex items-center gap-3">
+        <span className="text-4xl sticker-still">📸</span>
+        <div className="flex-1"><div className="font-bold">Show your win</div><div className="text-xs muted">Snap your bed, desk, dish or homework page. Handwriting corner too.</div></div>
+        <span className="btn-ghost btn-sm">Open</span>
+      </Link>
+
       <Link href="/tour" className="card flex items-center gap-3">
         <span className="text-4xl sticker-still">🗺️</span>
         <div className="flex-1"><div className="font-bold">Take the tour again</div><div className="text-xs muted">Two minutes: what each tab does and how points work.</div></div>

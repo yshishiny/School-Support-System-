@@ -2,7 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { logAccess } from "@/lib/access/log";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/api/cron"];
+const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron"];
 
 export async function updateSession(request: NextRequest, event?: NextFetchEvent) {
   let response = NextResponse.next({ request });

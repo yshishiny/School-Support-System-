@@ -14,10 +14,6 @@ export function SettingsForm({ family }: { family: Family }) {
         <label className="label">Family name</label>
         <input name="name" className="input" defaultValue={family.name} />
       </div>
-      <div>
-        <label className="label">Your WhatsApp number (country code, digits only)</label>
-        <input name="parent_whatsapp" className="input" inputMode="numeric" placeholder="2010xxxxxxxx" defaultValue={family.parent_whatsapp ?? ""} />
-      </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="label">Timezone</label>
@@ -34,14 +30,14 @@ export function SettingsForm({ family }: { family: Family }) {
   );
 }
 
-export function TelegramSettings({ family, botUsername }: { family: Family; botUsername: string | null }) {
+export function TelegramSettings({ chatId, botUsername }: { chatId: string | null; botUsername: string | null }) {
   const [state, action] = useActionState(connectTelegramAction, undefined);
   return (
     <div className="card space-y-3">
-      <h2 className="h2">Telegram delivery</h2>
-      {family.telegram_chat_id ? (
+      <h2 className="h2">Your Telegram</h2>
+      {chatId ? (
         <>
-          <p className="text-sm text-good">Connected. Daily reports go to Telegram chat {family.telegram_chat_id}.</p>
+          <p className="text-sm text-good">Connected. Daily reports and alerts go to your Telegram chat {chatId}.</p>
           <form action={disconnectTelegramAction}><button className="btn-ghost btn-sm">Disconnect</button></form>
         </>
       ) : (

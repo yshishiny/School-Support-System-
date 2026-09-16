@@ -67,13 +67,12 @@ export async function applyTimetableTemplateAction(formData: FormData) {
 export async function updateFamilyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
   const { family } = await requireParent();
   const supabase = await createClient();
-  const whatsapp = String(formData.get("parent_whatsapp") ?? "").replace(/[^\d]/g, "");
   const timezone = String(formData.get("timezone") ?? "Africa/Cairo").trim() || "Africa/Cairo";
   const reportHour = Number(formData.get("report_hour") ?? 20);
   const name = String(formData.get("name") ?? "").trim() || family.name;
   const { error } = await supabase
     .from("families")
-    .update({ parent_whatsapp: whatsapp || null, timezone, report_hour: reportHour, name })
+    .update({ timezone, report_hour: reportHour, name })
     .eq("id", family.id);
   if (error) return { error: error.message };
   revalidatePath("/parent/settings");
@@ -122,7 +121,7 @@ export async function deleteTimetableAction(formData: FormData) {
 }
 
 export async function connectTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
-  const { family } = await requireParent();
+  const { profile } = await requireParent();
   const supabase = await createClient();
   // Accept a bare id, or a pasted link like https://web.telegram.org/a/#8902952794
   const manual = (String(formData.get("telegram_chat_id") ?? "").match(/-?\d{5,}/) ?? [""])[0];
@@ -139,17 +138,17 @@ export async function connectTelegramAction(_prev: { error?: string; ok?: string
   } else if (process.env.TELEGRAM_BOT_TOKEN.startsWith(chatId + ":")) {
     return { error: "That number is the bot's own ID. Leave the box empty, send the bot a message in Telegram, and tap Connect." };
   }
-  const { error } = await supabase.from("families").update({ telegram_chat_id: chatId }).eq("id", family.id);
+  const { error } = await supabase.from("profiles").update({ telegram_chat_id: chatId }).eq("id", profile.id);
   if (error) return { error: error.message };
-  const test = await sendTelegram(chatId, "✅ Study Portal connected. Daily reports will arrive here.");
+  const test = await sendTelegram(chatId, `✅ Study Portal connected for ${profile.full_name.split(" ")[0]}. Daily reports and alerts will arrive here.`);
   revalidatePath("/parent/settings");
   return test.ok ? { ok: `Connected to ${name}. A test message was sent.` } : { error: `Saved, but the test message failed: ${test.error}` };
 }
 
 export async function disconnectTelegramAction() {
-  const { family } = await requireParent();
+  const { profile } = await requireParent();
   const supabase = await createClient();
-  await supabase.from("families").update({ telegram_chat_id: null }).eq("id", family.id);
+  await supabase.from("profiles").update({ telegram_chat_id: null }).eq("id", profile.id);
   revalidatePath("/parent/settings");
 }
 
@@ -163,4 +162,19 @@ export async function setChildHomeLayoutAction(formData: FormData): Promise<void
   await supabase.from("profiles").update({ home_layout: layout }).eq("id", studentId).eq("family_id", family.id).eq("role", "student");
   revalidatePath("/parent/children");
   revalidatePath("/today");
+}
+
+/** Parent marks a school day off (holiday, exam break); the home page and the report say so. */
+export async function setDayOffAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const day = String(formData.get("day") ?? "");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return;
+  const supabase = await createClient();
+  if (formData.get("remove") === "1") {
+    await supabase.from("school_days_off").delete().eq("family_id", family.id).eq("day", day);
+  } else {
+    const label = String(formData.get("label") ?? "").trim().slice(0, 80) || null;
+    await supabase.from("school_days_off").upsert({ family_id: family.id, day, label }, { onConflict: "family_id,day" });
+  }
+  ["/parent", "/parent/children", "/today"].forEach((p) => revalidatePath(p));
 }

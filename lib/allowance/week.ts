@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { amountFor, mergeKpis, scoreWeek, weekFor, type KpiOverride, type WeekResult } from "@/lib/allowance";
 import { dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
 import { shiftDate, todayIn } from "@/lib/dates";
+import { snapCounts, type SnapLite, type SnapTask } from "@/lib/snaps";
 import type { Family } from "@/lib/types";
 
 export interface WeekStatus extends WeekResult {
@@ -17,14 +18,23 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
   const admin = createAdminClient();
   const today = todayIn(family.timezone);
   const { start, end } = weekFor(anchorDate ?? today, family.allowance_pay_weekday);
-  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null);
-  const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }] = await Promise.all([
+  const { data: taskRows } = await admin.from("snap_tasks").select("*").eq("family_id", family.id).or(`student_id.is.null,student_id.eq.${studentId}`);
+  const snapTasks = (taskRows ?? []) as SnapTask[];
+  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks);
+  const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }, { data: snapRows }] = await Promise.all([
     admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", start).lte("tick_date", end),
     admin.from("prayer_logs").select("log_date").eq("student_id", studentId).gte("log_date", start).lte("log_date", end),
     admin.from("checkins").select("checkin_date").eq("student_id", studentId).gte("checkin_date", start).lte("checkin_date", end),
     admin.from("quizzes").select("scheduled_for, attempts(submitted_at)").eq("student_id", studentId).not("scheduled_for", "is", null).gte("scheduled_for", start).lte("scheduled_for", today < end ? today : end),
     admin.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", studentId).gte("taken_on", shiftDate(start, -60)).order("taken_on", { ascending: false }),
+    admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
   ]);
+  const snapDays: Record<string, string[]> = {};
+  for (const sn of (snapRows ?? []) as SnapLite[]) {
+    if (!snapCounts(sn)) continue;
+    const key = `snap:${sn.task_code}`;
+    if (!snapDays[key]?.includes(sn.taken_on)) (snapDays[key] ??= []).push(sn.taken_on);
+  }
   const prayerDays: Record<string, number> = {};
   for (const p of prayers ?? []) prayerDays[p.log_date as string] = (prayerDays[p.log_date as string] ?? 0) + 1;
   const plannedRows = (planned ?? []) as { scheduled_for: string; attempts: { submitted_at: string | null }[] }[];
@@ -45,6 +55,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     plannedAttempted: plannedRows.filter((q) => q.attempts.some((a) => a.submitted_at)).length,
     wellbeingDue,
     wellbeingDone,
+    snapDays,
   });
   return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }

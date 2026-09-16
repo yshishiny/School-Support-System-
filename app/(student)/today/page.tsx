@@ -2,6 +2,9 @@ import { redirect } from "next/navigation";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, hourIn } from "@/lib/dates";
+import { formatInTimeZone } from "date-fns-tz";
+import { dueSnapTasks, taskDayState, windowOpen, type SnapLite } from "@/lib/snaps";
+import { loadSnapTasks } from "@/lib/snaps/server";
 import { computeStreak, levelFor } from "@/lib/points";
 import type { PrayerRow } from "@/components/PrayerPill";
 import { themeById } from "@/lib/themes";
@@ -42,7 +45,16 @@ export default async function TodayPage() {
     supabase.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", profile.id).order("taken_on", { ascending: false }).limit(40),
     supabase.from("consequences").select("*").eq("student_id", profile.id).is("closed_at", null).gte("ends_on", today).order("ends_on"),
   ]);
-  const [hero, allowance] = await Promise.all([heroChoices(profile), family.allowance_enabled ? allowanceWeekStatus(profile.id, family).catch(() => null) : Promise.resolve(null)]);
+  const [hero, allowance, snapTasks, { data: snapRows }] = await Promise.all([
+    heroChoices(profile),
+    family.allowance_enabled ? allowanceWeekStatus(profile.id, family).catch(() => null) : Promise.resolve(null),
+    loadSnapTasks(family.id),
+    supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", today).order("created_at"),
+  ]);
+  const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
+  const snapsDue = dueSnapTasks(today, snapTasks, profile.id)
+    .filter((t) => windowOpen(t, hhmm) && ["due", "rejected"].includes(taskDayState(t, (snapRows ?? []) as SnapLite[], today, hhmm)))
+    .map((t) => ({ id: t.id, label: t.label, emoji: t.emoji }));
 
   const lat = family.latitude ?? 30.0444;
   const lng = family.longitude ?? 31.2357;
@@ -71,6 +83,7 @@ export default async function TodayPage() {
     dueCheck: due.length ? { id: due[0], title: INSTRUMENTS[due[0]].title, minutes: INSTRUMENTS[due[0]].minutes } : null,
     reviewsDue: dueReviews ?? 0,
     learnerDone: !!profile.learner_profile,
+    snapsDue,
   });
 
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);

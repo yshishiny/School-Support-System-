@@ -11,7 +11,9 @@ import { mergeKpis } from "@/lib/allowance";
 import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { classifyPosition, type Place } from "@/lib/places";
 import { signHeroUrls } from "@/lib/hero";
-import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile } from "@/lib/types";
+import { lessonsLine, schoolDay, type DayOff } from "@/lib/school-day";
+import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
+import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -42,7 +44,7 @@ export default async function ParentHome() {
   }
   const ids = students.map((s) => s.id);
   const admin = createAdminClient();
-  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }] = await Promise.all([
+  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }, { data: parentRows }, { data: overrideRows }, { data: timetableRows }, { data: daysOffRows }, { count: snapsPending }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
@@ -56,7 +58,19 @@ export default async function ParentHome() {
     supabase.from("consequences").select("id", { count: "exact", head: true }).eq("family_id", family.id).is("closed_at", null).not("student_claimed_at", "is", null),
     supabase.from("source_findings").select("id", { count: "exact", head: true }).eq("family_id", family.id).eq("status", "new"),
     admin.from("hero_images").select("id, path").in("id", students.map((s) => s.avatar_image_id).filter((x): x is string => !!x)),
+    supabase.from("profiles").select("id, full_name, parent_label").eq("family_id", family.id).eq("role", "parent"),
+    supabase.from("custody_overrides").select("day, parent_id").eq("family_id", family.id).eq("day", today),
+    supabase.from("timetable_entries").select("student_id, weekday, subject_name, start_time, end_time").in("student_id", ids),
+    supabase.from("school_days_off").select("day, label").eq("family_id", family.id).gte("day", today).lte("day", weekAhead),
+    supabase.from("snaps").select("id", { count: "exact", head: true }).eq("family_id", family.id).eq("status", "pending"),
   ]);
+  const timetable = (timetableRows ?? []) as Pick<TimetableEntry, "student_id" | "weekday" | "subject_name" | "start_time" | "end_time">[];
+  const daysOff = (daysOffRows ?? []) as DayOff[];
+  const parents = (parentRows ?? []) as ParentLite[];
+  const custodian = custodianFor(today, family.custody_pattern, (overrideRows ?? []) as CustodyOverride[]);
+  const custodyOn = parents.length > 1 && custodyInUse(family.custody_pattern, (overrideRows ?? []) as CustodyOverride[]);
+  const custodianParent = custodian ? parents.find((p) => p.id === custodian) ?? null : null;
+  const myTurn = askedToday(profile.id, custodian);
   const avatarUrls = await signHeroUrls((heroRows ?? []) as { id: string; path: string }[]);
   const places = (placeRows ?? []) as Place[];
   const kpis = mergeKpis(family.allowance_kpis);
@@ -73,6 +87,7 @@ export default async function ParentHome() {
     { href: "/parent/allowance", label: "earn-back to confirm", n: claimsCount ?? 0, emoji: "🪞" },
     { href: "/parent/import", label: "announcement to review", n: findingsCount ?? 0, emoji: "🏫" },
     { href: "/parent/plan", label: "quiz to prepare", n: planMissing, emoji: "📅" },
+    { href: "/parent/snaps", label: "snap to approve", n: snapsPending ?? 0, emoji: "📸" },
   ].filter((x) => x.n > 0);
 
   return (
@@ -80,13 +95,14 @@ export default async function ParentHome() {
       {/* Header */}
       <header className="flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <div className="text-xs muted">{prettyDate(today)}</div>
+          <div className="text-xs muted">{prettyDate(today)}{custodyOn ? ` · 🏠 ${custodian ? (custodian === profile.id ? "with you today" : `with ${parentName(custodianParent)} today`) : "shared day"}` : ""}</div>
           <h1 className="h1 truncate">Salam, {profile.full_name.split(" ")[0]}</h1>
         </div>
         <nav className="flex gap-1.5">
           {[
             { href: "/parent/plan", emoji: "📅", title: "Quiz plan" },
             { href: "/parent/allowance", emoji: "💵", title: "Allowance" },
+            { href: "/parent/snaps", emoji: "📸", title: "Snaps" },
             { href: "/parent/reports", emoji: "📨", title: "Reports" },
             { href: "/parent/guide", emoji: "❓", title: "Guide" },
           ].map((b) => (
@@ -138,6 +154,8 @@ export default async function ParentHome() {
         const lp = (pings ?? []).find((p) => p.user_id === s.id) ?? null;
         const avatar = s.avatar_image_id ? avatarUrls.get(s.avatar_image_id) ?? null : null;
         const where = lp && places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : null;
+        const school = schoolDay(today, timetable.filter((t) => t.student_id === s.id), daysOff);
+        const schoolTomorrow = schoolDay(shiftDate(today, 1), timetable.filter((t) => t.student_id === s.id), daysOff);
         return (
           <section key={s.id} className="card space-y-3">
             <div className="flex items-center gap-3">
@@ -154,18 +172,31 @@ export default async function ParentHome() {
               <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? "✓ checked in" : "no check-in"}</div>
             </div>
 
+            <Link href="/parent/children" className={`tile !p-2 block text-xs ${school.off ? "border-warn/60" : ""}`}>
+              {school.off ? (
+                <span><b>{school.reason === "Weekend" ? "🏖️ No school today" : `🏖️ ${school.reason}`}</b>{!schoolTomorrow.off && schoolTomorrow.lessons.length ? <span className="muted"> · tomorrow: {lessonsLine(schoolTomorrow.lessons, 4)}</span> : null}</span>
+              ) : (
+                <span><b>🏫 {school.lessons.length} lesson{school.lessons.length === 1 ? "" : "s"}</b> <span className="muted">{lessonsLine(school.lessons, 6)}</span></span>
+              )}
+            </Link>
+
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : "bg-warn") : "bg-panel-2 border border-line"}`} />; })}</div></div>
               <Link href="/parent/plan" className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{todayDone}/{todayQuizzes.length}</div><div className="text-[11px] muted">quizzes today</div></Link>
               <Link href="/parent/allowance" className="tile !p-2"><div className="font-bold text-lg leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{aw ? `${aw.amount}` : "—"}</div><div className="text-[11px] muted">{aw ? `EGP · score ${aw.score}` : "allowance off"}</div></Link>
             </div>
 
-            {family.allowance_enabled && (
+            {family.allowance_enabled && (myTurn ? (
               <div className="space-y-1">
                 <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗</div>
                 <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
               </div>
-            )}
+            ) : (
+              <details className="text-xs">
+                <summary className="cursor-pointer muted">🏠 With {parentName(custodianParent)} today, so the daily taps are theirs{Object.keys(ticks).length ? ` · ${Object.values(ticks).filter(Boolean).length} ✓ ${Object.values(ticks).filter((v) => !v).length} ✗ so far` : ""}. Tap anyway?</summary>
+                <div className="mt-1"><KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} /></div>
+              </details>
+            ))}
 
             <div className="flex items-center gap-2">
               <div className="flex gap-1 flex-1">

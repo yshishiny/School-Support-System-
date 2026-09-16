@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { extractItemsFromMessages } from "@/lib/ai/extract-items";
-import { sendTelegram } from "@/lib/whatsapp/send";
+import { notifyParents } from "@/lib/notify";
 import { todayIn } from "@/lib/dates";
 
 /** Turns a web page into readable text: drops scripts, styles and tags; keeps line breaks around blocks. */
@@ -42,14 +42,12 @@ export async function checkSource(source: { id: string; family_id: string; label
       await admin.from("sources").update({ last_checked_at: now, last_error: null }).eq("id", source.id);
       return { changed: false, items: 0 };
     }
-    const { data: family } = await admin.from("families").select("timezone, telegram_chat_id").eq("id", source.family_id).single();
+    const { data: family } = await admin.from("families").select("timezone").eq("id", source.family_id).single();
     const today = todayIn(family?.timezone ?? "Africa/Cairo");
     const extraction = await extractItemsFromMessages(`[${today}] Page: ${source.label} (${source.url})\n${text}`, today, ["This is a school website or announcements page, not a chat: extract dated announcements, events, exams, holidays, supply lists and deadlines that are still ahead; skip navigation text, old news and boilerplate."]);
     await admin.from("source_findings").insert({ source_id: source.id, family_id: source.family_id, summary: extraction.summary, items: extraction.items });
     await admin.from("sources").update({ last_checked_at: now, last_hash: hash, last_error: null }).eq("id", source.id);
-    if (family?.telegram_chat_id) {
-      await sendTelegram(family.telegram_chat_id, `🏫 *${source.label}* has news.\n${extraction.summary}\n${extraction.items.length} item${extraction.items.length === 1 ? "" : "s"} waiting for your approval under Import.`);
-    }
+    await notifyParents(source.family_id, `🏫 *${source.label}* has news.\n${extraction.summary}\n${extraction.items.length} item${extraction.items.length === 1 ? "" : "s"} waiting for your approval under Import.`);
     return { changed: true, items: extraction.items.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

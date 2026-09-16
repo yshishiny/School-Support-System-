@@ -27,12 +27,12 @@ export async function saveAllowanceSettingsAction(formData: FormData): Promise<v
 
 /** Parent's daily tap: ✓ or ✗ for a parent-judged KPI. Tapping the same value again clears it. */
 export async function tickKpiAction(studentId: string, code: string, value: boolean, date?: string): Promise<void> {
-  const { family } = await requireParent();
+  const { family, profile } = await requireParent();
   const supabase = await createClient();
   const day = date ?? todayIn(family.timezone);
   const { data: existing } = await supabase.from("kpi_ticks").select("id, value").eq("student_id", studentId).eq("tick_date", day).eq("code", code).maybeSingle();
   if (existing && existing.value === value) await supabase.from("kpi_ticks").delete().eq("id", existing.id);
-  else await supabase.from("kpi_ticks").upsert({ student_id: studentId, family_id: family.id, tick_date: day, code, value }, { onConflict: "student_id,tick_date,code" });
+  else await supabase.from("kpi_ticks").upsert({ student_id: studentId, family_id: family.id, tick_date: day, code, value, ticked_by: profile.id }, { onConflict: "student_id,tick_date,code" });
   PATHS.forEach((p) => revalidatePath(p));
 }
 

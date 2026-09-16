@@ -34,13 +34,15 @@ export async function signupAction(_prev: { error?: string; done?: boolean } | u
   if (!email || password.length < 8 || !fullName) {
     return { error: "Fill in your name, email and a password of at least 8 characters." };
   }
+  const inviteToken = String(formData.get("invite_token") ?? "").trim();
+  const parentLabel = String(formData.get("parent_label") ?? "").trim().slice(0, 24);
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
-    options: { data: { role: "parent", full_name: fullName, family_name: familyName } },
+    options: { data: { role: "parent", full_name: fullName, family_name: familyName, invite_token: inviteToken || undefined, parent_label: parentLabel || undefined } },
   });
-  if (error) return { error: error.message };
+  if (error) return { error: /invite link/i.test(error.message) ? "This invite link is no longer valid. Ask for a new one." : error.message };
   if (data.session) redirect("/parent");
   return { done: true };
 }

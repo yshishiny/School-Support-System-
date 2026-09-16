@@ -6,7 +6,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { INSTRUMENTS, scoreInstrument, type Instrument } from "@/lib/wellbeing";
 import { classifyRisk, coachChat, type ChatTurn } from "@/lib/ai/coach-chat";
 import { HELPLINES, parentAlertText, type RiskCategory, type RiskLevel } from "@/lib/safety";
-import { sendTelegram } from "@/lib/whatsapp/send";
+import { notifyParents } from "@/lib/notify";
 import { learnerPromptLine } from "@/lib/learner";
 import { themeById } from "@/lib/themes";
 import { todayIn } from "@/lib/dates";
@@ -20,8 +20,8 @@ async function raiseAlert(opts: { familyId: string; studentId: string; studentNa
   const since = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
   const { data: recent } = await admin.from("safety_alerts").select("id").eq("student_id", opts.studentId).eq("level", opts.level).gte("created_at", since).limit(1);
   if (recent && recent.length) return;
-  const { data: family } = await admin.from("families").select("telegram_chat_id").eq("id", opts.familyId).single();
-  const send = await sendTelegram(family?.telegram_chat_id ?? null, parentAlertText(opts.studentName, opts.level, opts.category));
+  // Safety alerts always go to every parent, whatever the custody day.
+  const send = await notifyParents(opts.familyId, parentAlertText(opts.studentName, opts.level, opts.category));
   await admin.from("safety_alerts").insert({ family_id: opts.familyId, student_id: opts.studentId, level: opts.level, category: opts.category, summary: opts.summary, notified: send.ok });
   revalidatePath("/parent");
   revalidatePath("/parent/progress");

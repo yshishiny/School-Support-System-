@@ -9,10 +9,8 @@ export type RedemptionStatus = "pending" | "approved" | "rejected" | "delivered"
 export interface Family {
   id: string;
   name: string;
-  parent_whatsapp: string | null;
   timezone: string;
   report_hour: number;
-  telegram_chat_id: string | null;
   latitude: number | null;
   longitude: number | null;
   allowance_enabled: boolean;
@@ -20,6 +18,7 @@ export interface Family {
   allowance_pay_weekday: number;
   allowance_kpis: { code: string; weight?: number; enabled?: boolean }[] | null;
   practices_enabled: string[];
+  custody_pattern: Record<string, string | null>; // weekday ("0".."6") -> parent id; empty = shared
 }
 
 export interface Consequence {
@@ -61,7 +60,10 @@ export interface Profile {
   banner_zoom: number;
   banner_x: number;
   banner_y: number;
-
+  // parents only
+  telegram_chat_id: string | null;
+  whatsapp: string | null;
+  parent_label: string | null; // "Dad", "Mum"…
 }
 
 export interface Subject {

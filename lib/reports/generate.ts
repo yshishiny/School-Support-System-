@@ -1,6 +1,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { buildDailyReport, type ReportChild } from "@/lib/report";
-import { deliverReport } from "@/lib/whatsapp/send";
+import { notifyParents, familyParents } from "@/lib/notify";
+import { custodianFor, parentName, type CustodyOverride } from "@/lib/custody";
+import { schoolDay, type DayOff } from "@/lib/school-day";
+import { dueSnapTasks, taskDayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { computeStreak } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { describeAccess } from "@/lib/device";
@@ -23,10 +26,13 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   }
 
   const { data: students } = await admin.from("profiles").select("*").eq("family_id", familyId).eq("role", "student").order("grade", { ascending: false });
-  const { data: parents } = await admin.from("profiles").select("id").eq("family_id", familyId).eq("role", "parent");
+  const parents = await familyParents(familyId);
+  const { data: overrideRows } = await admin.from("custody_overrides").select("day, parent_id").eq("family_id", familyId).eq("day", today);
+  const custodian = custodianFor(today, family.custody_pattern, (overrideRows ?? []) as CustodyOverride[]);
+  const custodianParent = custodian ? parents.find((p) => p.id === custodian) ?? null : null;
   // Entries today (family-local day) for every account in the family.
   const dayStartIso = new Date(`${today}T00:00:00${formatInTimeZone(new Date(), family.timezone, "xxx")}`).toISOString();
-  const memberIds = [...(students ?? []).map((s) => s.id), ...(parents ?? []).map((p) => p.id)];
+  const memberIds = [...(students ?? []).map((s) => s.id), ...parents.map((p) => p.id)];
   const weekStartIso = new Date(Date.parse(dayStartIso) - 6 * 86400000).toISOString();
   const { data: accessAll } = memberIds.length ? await admin.from("access_logs").select("user_id, event, ip, city, country, device_os, device_browser, created_at").in("user_id", memberIds).gte("created_at", weekStartIso).order("created_at") : { data: [] };
   const accessRows = (accessAll ?? []).filter((r) => r.created_at >= dayStartIso);
@@ -44,8 +50,27 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     const p = (pingRows ?? []).find((r) => r.user_id === id);
     return p ? { time: formatInTimeZone(new Date(p.created_at), family.timezone, "HH:mm"), lat: p.latitude as number, lng: p.longitude as number, source: p.source as string, place: places.length ? classifyPosition(p.latitude as number, p.longitude as number, places, id).label : null } : null;
   };
+  const studentIds = (students ?? []).map((s) => s.id);
+  const [{ data: ttRows }, { data: offRows }, { data: taskRows }, { data: snapRows }] = await Promise.all([
+    studentIds.length ? admin.from("timetable_entries").select("student_id, weekday, subject_name, start_time, end_time").in("student_id", studentIds) : { data: [] },
+    admin.from("school_days_off").select("day, label").eq("family_id", familyId).eq("day", today),
+    admin.from("snap_tasks").select("*").eq("family_id", familyId),
+    studentIds.length ? admin.from("snaps").select("student_id, task_code, kind, taken_on, status, ai_verdict, ai_detail, created_at").in("student_id", studentIds).gte("taken_on", shiftDate(today, -14)).order("created_at") : { data: [] },
+  ]);
+  const snapTasks = (taskRows ?? []) as SnapTask[];
+  type SnapRow = SnapLite & { student_id: string; kind: string; ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null };
+  const allSnaps = (snapRows ?? []) as SnapRow[];
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
+    const sd = schoolDay(today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string; start_time: string; end_time: string | null }[]).filter((t) => t.student_id === s.id), (offRows ?? []) as DayOff[]);
+    const mySnaps = allSnaps.filter((x) => x.student_id === s.id);
+    const snapsToday = dueSnapTasks(today, snapTasks, s.id).filter((t) => t.kind !== "handwriting").map((t) => {
+      const st = taskDayState(t, mySnaps, today, "23:59");
+      return { label: t.label, state: (st === "due" || st === "closed" ? "missing" : st) as "approved" | "good" | "sent" | "rejected" | "missing" };
+    });
+    const hw = mySnaps.filter((x) => x.kind === "handwriting" && x.ai_detail?.score !== undefined);
+    const hwLatest = hw[hw.length - 1];
+    const handwriting = hwLatest && hwLatest.taken_on >= shiftDate(today, -6) ? { score: hwLatest.ai_detail!.score!, before: hw.length > 1 ? hw[hw.length - 2].ai_detail!.score ?? null : null, focus: hwLatest.ai_detail!.focus ?? [] } : null;
     const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
     const [{ data: checkin }, { data: allCheckins }, { data: ledger }, { data: assignments }, { data: pending }, { data: attempts }, { count: reviewsDue }, { data: covered }, { data: prayers }, { data: coach }, { data: attention }] = await Promise.all([
       admin.from("checkins").select("*, checkin_items(status, assignments(title, kind))").eq("student_id", s.id).eq("checkin_date", today).maybeSingle(),
@@ -97,6 +122,9 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       covered: (covered ?? []).map((l) => ({ subject: l.subject_name, note: l.note })),
       prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       coach: coach?.headline ?? null,
+      school: { off: sd.off, reason: sd.reason, lessons: sd.lessons.length },
+      snaps: snapsToday,
+      handwriting,
       access: accessFor(s.id),
       accessWeek: weekFor(s.id),
       lastLocation: lastLocationFor(s.id),
@@ -111,8 +139,10 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     });
   }
 
-  const body = buildDailyReport(today, children, (parents ?? []).flatMap((p) => accessFor(p.id)));
-  const send = await deliverReport(family, body);
+  const custodyLine = custodian ? `🏠 Tonight the kids are with ${parentName(custodianParent)}.` : null;
+  const body = buildDailyReport(today, children, parents.flatMap((p) => accessFor(p.id)), custodyLine);
+  // Each parent gets the same report; the custody line is personal ("with you tonight").
+  const send = await notifyParents(familyId, (p) => (custodian === p.id ? body.replace(`with ${parentName(custodianParent)}.`, "with you.") : body));
   const row = {
     family_id: familyId,
     report_date: today,

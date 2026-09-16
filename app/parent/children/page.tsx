@@ -2,7 +2,8 @@ import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddChildForm } from "@/components/AddChildForm";
 import { HeroUploader } from "@/components/HeroUploader";
-import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction, setChildHomeLayoutAction } from "@/lib/actions/children";
+import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction, setChildHomeLayoutAction, setDayOffAction } from "@/lib/actions/children";
+import { prettyDate, todayIn } from "@/lib/dates";
 import type { Profile, Subject, TimetableEntry } from "@/lib/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -13,10 +14,12 @@ export default async function ChildrenPage() {
   const { data: kids } = await supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false });
   const students = (kids ?? []) as Profile[];
   const ids = students.map((s) => s.id);
-  const [{ data: subjects }, { data: timetable }, { data: heroes }] = await Promise.all([
+  const today = todayIn(family.timezone);
+  const [{ data: subjects }, { data: timetable }, { data: heroes }, { data: daysOff }] = await Promise.all([
     ids.length ? supabase.from("subjects").select("*").in("student_id", ids).order("name") : { data: [] },
     ids.length ? supabase.from("timetable_entries").select("*").in("student_id", ids).order("weekday").order("start_time") : { data: [] },
     ids.length ? supabase.from("hero_images").select("id, student_id").in("student_id", ids) : { data: [] },
+    supabase.from("school_days_off").select("id, day, label").eq("family_id", family.id).gte("day", today).order("day").limit(40),
   ]);
 
   return (
@@ -102,6 +105,25 @@ export default async function ChildrenPage() {
         );
       })}
       <AddChildForm />
+      <section className="card space-y-2">
+        <h2 className="h2">🏖️ School days off</h2>
+        <p className="text-xs muted">Holidays, exam breaks, strikes. Fridays and Saturdays are off already. Marked days show as “no school” on your home page and in the report.</p>
+        <form action={setDayOffAction} className="flex flex-wrap gap-2 items-end">
+          <div><label className="label">Date</label><input name="day" type="date" className="input" defaultValue={today} required /></div>
+          <div className="flex-1 min-w-[10rem]"><label className="label">Reason (optional)</label><input name="label" className="input" placeholder="6 October holiday" /></div>
+          <button className="btn-primary">Mark off</button>
+        </form>
+        {(daysOff ?? []).length > 0 && (
+          <ul className="divide-y divide-line text-sm">
+            {(daysOff ?? []).map((d) => (
+              <li key={d.id} className="py-1.5 flex items-center gap-2">
+                <span className="flex-1">{prettyDate(d.day)}{d.label ? ` · ${d.label}` : ""}</span>
+                <form action={setDayOffAction}><input type="hidden" name="day" value={d.day} /><input type="hidden" name="remove" value="1" /><button className="btn-ghost btn-sm">✕</button></form>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </main>
   );
 }

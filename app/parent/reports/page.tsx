@@ -32,7 +32,7 @@ export default async function ReportsPage() {
       <h1 className="h1">Daily reports</h1>
       <div className="card space-y-3">
         <p className="text-sm muted">
-          A report is generated automatically every evening and sent to {family.telegram_chat_id ? "Telegram" : "Telegram once connected in Settings"}{family.parent_whatsapp ? ` and WhatsApp +${family.parent_whatsapp}` : ""}. You can also trigger it now.
+          A report is generated automatically every evening and sent to every parent who connected Telegram (or WhatsApp) under More. You can also trigger it now.
         </p>
         <SendReportButton lastStatus={reports[0] ? `${reports[0].status} via ${reports[0].channel}${reports[0].error ? ` (${reports[0].error})` : ""} · ${String(reports[0].sent_at ?? reports[0].created_at ?? "").slice(0, 16).replace("T", " ")}` : null} />
       </div>

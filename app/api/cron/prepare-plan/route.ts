@@ -4,8 +4,9 @@ import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
 import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
 import { snapshotAttention } from "@/lib/coach/signals-run";
 import { closeAllowanceWeek } from "@/lib/allowance/week";
-import { sendTelegram } from "@/lib/whatsapp/send";
+import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
+import { pruneOldSnaps } from "@/lib/snaps/server";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -38,7 +39,7 @@ export async function GET(request: Request) {
     }
   }
   // Allowance: close last week the morning after pay day and tell the parent.
-  const { data: fams } = await admin.from("families").select("id, timezone, telegram_chat_id, allowance_enabled, allowance_amount, allowance_pay_weekday, allowance_kpis").eq("allowance_enabled", true);
+  const { data: fams } = await admin.from("families").select("id, timezone, allowance_enabled, allowance_amount, allowance_pay_weekday, allowance_kpis").eq("allowance_enabled", true);
   for (const f of fams ?? []) {
     const lines: string[] = [];
     for (const s of (students ?? []).filter((x) => x.family_id === f.id)) {
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
       }
     }
     if (lines.length) {
-      await sendTelegram(f.telegram_chat_id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`);
+      await notifyParents(f.id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`);
       (results[f.id] ??= []).push(`allowance closed: ${lines.join("; ")}`);
     }
   }
@@ -83,6 +84,13 @@ export async function GET(request: Request) {
     } catch (err) {
       results.sources = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
+  }
+  // Snap pictures: 30-day retention (handwriting samples a year).
+  try {
+    const n = await pruneOldSnaps();
+    if (n) results.snaps = [`pruned ${n}`];
+  } catch (err) {
+    results.snaps = [`prune error: ${err instanceof Error ? err.message : String(err)}`];
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));
   return NextResponse.json({ ok: true, seconds: Math.round((Date.now() - started) / 1000), results });
