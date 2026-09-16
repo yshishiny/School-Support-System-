@@ -1,21 +1,28 @@
 import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 import { computeStreak } from "@/lib/points";
-import { decideRedemptionAction } from "@/lib/actions/rewards";
 import { loadPlan } from "@/lib/plan/prepare";
 import { acknowledgeAlertAction } from "@/lib/actions/wellbeing";
 import { KpiTicks } from "@/components/KpiTicks";
 import { mergeKpis } from "@/lib/allowance";
 import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { classifyPosition, type Place } from "@/lib/places";
-import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type Redemption } from "@/lib/types";
+import { signHeroUrls } from "@/lib/hero";
+import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile } from "@/lib/types";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
+const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
+
+function ago(iso: string): string {
+  const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  return mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
+}
 
 export default async function ParentHome() {
-  const { family } = await requireParent();
+  const { family, profile } = await requireParent();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
   const weekAhead = shiftDate(today, 7);
@@ -34,73 +41,87 @@ export default async function ParentHome() {
     );
   }
   const ids = students.map((s) => s.id);
-  const [{ data: checkins }, { data: open }, { data: ledger }, { data: pending }, { data: report }, { data: prayers }, { data: alerts }] = await Promise.all([
+  const admin = createAdminClient();
+  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
-    supabase.from("redemptions").select("*, rewards(title, emoji, kind, cash_amount_egp), profiles(full_name)").in("student_id", ids).eq("status", "pending"),
-    supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
+    supabase.from("redemptions").select("id", { count: "exact", head: true }).in("student_id", ids).eq("status", "pending"),
+    supabase.from("daily_reports").select("report_date, status, sent_at").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
     supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
     supabase.from("safety_alerts").select("*, profiles(full_name)").eq("family_id", family.id).is("acknowledged_at", null).order("created_at", { ascending: false }),
+    supabase.from("location_pings").select("user_id, latitude, longitude, accuracy_m, source, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(50),
+    supabase.from("places").select("id, kind, label, latitude, longitude, radius_m, student_id").eq("family_id", family.id),
+    supabase.from("kpi_ticks").select("student_id, code, value").in("student_id", ids).eq("tick_date", today),
+    supabase.from("consequences").select("id", { count: "exact", head: true }).eq("family_id", family.id).is("closed_at", null).not("student_claimed_at", "is", null),
+    supabase.from("source_findings").select("id", { count: "exact", head: true }).eq("family_id", family.id).eq("status", "new"),
+    admin.from("hero_images").select("id, path").in("id", students.map((s) => s.avatar_image_id).filter((x): x is string => !!x)),
   ]);
-  const { data: pings } = await supabase.from("location_pings").select("user_id, latitude, longitude, accuracy_m, source, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(50);
-  const lastPing = (id: string) => (pings ?? []).find((p) => p.user_id === id) ?? null;
-  const { data: placeRows } = await supabase.from("places").select("id, kind, label, latitude, longitude, radius_m, student_id").eq("family_id", family.id);
+  const avatarUrls = await signHeroUrls((heroRows ?? []) as { id: string; path: string }[]);
   const places = (placeRows ?? []) as Place[];
   const kpis = mergeKpis(family.allowance_kpis);
-  const { data: todayTicks } = await supabase.from("kpi_ticks").select("student_id, code, value").in("student_id", ids).eq("tick_date", today);
   const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
-  const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
-  const planReady = plans.reduce((n, p) => n + (p ? p.quizzes.filter((q) => q.scheduled_for >= p.today).length : 0), 0);
-  const planWanted = plans.reduce((n, p) => n + (p ? p.wanted.length : 0), 0);
   const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
+  const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
   const allCk = (checkins ?? []) as CK[];
   const openAll = (open ?? []) as Assignment[];
-  const pendingList = (pending ?? []) as (Redemption & { rewards: { title: string; emoji: string; kind: string; cash_amount_egp: number | null } | null; profiles: { full_name: string } | null })[];
+
+  const needs: { href: string; label: string; n: number; emoji: string }[] = [
+    { href: "/parent/rewards", label: "reward request", n: pendingCount ?? 0, emoji: "🎁" },
+    { href: "/parent/allowance", label: "earn-back to confirm", n: claimsCount ?? 0, emoji: "🪞" },
+    { href: "/parent/import", label: "announcement to review", n: findingsCount ?? 0, emoji: "🏫" },
+    { href: "/parent/plan", label: "quiz to prepare", n: planMissing, emoji: "📅" },
+  ].filter((x) => x.n > 0);
 
   return (
-    <main className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="h1">{prettyDate(today)}</h1>
-        <div className="flex gap-2">
-          <Link href="/parent/allowance" className="btn-ghost btn-sm">💵 Allowance</Link>
-          <Link href="/parent/guide" className="btn-ghost btn-sm">❓ Guide</Link>
-          <Link href="/parent/plan" className="btn-ghost btn-sm">📅 Quiz plan</Link>
-          <Link href="/parent/reports" className="btn-ghost btn-sm">Reports</Link>
+    <main className="space-y-3">
+      {/* Header */}
+      <header className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="text-xs muted">{prettyDate(today)}</div>
+          <h1 className="h1 truncate">Salam, {profile.full_name.split(" ")[0]}</h1>
         </div>
-      </div>
+        <nav className="flex gap-1.5">
+          {[
+            { href: "/parent/plan", emoji: "📅", title: "Quiz plan" },
+            { href: "/parent/allowance", emoji: "💵", title: "Allowance" },
+            { href: "/parent/reports", emoji: "📨", title: "Reports" },
+            { href: "/parent/guide", emoji: "❓", title: "Guide" },
+          ].map((b) => (
+            <Link key={b.href} href={b.href} title={b.title} className="h-10 w-10 rounded-full border-2 border-line bg-panel flex items-center justify-center text-lg hover:border-accent">{b.emoji}</Link>
+          ))}
+        </nav>
+      </header>
 
+      {/* Alerts */}
       {openAlerts.map((a) => (
-        <section key={a.id} className={`card space-y-2 ${a.level === "red" ? "border-bad" : "border-warn"}`}>
+        <section key={a.id} className={`card !py-3 space-y-2 ${a.level === "red" ? "border-bad" : "border-warn"}`}>
           <div className="flex items-start gap-3">
-            <span className="text-3xl">{a.level === "red" ? "🚨" : "💛"}</span>
+            <span className="text-2xl">{a.level === "red" ? "🚨" : "💛"}</span>
             <div className="flex-1 text-sm">
               <div className="font-bold">{a.level === "red" ? "Please talk to" : "A gentle heads-up about"} {a.profiles?.full_name?.split(" ")[0]}</div>
-              <div className="muted">{a.summary}. {a.level === "red" ? "Sit with him calmly today and listen first. If you think he is in immediate danger call 123." : "A relaxed conversation this week, without grades, would help."} What he wrote stays private; the app only tells you that you are needed.</div>
-              <div className="text-[11px] muted mt-1">{String(a.created_at).slice(0, 16).replace("T", " ")}</div>
+              <div className="muted text-xs">{a.summary}. {a.level === "red" ? "Sit with him calmly today and listen first. If you think he is in immediate danger call 123." : "A relaxed conversation this week, without grades, would help."} What he wrote stays private.</div>
             </div>
+            <form action={acknowledgeAlertAction.bind(null, a.id)}><button className="btn-ghost btn-sm">Done</button></form>
           </div>
-          <form action={acknowledgeAlertAction.bind(null, a.id)} className="flex justify-end"><button className="btn-ghost btn-sm">I have talked to him</button></form>
         </section>
       ))}
 
-      <Link href="/parent/plan" className={`card flex items-center gap-3 ${planMissing > 0 ? "border-warn/60" : "border-good/40"}`}>
-        <span className="text-3xl">📅</span>
-        <div className="flex-1">
-          <div className="font-bold">Weekly quiz plan</div>
-          <div className="text-xs muted">
-            {planWanted === 0 ? "No school days found in the timetables yet." : `${planReady} of ${planWanted} quizzes ready for the next 7 days.`}
-            {planMissing > 0 ? ` ${planMissing} still to prepare.` : planWanted > 0 ? " All set." : ""}
-          </div>
+      {/* Needs you */}
+      {needs.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {needs.map((x) => (
+            <Link key={x.href} href={x.href} className="chip !border-accent/60">{x.emoji} {x.n} {x.label}{x.n === 1 ? "" : "s"}</Link>
+          ))}
         </div>
-        <span className={planMissing > 0 ? "btn-primary btn-sm" : "btn-ghost btn-sm"}>{planMissing > 0 ? "Prepare" : "Open"}</span>
-      </Link>
+      )}
 
-      {students.map((s) => {
+      {/* Kids */}
+      {students.map((s, idx) => {
         const mine = allCk.filter((c) => c.student_id === s.id);
-        const ck = mine.find((c) => c.checkin_date === today);
+        const ck = mine.find((c) => c.checkin_date === today) ?? null;
         const streak = computeStreak(mine.map((c) => c.checkin_date), today) || computeStreak(mine.map((c) => c.checkin_date), shiftDate(today, -1));
         const balance = (ledger ?? []).filter((l) => l.student_id === s.id).reduce((a, l) => a + l.delta, 0);
         const overdue = openAll.filter((a) => a.student_id === s.id && a.due_date && a.due_date < today && (a.kind === "homework" || a.kind === "project"));
@@ -108,102 +129,83 @@ export default async function ParentHome() {
         const last7 = Array.from({ length: 7 }, (_, i) => shiftDate(today, -6 + i));
         const ticks: Record<string, boolean> = {};
         (todayTicks ?? []).filter((t) => t.student_id === s.id).forEach((t) => (ticks[t.code] = t.value));
-        const aw = allowanceStatus[students.indexOf(s)];
+        const aw = allowanceStatus[idx];
+        const plan = plans[idx];
+        const todayQuizzes = plan ? plan.quizzes.filter((q) => q.scheduled_for === today) : [];
+        const todayDone = todayQuizzes.filter((q) => q.attempts.some((a) => a.submitted_at)).length;
+        const prayed = (prayers ?? []).filter((p) => p.student_id === s.id);
+        const onTime = prayed.filter((p) => p.status === "on_time").length;
+        const lp = (pings ?? []).find((p) => p.user_id === s.id) ?? null;
+        const avatar = s.avatar_image_id ? avatarUrls.get(s.avatar_image_id) ?? null : null;
+        const where = lp && places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : null;
         return (
           <section key={s.id} className="card space-y-3">
-            {(() => {
-              const lp = lastPing(s.id);
-              if (!lp) return null;
-              const when = new Date(lp.created_at);
-              const mins = Math.round((Date.now() - when.getTime()) / 60000);
-              const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
-              return (
-                <a href={`https://maps.google.com/?q=${lp.latitude},${lp.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs rounded-xl border border-line px-2.5 py-1.5">
-                  <span>📍</span>
-                  <span className="flex-1">Last seen {ago}: <b>{places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : "location"}</b> (at his {lp.source}){lp.accuracy_m ? ` · ±${lp.accuracy_m} m` : ""}</span>
-                  <span className="underline">map</span>
-                </a>
-              );
-            })()}
+            <div className="flex items-center gap-3">
+              <Link href="/parent/children" className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
+                {avatar ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatar} alt="" className="h-full w-full object-cover" />
+                ) : s.avatar_emoji}
+              </Link>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
+                <div className="text-xs muted">{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
+              </div>
+              <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? "✓ checked in" : "no check-in"}</div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center">
+              <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : "bg-warn") : "bg-panel-2 border border-line"}`} />; })}</div></div>
+              <Link href="/parent/plan" className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{todayDone}/{todayQuizzes.length}</div><div className="text-[11px] muted">quizzes today</div></Link>
+              <Link href="/parent/allowance" className="tile !p-2"><div className="font-bold text-lg leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{aw ? `${aw.amount}` : "—"}</div><div className="text-[11px] muted">{aw ? `EGP · score ${aw.score}` : "allowance off"}</div></Link>
+            </div>
+
             {family.allowance_enabled && (
-              <div className="rounded-xl border border-line p-2 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold">Basics today</span>
-                  {aw && <Link href="/parent/allowance" className="muted">💵 {aw.amount} EGP · score {aw.score} · day {aw.elapsedDays}/7</Link>}
-                </div>
+              <div className="space-y-1">
+                <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗</div>
                 <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
               </div>
             )}
-            <div className="flex items-center gap-3">
-              <div className="text-3xl">{s.avatar_emoji}</div>
-              <div className="flex-1">
-                <div className="font-bold">{s.full_name} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
-                <div className="text-xs muted">{balance} ⭐ · {streak}🔥 streak</div>
+
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1 flex-1">
+                {last7.map((d) => {
+                  const has = mine.some((c) => c.checkin_date === d);
+                  return <div key={d} title={d} className={`h-1.5 flex-1 rounded ${has ? "bg-good" : d === today ? "bg-panel-2 border border-line" : "bg-bad/40"}`} />;
+                })}
               </div>
-              <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? "checked in" : "no check-in yet"}</div>
+              <span className="text-[11px] muted">7 days</span>
             </div>
 
-            <div className="flex gap-1">
-              {last7.map((d) => {
-                const has = mine.some((c) => c.checkin_date === d);
-                return <div key={d} title={d} className={`h-2 flex-1 rounded ${has ? "bg-good" : d === today ? "bg-panel-2 border border-line" : "bg-bad/40"}`} />;
-              })}
-            </div>
+            {(overdue.length > 0 || tests.length > 0) && (
+              <div className="text-xs space-y-0.5">
+                {overdue.length > 0 && <div className="text-bad">⏰ Overdue: {overdue.map((o) => o.title).join(", ")}</div>}
+                {tests.length > 0 && <div className="text-warn">🎯 {tests.map((t) => `${t.title} (${prettyDate(t.due_date!)})`).join(", ")}</div>}
+              </div>
+            )}
 
             {ck && (
-              <div className="text-sm space-y-1">
-                <div>{ck.mood ? MOOD[ck.mood] : ""} {ck.minutes_studied} min studied · {ck.checkin_items.filter((i) => i.status === "done").length}/{ck.checkin_items.length} tasks done</div>
-                {ck.checkin_items.map((i) => (
-                  <div key={i.id} className="text-xs muted">
-                    {i.status === "done" ? "✅" : i.status === "partial" ? "🟡" : "❌"} {i.assignments ? `${KIND_EMOJI[i.assignments.kind]} ${i.assignments.title}` : "task"}
-                  </div>
-                ))}
-                {ck.learned && <div className="text-xs"><span className="muted">Learned:</span> {ck.learned}</div>}
-                {ck.stuck_on && <div className="text-xs text-warn"><span className="muted">Stuck on:</span> {ck.stuck_on}</div>}
-              </div>
-            )}
-
-            <div className="text-xs muted">
-              🕌 {["fajr", "dhuhr", "asr", "maghrib", "isha"].map((p) => {
-                const log = (prayers ?? []).find((x) => x.student_id === s.id && x.prayer === p);
-                return <span key={p} className="mr-2">{log ? (log.status === "on_time" ? "✅" : "🟡") : "⬜"} {p[0].toUpperCase() + p.slice(1)}</span>;
-              })}
-            </div>
-            {overdue.length > 0 && (
-              <div className="text-xs text-bad">⏰ Overdue: {overdue.map((o) => o.title).join(", ")}</div>
-            )}
-            {tests.length > 0 && (
-              <div className="text-xs text-warn">🎯 {tests.map((t) => `${t.title} (${prettyDate(t.due_date!)})`).join(", ")}</div>
+              <details className="text-sm">
+                <summary className="cursor-pointer muted text-xs">Today&apos;s check-in · {ck.mood ? MOOD[ck.mood] : ""} {ck.minutes_studied} min · {ck.checkin_items.filter((i) => i.status === "done").length}/{ck.checkin_items.length} tasks</summary>
+                <div className="mt-1 space-y-1">
+                  {ck.checkin_items.map((i) => (
+                    <div key={i.id} className="text-xs muted">{i.status === "done" ? "✅" : i.status === "partial" ? "🟡" : "❌"} {i.assignments ? `${KIND_EMOJI[i.assignments.kind]} ${i.assignments.title}` : "task"}</div>
+                  ))}
+                  {ck.learned && <div className="text-xs"><span className="muted">Learned:</span> {ck.learned}</div>}
+                  {ck.stuck_on && <div className="text-xs text-warn"><span className="muted">Stuck on:</span> {ck.stuck_on}</div>}
+                </div>
+              </details>
             )}
           </section>
         );
       })}
 
-      {pendingList.length > 0 && (
-        <section className="card space-y-2">
-          <h2 className="h2">🎁 Reward requests</h2>
-          {pendingList.map((r) => (
-            <div key={r.id} className="flex items-center gap-2 text-sm">
-              <div className="flex-1">
-                <b>{r.profiles?.full_name}</b> wants {r.rewards?.emoji} {r.rewards?.title}
-                {r.rewards?.kind === "cash" && r.rewards.cash_amount_egp ? ` (${Number(r.rewards.cash_amount_egp)} EGP)` : ""} · {r.points_spent} pts
-              </div>
-              <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="approved" /><button className="btn-primary btn-sm">Approve</button></form>
-              <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="rejected" /><button className="btn-ghost btn-sm">No</button></form>
-            </div>
-          ))}
-        </section>
-      )}
-
-      {report && (
-        <section className="card">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="h2">Last report · {prettyDate(report.report_date)}</h2>
-            <span className={`badge ${report.status === "sent" ? "text-good" : report.status === "failed" ? "text-bad" : "text-warn"}`}>{report.status}</span>
-          </div>
-          <pre className="whitespace-pre-wrap text-xs muted font-sans">{report.body}</pre>
-        </section>
-      )}
+      {/* Report line */}
+      <Link href="/parent/reports" className="flex items-center gap-2 text-xs muted px-1">
+        <span>📨</span>
+        <span className="flex-1">{report ? `Last report ${prettyDate(report.report_date)} · ${report.status}` : "No report sent yet"}</span>
+        <span className="underline">Reports</span>
+      </Link>
     </main>
   );
 }
