@@ -7,6 +7,7 @@ import { closeAllowanceWeek } from "@/lib/allowance/week";
 import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
 import { pruneOldSnaps } from "@/lib/snaps/server";
+import { retryFailedMaterials } from "@/lib/actions/materials";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -83,6 +84,15 @@ export async function GET(request: Request) {
       if (Object.keys(r).length) results.sources = Object.entries(r).map(([k, v]) => `${k}: ${v}`);
     } catch (err) {
       results.sources = [`error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
+  // School files that failed to read for a temporary reason: try again.
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await retryFailedMaterials();
+      if (r.length) results.materials = r;
+    } catch (err) {
+      results.materials = [`retry error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
   // Snap pictures: 30-day retention (handwriting samples a year).

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { acceptMaterialItemsAction, createMaterialQuizAction, dismissMaterialItemsAction, rereadMaterialAction } from "@/lib/actions/materials";
 import type { ExtractedItem } from "@/lib/ai/extract-items";
 import { KIND_EMOJI } from "@/lib/types";
+import { runAction } from "@/lib/client-action";
 
 /** Suggested tasks from a file: tick the ones to add. */
 export function MaterialItemsReview({ materialId, items }: { materialId: string; items: ExtractedItem[] }) {
@@ -23,8 +24,8 @@ export function MaterialItemsReview({ materialId, items }: { materialId: string;
         </label>
       ))}
       <div className="flex gap-2 pt-1">
-        <button type="button" disabled={pending || keep.length === 0} className="btn-primary btn-sm" onClick={() => start(async () => { const r = await acceptMaterialItemsAction(materialId, keep); setDone(`${r.added} task${r.added === 1 ? "" : "s"} added.`); router.refresh(); })}>Add {keep.length}</button>
-        <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { await dismissMaterialItemsAction(materialId); setDone("Skipped."); router.refresh(); })}>Skip</button>
+        <button type="button" disabled={pending || keep.length === 0} className="btn-primary btn-sm" onClick={() => start(async () => { const r = await runAction(() => acceptMaterialItemsAction(materialId, keep), setDone); if (!r) return; setDone(`${r.added} task${r.added === 1 ? "" : "s"} added.`); router.refresh(); })}>Add {keep.length}</button>
+        <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { const r = await runAction(async () => { await dismissMaterialItemsAction(materialId); return true; }, setDone); if (!r) return; setDone("Skipped."); router.refresh(); })}>Skip</button>
       </div>
     </div>
   );
@@ -40,7 +41,7 @@ export function PractiseFromFile({ materialId, sets }: { materialId: string; set
       <select className="input !py-1 !w-auto text-xs" value={difficulty} onChange={(e) => setDifficulty(e.target.value as "easy" | "medium" | "hard")}>
         <option value="easy">Easy</option><option value="medium">Medium</option><option value="hard">Hard</option>
       </select>
-      <button type="button" disabled={pending} className="btn-primary btn-sm" onClick={() => start(async () => { setError(null); const r = await createMaterialQuizAction(materialId, difficulty); if (r?.error) setError(r.error); })}>{pending ? "Writing questions…" : sets ? `⚡ Another set (${sets} done)` : "⚡ Practise from this file"}</button>
+      <button type="button" disabled={pending} className="btn-primary btn-sm" onClick={() => start(async () => { setError(null); const r = await runAction(() => createMaterialQuizAction(materialId, difficulty), setError); if (r?.error) setError(r.error); })}>{pending ? "Writing questions…" : sets ? `⚡ Another set (${sets} done)` : "⚡ Practise from this file"}</button>
       {error && <span className="text-xs text-bad">{error}</span>}
     </div>
   );
@@ -53,7 +54,7 @@ export function ReadAgainButton({ materialId }: { materialId: string }) {
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <span className="inline-flex items-center gap-2">
-      <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { setMsg(null); const r = await rereadMaterialAction(materialId); setMsg(r.error ?? (r.items !== undefined && r.summary && !r.summary.startsWith("Saved, but") ? "Read ✓" : r.summary ?? null)); router.refresh(); })}>{pending ? "Reading… (up to a minute)" : "🔁 Read again"}</button>
+      <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { setMsg(null); const r = await runAction(() => rereadMaterialAction(materialId), setMsg); if (!r) return; setMsg(r.error ?? (r.items !== undefined && r.summary && !r.summary.startsWith("Saved, but") ? "Read ✓" : r.summary ?? null)); router.refresh(); })}>{pending ? "Reading… (up to a minute)" : "🔁 Read again"}</button>
       {msg && <span className="text-xs muted">{msg}</span>}
     </span>
   );
