@@ -21,7 +21,7 @@ describe("bands", () => {
 });
 
 const base = {
-  kpis: mergeKpis([{ code: "classlog", enabled: false }]), // the class-log KPI has its own test below
+  kpis: mergeKpis([{ code: "classlog", enabled: false }, { code: "checkpoint", enabled: false }]), // these two have their own tests below
   start: "2026-09-11",
   end: "2026-09-17",
   today: "2026-09-14", // 4 days elapsed
@@ -77,6 +77,12 @@ describe("scoreWeek", () => {
     expect(half.hints[0]).toContain("Fill in 4 classes");
     const none = scoreWeek({ ...base, kpis });
     expect(none.results.find((x) => x.code === "classlog")!.detail).toBe("no classes yet this week");
+  });
+  it("gives the checkpoint the benefit of the doubt until it expires", () => {
+    const kpis = mergeKpis([{ code: "classlog", enabled: false }]);
+    expect(scoreWeek({ ...base, kpis, checkpoint: { status: "ready" } }).results.find((r) => r.code === "checkpoint")!.fraction).toBe(1);
+    expect(scoreWeek({ ...base, kpis, checkpoint: { status: "expired" } }).results.find((r) => r.code === "checkpoint")!.fraction).toBe(0);
+    expect(scoreWeek({ ...base, kpis, checkpoint: { status: "ready" } }).hints).toContain("Do the weekly checkpoint (20 min, one attempt)");
   });
   it("respects weight overrides and disabled KPIs", () => {
     const kpis = mergeKpis([{ code: "quizzes", enabled: false }, { code: "dish", weight: 40 }]);
