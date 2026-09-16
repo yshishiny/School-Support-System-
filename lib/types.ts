@@ -54,6 +54,8 @@ export interface Profile {
   learner_profile: { answers: Record<string, string>; completed_at: string } | null;
   tour_seen_at: string | null;
   professional_guidance: string | null; // notes from a clinician or specialist, entered by the parent
+  avatar_image_id: string | null;
+  banner_image_id: string | null;
 
 }
 

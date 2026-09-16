@@ -1,6 +1,7 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddChildForm } from "@/components/AddChildForm";
+import { HeroUploader } from "@/components/HeroUploader";
 import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction } from "@/lib/actions/children";
 import type { Profile, Subject, TimetableEntry } from "@/lib/types";
 
@@ -12,9 +13,10 @@ export default async function ChildrenPage() {
   const { data: kids } = await supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false });
   const students = (kids ?? []) as Profile[];
   const ids = students.map((s) => s.id);
-  const [{ data: subjects }, { data: timetable }] = await Promise.all([
+  const [{ data: subjects }, { data: timetable }, { data: heroes }] = await Promise.all([
     ids.length ? supabase.from("subjects").select("*").in("student_id", ids).order("name") : { data: [] },
     ids.length ? supabase.from("timetable_entries").select("*").in("student_id", ids).order("weekday").order("start_time") : { data: [] },
+    ids.length ? supabase.from("hero_images").select("id, student_id").in("student_id", ids) : { data: [] },
   ]);
 
   return (
@@ -27,10 +29,11 @@ export default async function ChildrenPage() {
           <section key={s.id} className="card space-y-4">
             <div className="flex items-center gap-3">
               <div className="text-3xl">{s.avatar_emoji}</div>
-              <div>
+              <div className="flex-1">
                 <div className="font-bold">{s.full_name}</div>
-                <div className="text-xs muted">Grade {s.grade}</div>
+                <div className="text-xs muted">Grade {s.grade} · {(heroes ?? []).filter((h) => h.student_id === s.id).length} hero picture{(heroes ?? []).filter((h) => h.student_id === s.id).length === 1 ? "" : "s"}</div>
               </div>
+              <HeroUploader familyId={family.id} studentId={s.id} compact />
             </div>
 
             <div>

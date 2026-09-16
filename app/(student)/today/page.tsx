@@ -18,6 +18,7 @@ import { allowanceWeekStatus } from "@/lib/allowance/week";
 import type { Consequence } from "@/lib/types";
 import { themeById } from "@/lib/themes";
 import { subjectEmoji } from "@/lib/plan";
+import { heroChoices } from "@/lib/hero";
 import { formatPrayerTime, prayerState, prayerWindows, type PrayerName, type PrayerStatus } from "@/lib/prayers";
 import Link from "next/link";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type ItemStatus, type Subject, type TimetableEntry } from "@/lib/types";
@@ -90,6 +91,7 @@ export default async function TodayPage() {
     logged: loggedPrayers.get(w.prayer) ?? null,
   }));
   const theme = themeById(profile.theme);
+  const hero = await heroChoices(profile);
   const onTimeCount = [...loggedPrayers.values()].filter((s) => s === "on_time").length;
 
   const assignments = (open ?? []) as Assignment[];
@@ -107,12 +109,17 @@ export default async function TodayPage() {
 
   return (
     <main className="space-y-4">
-      <header className="card space-y-3 relative overflow-hidden">
-        <div className="pointer-events-none absolute -right-2 -bottom-3 text-6xl opacity-25 select-none sticker-still" aria-hidden>{(theme.stickers ?? [theme.emoji])[1] ?? theme.emoji}</div>
+      <header className="card space-y-3 relative overflow-hidden" style={hero.banner ? { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, var(--color-panel) 92%, transparent) 30%, color-mix(in srgb, var(--color-panel) 55%, transparent) 100%), url(${hero.banner})`, backgroundSize: "cover", backgroundPosition: "center 25%" } : undefined}>
+        {!hero.banner && <div className="pointer-events-none absolute -right-2 -bottom-3 text-6xl opacity-25 select-none sticker-still" aria-hidden>{(theme.stickers ?? [theme.emoji])[1] ?? theme.emoji}</div>}
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-3 min-w-0">
             <div className="ring h-16 w-16 shrink-0 rounded-full p-[3px]" style={{ ["--pct" as string]: (lvl.into / lvl.span) * 100 }}>
-              <div className="h-full w-full rounded-full bg-panel flex items-center justify-center text-3xl">{profile.avatar_emoji}</div>
+              {hero.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={hero.avatar} alt="" className="h-full w-full rounded-full object-cover" />
+              ) : (
+                <div className="h-full w-full rounded-full bg-panel flex items-center justify-center text-3xl">{profile.avatar_emoji}</div>
+              )}
             </div>
             <div className="min-w-0">
               <div className="h1 truncate leading-tight">Hey {profile.full_name.split(" ")[0]} <span className="sticker text-2xl align-middle">{theme.emoji}</span></div>
