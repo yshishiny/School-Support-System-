@@ -8,6 +8,8 @@ import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
 import { pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
+import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
+import { todayIn } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 300;
@@ -84,6 +86,15 @@ export async function GET(request: Request) {
       if (Object.keys(r).length) results.sources = Object.entries(r).map(([k, v]) => `${k}: ${v}`);
     } catch (err) {
       results.sources = [`error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
+  // Weekly checkpoint the day before pay day (per family timezone; Cairo for now).
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await runWeeklyCheckpoints(todayIn("Africa/Cairo"));
+      if (r.length) results.checkpoints = r;
+    } catch (err) {
+      results.checkpoints = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
   // School files that failed to read for a temporary reason: try again.

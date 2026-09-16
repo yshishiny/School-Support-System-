@@ -31,6 +31,7 @@ export interface ReportChild {
   lastLocation?: { time: string; lat: number; lng: number; source: string; place?: string | null } | null; // from the phone, with consent
   school?: { off: boolean; reason: string | null; lessons: number } | null;
   classLog?: { due: number; done: number; missing: string | null } | null; // this allowance week
+  checkpoint?: { line: string; kind: string; notLearned: string[] } | { pending: string } | null;
   snaps?: { label: string; state: "approved" | "good" | "sent" | "rejected" | "missing" }[]; // show-your-win tasks due today
   handwriting?: { score: number; before: number | null; focus: string[] } | null; // latest sample this week
 }
@@ -78,6 +79,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       lines.push(`🕌 Prayers: ${onTime}/5 on time${later.length ? ` (logged later: ${later.join(", ")})` : ""}${late.length ? ` · late: ${late.join(", ")}` : ""}${missed.length ? ` · missed (said so): ${missed.join(", ")}` : ""}${missing > 0 ? ` · ${missing} not logged` : ""}`);
     }
     if (c.askTonight && c.askTonight.length) lines.push(`🔎 Worth asking tonight: ${c.askTonight.join(" · ")}`);
+    if (c.checkpoint) lines.push("pending" in c.checkpoint ? `🎯 Checkpoint: ${c.checkpoint.pending}` : `🎯 ${c.checkpoint.kind === "spot" ? "Spot check" : "Checkpoint"}: ${c.checkpoint.line}${c.checkpoint.notLearned.length ? ` · ask about ${c.checkpoint.notLearned.join(", ")}` : ""}`);
     if (c.classLog && c.classLog.due > 0) lines.push(`📖 Class log this week: ${c.classLog.done}/${c.classLog.due}${c.classLog.missing ? ` · still missing ${c.classLog.missing}` : " · complete"}`);
     if (c.covered && c.covered.length) {
       lines.push(`📖 Covered today: ${c.covered.map((l) => `${l.subject}: ${l.note}`).join(" · ")}`);

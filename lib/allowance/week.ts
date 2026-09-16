@@ -36,6 +36,8 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     admin.from("lesson_logs").select("log_date, subject_name, note, homework_given").eq("student_id", studentId).gte("log_date", start).lte("log_date", lastDay),
     admin.from("school_days_off").select("day").eq("family_id", family.id).gte("day", start).lte("day", end),
   ]);
+  const { data: cpRow } = await admin.from("checkpoints").select("status").eq("student_id", studentId).eq("kind", "weekly").eq("week_start", start).order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const checkpoint = { status: (cpRow?.status as "ready" | "done" | "expired" | "failed" | undefined) ?? "none" } as const;
   const coverage = classLogCoverage(start, lastDay, ttRows ?? [], (logRows ?? []) as ClassLogRow[], (offRows ?? []).map((d) => d.day as string));
   const classLog = { due: coverage.due, done: coverage.done, missingLine: coverage.days.length ? missingLine(coverage.days) : null };
   const snapDays: Record<string, string[]> = {};
@@ -66,6 +68,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     wellbeingDone,
     snapDays,
     classLog,
+    checkpoint,
   });
   return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }

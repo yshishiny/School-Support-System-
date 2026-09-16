@@ -1,6 +1,6 @@
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { todayIn } from "@/lib/dates";
+import { shiftDate, todayIn } from "@/lib/dates";
 import { EXAM_INFO, examsFor, scaledEstimate, sectionsFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { setTargetExamAction } from "@/lib/actions/learning";
@@ -12,6 +12,7 @@ import { CoachButton } from "@/components/CoachButton";
 import type { CoachReport } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { wellbeingStatus, straightTalkLabels, type CheckHistoryRow } from "@/lib/wellbeing";
+import { CheckpointPanel, type CheckpointRow } from "@/components/CheckpointPanel";
 import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
 export default async function ProgressPage() {
@@ -31,6 +32,10 @@ export default async function ProgressPage() {
   const admin = createAdminClient();
   const { data: wbRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, instrument, taken_on, band, score").in("student_id", ids).order("taken_on", { ascending: false }).limit(300) : { data: [] };
   const { data: straightRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, taken_on, answers").in("student_id", ids).eq("instrument", "straight").order("taken_on", { ascending: false }).limit(20) : { data: [] };
+  const { data: cpRows } = ids.length ? await admin.from("checkpoints").select("id, student_id, kind, subject, status, due_by, week_start, result, error, created_at").in("student_id", ids).order("created_at", { ascending: false }).limit(30) : { data: [] };
+  const { data: subjRows } = ids.length ? await admin.from("lesson_logs").select("student_id, subject_name").in("student_id", ids).gte("log_date", shiftDate(today, -6)) : { data: [] };
+  const checkpointsFor = (id: string) => ((cpRows ?? []) as (CheckpointRow & { student_id: string })[]).filter((r) => r.student_id === id);
+  const subjectsFor = (id: string) => [...new Set((subjRows ?? []).filter((r) => r.student_id === id).map((r) => r.subject_name as string))].sort();
   const straightFor = (id: string) => ((straightRows ?? []) as { student_id: string; taken_on: string; answers: Record<string, string> }[]).filter((r) => r.student_id === id).slice(0, 4);
   const wellbeingByStudent = new Map<string, ReturnType<typeof wellbeingStatus>>();
   for (const s of students) wellbeingByStudent.set(s.id, wellbeingStatus(((wbRows ?? []) as (CheckHistoryRow & { student_id: string })[]).filter((r) => r.student_id === s.id), today));
@@ -78,6 +83,8 @@ export default async function ProgressPage() {
                 </div>
               );
             })()}
+
+            <CheckpointPanel studentId={s.id} firstName={s.full_name.split(" ")[0]} rows={checkpointsFor(s.id)} subjects={subjectsFor(s.id)} />
 
             {(() => {
               const rows = straightFor(s.id);

@@ -22,6 +22,7 @@ export function QuizRunner({
   kind,
   backHref,
   title,
+  deadlineMs = null,
 }: {
   attemptId: string | null;
   quizId?: string;
@@ -31,6 +32,7 @@ export function QuizRunner({
   kind: "quiz" | "review";
   backHref: string;
   title: string;
+  deadlineMs?: number | null; // checkpoint clock: auto-finishes when it runs out
 }) {
   const [attemptId, setAttemptId] = useState<string | null>(initialAttemptId);
   const [index, setIndex] = useState(0);
@@ -58,6 +60,26 @@ export function QuizRunner({
 
   const q = questions[index];
   const shownPassage = q?.passage ?? passage;
+  const [now, setNow] = useState(Date.now());
+  const finishing = useRef(false);
+  useEffect(() => {
+    if (deadlineMs === null) return;
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [deadlineMs]);
+  const remaining = deadlineMs === null ? null : Math.max(0, Math.round((deadlineMs - now) / 1000));
+  useEffect(() => {
+    if (remaining !== 0 || result || finishing.current) return;
+    finishing.current = true;
+    (async () => {
+      try {
+        if (attemptId) setResult(await finishAttemptAction(attemptId, tabSwitches.current, questions.length));
+        else setError("Time is up before any answer was saved.");
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Could not finish.");
+      }
+    })();
+  }, [remaining, result, attemptId, questions.length]);
 
   async function choose(i: number) {
     if (feedback || busy) return;
@@ -121,8 +143,9 @@ export function QuizRunner({
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm muted">
         <span>{title}</span>
-        <span>{index + 1} / {questions.length}</span>
+        <span>{remaining !== null && <span className={`badge mr-2 ${remaining < 120 ? "text-warn" : ""}`}>⏳ {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, "0")}</span>}{index + 1} / {questions.length}</span>
       </div>
+      {deadlineMs !== null && index === 0 && !feedback && <p className="text-xs text-warn">Checkpoint: one attempt, the clock is running, answers save as you go. Unanswered questions count as wrong when time runs out.</p>}
       <div className="h-1.5 rounded-full bg-panel-2 overflow-hidden">
         <div className="h-full bg-gradient-to-r from-accent to-accent-2 transition-all" style={{ width: `${(index / questions.length) * 100}%` }} />
       </div>

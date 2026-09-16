@@ -8,7 +8,7 @@ import { getPosition } from "@/lib/geo-client";
 import { recordPositionAction } from "@/lib/actions/location";
 import type { QueueItem } from "@/lib/today-queue";
 
-const KIND_ICON: Record<string, string> = { prayer: "🕌", quiz: "⚡", check: "💓", checkin: "✅", recall: "🤔", review: "🔁", catchup: "⏰", learner: "🦸", snap: "📸", classlog: "📖", done: "🎉" };
+const KIND_ICON: Record<string, string> = { prayer: "🕌", quiz: "⚡", check: "💓", checkin: "✅", recall: "🤔", review: "🔁", catchup: "⏰", learner: "🦸", snap: "📸", classlog: "📖", checkpoint: "🎯", done: "🎉" };
 
 /** The one big card: what to do now. A prayer logs in place; everything else links. */
 export function NowCard({ item, index, total, mascot }: { item: QueueItem; index: number; total: number; mascot: string }) {

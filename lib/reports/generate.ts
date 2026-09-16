@@ -6,10 +6,11 @@ import { schoolDay, type DayOff } from "@/lib/school-day";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { computeIntegrity } from "@/lib/integrity/run";
 import { straightTalkLabels } from "@/lib/wellbeing";
+import { checkpointLine, claimedNotLearned, type CheckpointResult } from "@/lib/checkpoint";
 import { weekFor as allowanceWeekFor } from "@/lib/allowance";
 import { dueSnapTasks, taskDayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { computeStreak } from "@/lib/points";
-import { shiftDate, todayIn } from "@/lib/dates";
+import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { describeAccess } from "@/lib/device";
 import { formatInTimeZone } from "date-fns-tz";
 import { classifyPosition, type Place } from "@/lib/places";
@@ -74,6 +75,8 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     const integrity = await computeIntegrity(s.id, today, family.timezone).catch(() => []);
     const { data: straightRow } = await admin.from("wellbeing_checks").select("answers, taken_on").eq("student_id", s.id).eq("instrument", "straight").gte("taken_on", shiftDate(today, -7)).order("taken_on", { ascending: false }).limit(1).maybeSingle();
     const straightLabels = straightRow ? straightTalkLabels(straightRow.answers as Record<string, string>) : null;
+    const { data: cpRow } = await admin.from("checkpoints").select("kind, status, result, due_by, created_at").eq("student_id", s.id).in("status", ["ready", "done"]).gte("created_at", new Date(shiftDate(today, -7) + "T00:00:00Z").toISOString()).order("created_at", { ascending: false }).limit(1).maybeSingle();
+    const checkpoint = cpRow ? (cpRow.status === "done" && cpRow.result ? { line: checkpointLine(cpRow.result as CheckpointResult), kind: cpRow.kind as string, notLearned: claimedNotLearned(cpRow.result as CheckpointResult) } : { pending: `ready, not attempted yet (by ${prettyDate(cpRow.due_by)})` }) : null;
     const cov = classLogCoverage(weekStart, today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string }[]).filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), (weekOff ?? []).map((d) => d.day as string));
     const snapsToday = dueSnapTasks(today, snapTasks, s.id).filter((t) => t.kind !== "handwriting").map((t) => {
       const st = taskDayState(t, mySnaps, today, "23:59");
@@ -136,6 +139,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       coach: coach?.headline ?? null,
       school: { off: sd.off, reason: sd.reason, lessons: sd.lessons.length },
       classLog: { due: cov.due, done: cov.done, missing: cov.days.length ? missingLine(cov.days) : null },
+      checkpoint,
       askTonight: [...(straightLabels ? [straightLabels.length ? `Straight talk this week: he admitted a slip on ${straightLabels.join(", ")}. Thank him for saying so before anything else.` : "Straight talk this week: nothing to admit."] : []), ...integrity.slice(0, 2).map((x) => x.ask)],
       snaps: snapsToday,
       handwriting,

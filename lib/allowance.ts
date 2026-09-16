@@ -22,6 +22,7 @@ export const DEFAULT_KPIS: KpiDef[] = [
   { code: "prayers", label: "Prayers logged, 4 of 5 most days", emoji: "🕌", source: "app", weight: 15, enabled: true, hint: "Counted from the prayer pill." },
   { code: "checkins", label: "Check-in done 5 of 7 days", emoji: "✅", source: "app", weight: 15, enabled: true, hint: "Counted automatically." },
   { code: "classlog", label: "Every class logged: what he took, homework yes/no", emoji: "📖", source: "app", weight: 15, enabled: true, hint: "Per the timetable. A missed day can be filled in until the week closes; after that it counts against him." },
+  { code: "checkpoint", label: "Weekly checkpoint attempted", emoji: "🎯", source: "app", weight: 10, enabled: true, hint: "The timed test on what he logged this week. Attempting it is the KPI; the score positions him." },
   { code: "quizzes", label: "Attempted 60% of the week's planned quizzes", emoji: "📅", source: "app", weight: 15, enabled: true, hint: "Attempts, never scores." },
   { code: "phone", label: "Phone parked by the agreed hour", emoji: "📵", source: "parent", weight: 10, enabled: true, hint: "One tap a day." },
   { code: "wellbeing", label: "Did the coach check-in when it was due", emoji: "💓", source: "app", weight: 5, enabled: true, hint: "Weekly pulse or monthly check." },
@@ -76,6 +77,7 @@ export interface WeekInput {
   wellbeingDone: boolean;
   snapDays?: Record<string, string[]>; // "snap:<code>" -> dates with a counting snap
   classLog?: { due: number; done: number; missingLine: string | null }; // timetable classes in the week so far
+  checkpoint?: { status: "none" | "ready" | "done" | "expired" | "failed" };
 }
 
 export interface KpiResult {
@@ -155,6 +157,12 @@ export function scoreWeek(i: WeekInput): WeekResult {
       maxFraction = 1; // catch-up is allowed until the week closes
       detail = c.due === 0 ? "no classes yet this week" : `${c.done} of ${c.due} classes logged`;
       if (fraction < 1) hintByCode.set(k.code, `Fill in ${c.due - c.done} class${c.due - c.done === 1 ? "" : "es"} in the check-in${c.missingLine ? ` (${c.missingLine})` : ""}`);
+    } else if (k.code === "checkpoint") {
+      const st = i.checkpoint?.status ?? "none";
+      fraction = st === "expired" ? 0 : 1; // benefit of the doubt until it is due
+      maxFraction = st === "expired" ? 0 : 1;
+      detail = st === "done" ? "done" : st === "ready" ? "ready, not attempted yet" : st === "expired" ? "not attempted before the week closed" : st === "failed" ? "could not be prepared (does not count)" : "none this week";
+      if (st === "ready") hintByCode.set(k.code, "Do the weekly checkpoint (20 min, one attempt)");
     } else if (k.source === "snap") {
       const dueDays = days.filter((d) => (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d)));
       const doneDays = (i.snapDays?.[k.code] ?? []).filter((d) => dueDays.includes(d)).length;

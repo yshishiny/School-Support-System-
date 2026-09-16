@@ -213,6 +213,8 @@ export interface Quiz {
   language: "en" | "ar";
   created_at: string;
   material_id?: string | null; // practice set written from a school file
+  checkpoint_id?: string | null; // timed one-attempt verification test
+  time_limit_min?: number | null;
 }
 
 export interface QuizQuestion {

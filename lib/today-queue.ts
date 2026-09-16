@@ -4,7 +4,7 @@
  */
 import type { PrayerName } from "./prayers";
 
-export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "classlog" | "done";
+export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "classlog" | "checkpoint" | "done";
 
 export interface QueueItem {
   key: string;
@@ -32,6 +32,7 @@ export interface QueueInput {
   snapsDue?: { id: string; label: string; emoji: string }[]; // snap tasks open now and not yet sent today
   classLogMissing?: { count: number; line: string; deadline: string } | null; // previous days' classes still not logged this week
   checkinsMissed?: { date: string; label: string }[]; // earlier days this week without a check-in
+  checkpoint?: { quizId: string; title: string; questions: number; minutes: number; dueLabel: string } | null; // ready, not attempted
 }
 
 export function buildQueue(i: QueueInput): QueueItem[] {
@@ -58,6 +59,7 @@ export function buildQueue(i: QueueInput): QueueItem[] {
     cta: "Play now",
     chips: ["8 questions", "+5 on the day"],
   }));
+  if (i.checkpoint) q.push({ key: `checkpoint-${i.checkpoint.quizId}`, kind: "checkpoint", title: i.checkpoint.title, subtitle: `${i.checkpoint.questions} questions · ${i.checkpoint.minutes} min · one attempt · by ${i.checkpoint.dueLabel}`, href: `/quiz/${i.checkpoint.quizId}`, cta: "Start when ready", chips: ["study first", "counts for allowance"] });
   if (i.classLogMissing && i.classLogMissing.count > 0) q.push({ key: "classlog", kind: "classlog", title: `${i.classLogMissing.count} class${i.classLogMissing.count === 1 ? "" : "es"} not logged yet`, subtitle: `${i.classLogMissing.line} · fill in before ${i.classLogMissing.deadline}`, href: "/checkin", cta: "Fill in", chips: ["+1 each", "keeps the allowance"] });
   if (evening && !i.checkinDone) q.push(checkin);
   for (const m of (i.checkinsMissed ?? []).slice(0, 2)) q.push({ key: `checkin-${m.date}`, kind: "checkin", title: `${m.label}'s check-in`, subtitle: "You missed it: fill it in before the week closes", href: `/checkin?date=${m.date}`, cta: "Fill in", chips: ["+5", "streak kept"] });

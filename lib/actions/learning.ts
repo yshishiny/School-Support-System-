@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { settleCheckpoint } from "@/lib/checkpoint/build";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -195,7 +196,7 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   const { profile, family } = await requireStudent();
   const admin = createAdminClient();
   const today = todayIn(family.timezone);
-  const { data: attempt } = await admin.from("attempts").select("*, quizzes(act_section, scheduled_for)").eq("id", attemptId).eq("student_id", profile.id).single();
+  const { data: attempt } = await admin.from("attempts").select("*, quizzes(act_section, scheduled_for, checkpoint_id)").eq("id", attemptId).eq("student_id", profile.id).single();
   if (!attempt) throw new Error("Attempt not found.");
   if (attempt.submitted_at) return { score: attempt.score, total: attempt.total, earned: 0, flag: attempt.flag_reason };
 
@@ -203,7 +204,7 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   const list = answers ?? [];
   const score = list.filter((a) => a.correct).length;
   const seconds = list.reduce((s, a) => s + a.seconds, 0);
-  const quizMeta = (attempt as { quizzes?: { act_section?: string | null; scheduled_for?: string | null } | null }).quizzes ?? null;
+  const quizMeta = (attempt as { quizzes?: { act_section?: string | null; scheduled_for?: string | null; checkpoint_id?: string | null } | null }).quizzes ?? null;
   const section = quizMeta?.act_section ?? null;
   const flag = integrityFlag({
     secondsPerAnswer: list.map((a) => a.seconds),
@@ -257,6 +258,7 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
       if (!error) earned += QUIZ_POINTS.PLANNED_ON_DAY;
     }
   }
+  if (quizMeta?.checkpoint_id) await settleCheckpoint(quizMeta.checkpoint_id, attemptId).catch((err) => console.error("[checkpoint] settle failed", err));
   ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
 }

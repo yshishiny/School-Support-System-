@@ -83,6 +83,11 @@ export default async function TodayPage() {
   const week = (timetable ?? []) as TimetableEntry[];
   const todayRows = week.filter((t) => t.weekday === weekdayOf(today));
   const checkinDates = (checkins ?? []).map((c) => c.checkin_date as string);
+  const { data: cpRows } = await supabase.from("checkpoints").select("id, quiz_id, kind, subject, time_limit_min, due_by, quizzes(title, attempts(submitted_at))").eq("student_id", profile.id).eq("status", "ready").gte("due_by", today).order("created_at", { ascending: false }).limit(3);
+  type CP = { id: string; quiz_id: string | null; kind: string; subject: string | null; time_limit_min: number; due_by: string; quizzes: { title: string; attempts: { submitted_at: string | null }[] } | null };
+  const cp = ((cpRows ?? []) as unknown as CP[]).find((c) => c.quiz_id && !c.quizzes?.attempts?.some((a) => a.submitted_at)) ?? null;
+  const { data: cpCount } = cp ? await supabase.from("quiz_questions").select("id").eq("quiz_id", cp.quiz_id!) : { data: [] };
+  const checkpoint = cp ? { quizId: cp.quiz_id!, title: cp.quizzes?.title ?? (cp.kind === "weekly" ? "Weekly checkpoint" : `Spot check · ${cp.subject}`), questions: (cpCount ?? []).length, minutes: cp.time_limit_min, dueLabel: SHORT[weekdayOf(cp.due_by)] } : null;
   const checkinsMissed = Array.from({ length: 6 }, (_, k) => shiftDate(today, -1 - k)).filter((d) => d >= weekStart && !checkinDates.includes(d)).reverse().map((d) => ({ date: d, label: d === shiftDate(today, -1) ? "Yesterday" : SHORT[weekdayOf(d)] }));
   const due = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
   const queue = buildQueue({
@@ -100,6 +105,7 @@ export default async function TodayPage() {
     snapsDue,
     classLogMissing,
     checkinsMissed,
+    checkpoint,
   });
 
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);
