@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -46,7 +47,7 @@ export async function coachChat(input: { studentName: string; grade: number | nu
     `Helplines to give if risk is moderate or high: ${input.helplines}`,
   ].filter(Boolean).join("\n");
   const message = await client.messages.create({
-    model: "claude-opus-5",
+    model: modelFor("coach-chat"),
     max_tokens: 1200,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }, { type: "text", text: context }],
     messages: input.history.map((h) => ({ role: h.role, content: h.content })),
@@ -67,11 +68,11 @@ const RiskOnly = z.object({
 export async function classifyRisk(text: string): Promise<z.infer<typeof RiskOnly>> {
   const client = new Anthropic();
   const message = await client.messages.create({
-    model: "claude-sonnet-5",
+    model: modelFor("risk"),
     max_tokens: 300,
     system: "Classify the safety risk in a teenager's private note to his study coach. high: self-harm, suicide, abuse, being harmed, drugs, weapons. moderate: hopelessness, self-hate, not eating/sleeping for days, severe bullying. low: stress, sadness, friend trouble. none: everyday. Also write a neutral one-line private note for the coach's memory, or null.",
     messages: [{ role: "user", content: text }],
-    output_config: { format: zodOutputFormat(RiskOnly), effort: "low" },
+    output_config: { format: zodOutputFormat(RiskOnly), ...effortFor("risk", "low") },
   });
   const out = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
   return RiskOnly.parse(JSON.parse(out));

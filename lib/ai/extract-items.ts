@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -32,7 +33,7 @@ Rules:
 export async function extractItemsFromMessages(renderedMessages: string, today: string, conventions: string[] = []): Promise<Extraction> {
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("extract"),
     max_tokens: 32000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -39,11 +40,11 @@ export async function guessLesson(spec: GuessSpec): Promise<LessonGuess> {
     `Curriculum topics (id: name [unit]):\n${spec.topics.map((t) => `- ${t.id}: ${t.name}${t.unit ? ` [${t.unit}]` : ""}`).join("\n")}`,
   ].filter(Boolean);
   const message = await client.messages.create({
-    model: "claude-sonnet-5",
+    model: modelFor("lesson-guess"),
     max_tokens: 700,
     system: SYSTEM,
     messages: [{ role: "user", content: lines.join("\n") }],
-    output_config: { format: zodOutputFormat(Schema), effort: "low" },
+    output_config: { format: zodOutputFormat(Schema), ...effortFor("lesson-guess", "low") },
   });
   if (message.stop_reason === "refusal") throw new Error("The helper could not answer that.");
   const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");

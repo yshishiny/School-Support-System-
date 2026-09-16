@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -99,11 +100,11 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
   ].filter(Boolean);
 
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("quiz"),
     max_tokens: 12000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: lines.join("\n") }],
-    output_config: { format: zodOutputFormat(QuizSchema), effort: "medium" },
+    output_config: { format: zodOutputFormat(QuizSchema), ...effortFor("quiz", "medium") },
   });
   const message = await stream.finalMessage();
   if (message.stop_reason === "refusal") throw new Error("The model declined to generate this quiz.");

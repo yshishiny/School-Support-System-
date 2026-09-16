@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { effortFor, modelFor } from "./models";
 
 const SYSTEM = `You are a patient tutor writing a lesson for a teenage student at an American-curriculum school. Write in clear, friendly English. Markdown is allowed (headings, bold, bullet lists, numbered steps) but keep it light. Use unicode math (x², √, ×, π), never LaTeX.
 
@@ -27,9 +28,9 @@ export interface ExplainSpec {
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("explain"),
     max_tokens: 8000,
-    output_config: { effort: "medium" },
+    output_config: { ...effortFor("explain", "medium") },
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [
       {

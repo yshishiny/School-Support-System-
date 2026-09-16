@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 
 /**
  * Drafts an information summary for a child and adolescent mental-health professional from app data.
@@ -33,7 +34,7 @@ References: WHO-5 (Topp CW et al., Psychother Psychosom 2015;84:167-176; cut-off
 
 export async function draftClinicianSummary(payload: string): Promise<{ content: string; model: string }> {
   const client = new Anthropic();
-  const model = "claude-opus-5";
+  const model = modelFor("clinician");
   const stream = client.messages.stream({
     model,
     max_tokens: 7000,

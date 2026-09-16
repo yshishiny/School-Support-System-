@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { CoachStats } from "@/lib/coach/analyze";
@@ -52,7 +53,7 @@ export async function runCoach(stats: CoachStats): Promise<CoachOutput & { model
     stats.attention ? `Early-warning signals (rule-based, sensitive by design): tier ${stats.attention.tier}, score ${stats.attention.score}; ${stats.attention.labels.join("; ") || "none"}.` : null,
     stats.privateNotes.length ? `CONFIDENTIAL coach notes from private chats and check-ins (use to shape tone and support; NEVER quote, summarise or hint at them in parent_md or headline): ${stats.privateNotes.join(" | ")}` : null,
   ].filter(Boolean);
-  const model = "claude-opus-5";
+  const model = modelFor("coach-report");
   const stream = client.messages.stream({
     model,
     max_tokens: 6000,

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedItemSchema } from "./extract-items";
@@ -34,7 +35,7 @@ export async function readMaterial(doc: MaterialInput, ctx: { today: string; sub
       ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: doc.data } }, { type: "text", text: lines.join("\n") }]
       : [{ type: "image", source: { type: "base64", media_type: doc.media_type, data: doc.data } }, { type: "text", text: lines.join("\n") }];
   const stream = client.messages.stream({
-    model: "claude-sonnet-5",
+    model: modelFor("read-material"),
     max_tokens: 12000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content }],

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
@@ -22,11 +23,11 @@ Be concrete and cite real examples briefly. Never include phone numbers. Keep th
 export async function learnArchiveConventions(sample: string, statsLine: string): Promise<ArchiveInsights> {
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("archive"),
     max_tokens: 4000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `${statsLine}\n\nSample of the chat (attachments marked as <kind: file>):\n\n${sample}` }],
-    output_config: { format: zodOutputFormat(Schema), effort: "medium" },
+    output_config: { format: zodOutputFormat(Schema), ...effortFor("archive", "medium") },
   });
   const message = await stream.finalMessage();
   if (message.stop_reason === "refusal") throw new Error("The model declined to read this archive.");

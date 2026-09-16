@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedItemSchema } from "./extract-items";
@@ -21,7 +22,7 @@ Rules:
 export async function extractItemsFromImages(images: ImageInput[], today: string): Promise<z.infer<typeof ItemsSchema>> {
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("extract"),
     max_tokens: 16000,
     system: [{ type: "text", text: ITEMS_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [
@@ -66,7 +67,7 @@ Rules:
 export async function extractTimetableFromImage(image: ImageInput): Promise<z.infer<typeof TimetableSchema>> {
   const client = new Anthropic();
   const stream = client.messages.stream({
-    model: "claude-opus-5",
+    model: modelFor("extract"),
     max_tokens: 16000,
     system: [{ type: "text", text: TT_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [

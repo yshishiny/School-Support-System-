@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { ImageInput } from "./extract-from-images";
@@ -56,7 +57,7 @@ export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label
   const schema = task.kind === "handwriting" ? HandwritingSchema : task.kind === "homework" ? HomeworkSchema : PhotoSchema;
   const lines = [`Task: "${task.label}".`, task.prompt ? `What good looks like: ${task.prompt}` : "", ctx.subjectsToday?.length ? `Today's subjects at school: ${ctx.subjectsToday.join(", ")}.` : "", ctx.studentFirstName ? `The child's name is ${ctx.studentFirstName}.` : ""].filter(Boolean);
   const stream = client.messages.stream({
-    model: "claude-sonnet-5",
+    model: modelFor("snap"),
     max_tokens: 2000,
     system: [{ type: "text", text: task.kind === "handwriting" ? HANDWRITING_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } }, { type: "text", text: lines.join("\n") }] }],
