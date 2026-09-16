@@ -21,7 +21,7 @@ export function LayoutC({ d }: { d: TodayData }) {
         x={d.banner.x}
         y={d.banner.y}
         fallback={<div className="absolute inset-0 flex items-center justify-center gap-4 text-7xl opacity-25 select-none" aria-hidden>{d.stickers.slice(0, 3).join(" ")}</div>}
-        topRight={<PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} />}
+        topRight={<PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} yesterday={d.yesterdayRows} today={d.today} yesterdayDate={d.yesterdayDate} />}
       >
         <div className="flex items-end gap-3">
           <Link href="/me" className="h-14 w-14 shrink-0 rounded-2xl border-[3px] border-accent bg-panel flex items-center justify-center text-2xl overflow-hidden">

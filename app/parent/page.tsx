@@ -13,6 +13,7 @@ import { classifyPosition, type Place } from "@/lib/places";
 import { signHeroUrls } from "@/lib/hero";
 import { lessonsLine, schoolDay, type DayOff } from "@/lib/school-day";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { computeIntegrity } from "@/lib/integrity/run";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
@@ -52,7 +53,7 @@ export default async function ParentHome() {
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
     supabase.from("redemptions").select("id", { count: "exact", head: true }).in("student_id", ids).eq("status", "pending"),
     supabase.from("daily_reports").select("report_date, status, sent_at").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1).maybeSingle(),
-    supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
+    supabase.from("prayer_logs").select("student_id, prayer, status, entered_late").in("student_id", ids).eq("log_date", today),
     supabase.from("safety_alerts").select("*, profiles(full_name)").eq("family_id", family.id).is("acknowledged_at", null).order("created_at", { ascending: false }),
     supabase.from("location_pings").select("user_id, latitude, longitude, accuracy_m, source, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(50),
     supabase.from("places").select("id, kind, label, latitude, longitude, radius_m, student_id").eq("family_id", family.id),
@@ -82,6 +83,7 @@ export default async function ParentHome() {
   const kpis = mergeKpis(family.allowance_kpis);
   const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
+  const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
   const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
@@ -189,12 +191,21 @@ export default async function ParentHome() {
               )}
             </Link>
 
+            {integrity[idx].length > 0 && (
+              <details className="text-xs rounded-xl border border-accent/40 p-2">
+                <summary className="cursor-pointer">🔎 Worth asking tonight · {integrity[idx].length} thing{integrity[idx].length === 1 ? "" : "s"}</summary>
+                <ul className="mt-1 space-y-1">
+                  {integrity[idx].map((x) => <li key={x.code}><b>{x.label}.</b> <span className="muted">{x.ask}</span></li>)}
+                </ul>
+                <p className="muted mt-1">Signals, not verdicts. Ask with curiosity; the honest answer is the goal.</p>
+              </details>
+            )}
             {cov.due > 0 && (
               <div className={`text-xs ${cov.done === cov.due ? "text-good" : "text-warn"}`}>📖 Class log this week: {cov.done}/{cov.due}{cov.days.length ? ` · missing ${missingLine(cov.days)}` : " · complete"}</div>
             )}
 
             <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : "bg-warn") : "bg-panel-2 border border-line"}`} />; })}</div></div>
+              <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} title={l ? `${p}: ${l.status}${l.entered_late ? " (logged later)" : ""}` : p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : l.status === "late" ? "bg-warn" : "bg-bad") : "bg-panel-2 border border-line"}`} />; })}</div></div>
               <Link href="/parent/plan" className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{todayDone}/{todayQuizzes.length}</div><div className="text-[11px] muted">quizzes today</div></Link>
               <Link href="/parent/allowance" className="tile !p-2"><div className="font-bold text-lg leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{aw ? `${aw.amount}` : "—"}</div><div className="text-[11px] muted">{aw ? `EGP · score ${aw.score}` : "allowance off"}</div></Link>
             </div>

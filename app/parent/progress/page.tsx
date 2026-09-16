@@ -11,7 +11,7 @@ import ReactMarkdown from "react-markdown";
 import { CoachButton } from "@/components/CoachButton";
 import type { CoachReport } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { wellbeingStatus, type CheckHistoryRow } from "@/lib/wellbeing";
+import { wellbeingStatus, straightTalkLabels, type CheckHistoryRow } from "@/lib/wellbeing";
 import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
 export default async function ProgressPage() {
@@ -30,6 +30,8 @@ export default async function ProgressPage() {
   // Wellbeing: parents get a traffic light only. Answers stay with the child (RLS), so this uses the service role and discards them.
   const admin = createAdminClient();
   const { data: wbRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, instrument, taken_on, band, score").in("student_id", ids).order("taken_on", { ascending: false }).limit(300) : { data: [] };
+  const { data: straightRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, taken_on, answers").in("student_id", ids).eq("instrument", "straight").order("taken_on", { ascending: false }).limit(20) : { data: [] };
+  const straightFor = (id: string) => ((straightRows ?? []) as { student_id: string; taken_on: string; answers: Record<string, string> }[]).filter((r) => r.student_id === id).slice(0, 4);
   const wellbeingByStudent = new Map<string, ReturnType<typeof wellbeingStatus>>();
   for (const s of students) wellbeingByStudent.set(s.id, wellbeingStatus(((wbRows ?? []) as (CheckHistoryRow & { student_id: string })[]).filter((r) => r.student_id === s.id), today));
   const attentionByStudent = new Map<string, AttentionResult>();
@@ -72,6 +74,23 @@ export default async function ProgressPage() {
                   <div className="flex-1">
                     <div className="font-semibold">Wellbeing check-ins <span className="muted font-normal">· {w.checks} in the last 5 weeks</span></div>
                     <div className="muted text-xs">{w.note} You see this light only; his answers and his chat with the coach stay private unless there is danger.</div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {(() => {
+              const rows = straightFor(s.id);
+              return (
+                <div className="rounded-xl border border-line p-3 text-sm flex items-center gap-3">
+                  <span className="text-2xl">🤝</span>
+                  <div className="flex-1">
+                    <div className="font-semibold">Straight talk <span className="muted font-normal">· weekly honesty check he knows you see</span></div>
+                    {rows.length === 0 ? <div className="muted text-xs">Not answered yet. It appears on his Coach page every week.</div> : (
+                      <ul className="text-xs space-y-0.5">
+                        {rows.map((r) => { const l = straightTalkLabels(r.answers); return <li key={r.taken_on}>{r.taken_on}: {l.length ? `admitted a slip on ${l.join(", ")}` : "nothing to admit"} {l.length ? <span className="muted">· thank him for saying so; no punishment that week</span> : "✅"}</li>; })}
+                      </ul>
+                    )}
                   </div>
                 </div>
               );

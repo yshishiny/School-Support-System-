@@ -40,7 +40,7 @@ export default async function TodayPage() {
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("lesson_logs").select("id").eq("student_id", profile.id).eq("log_date", today).limit(1),
-    supabase.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today),
+    supabase.from("prayer_logs").select("prayer, status, entered_late, log_date").eq("student_id", profile.id).in("log_date", [today, shiftDate(today, -1)]),
     supabase.from("quizzes").select("id, title, scheduled_for, plan_slot, attempts(submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", shiftDate(today, -6)).lte("scheduled_for", shiftDate(today, 6)).order("scheduled_for"),
     supabase.from("quizzes").select("id, attempts(submitted_at)").eq("student_id", profile.id).eq("recall_date", today),
     supabase.from("coach_reports").select("kid_md, headline, created_at").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
@@ -68,10 +68,14 @@ export default async function TodayPage() {
   const lat = family.latitude ?? 30.0444;
   const lng = family.longitude ?? 31.2357;
   const now = new Date();
-  const logged = new Map<PrayerName, PrayerStatus>((prayers ?? []).map((p) => [p.prayer as PrayerName, p.status as PrayerStatus]));
-  const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), state: prayerState(w, now), logged: logged.get(w.prayer) ?? null }));
+  type PL = { prayer: string; status: string; entered_late: boolean; log_date: string };
+  const yesterdayDate = shiftDate(today, -1);
+  const logged = new Map<PrayerName, PL>(((prayers ?? []) as PL[]).filter((p) => p.log_date === today).map((p) => [p.prayer as PrayerName, p]));
+  const loggedY = new Map<PrayerName, PL>(((prayers ?? []) as PL[]).filter((p) => p.log_date === yesterdayDate).map((p) => [p.prayer as PrayerName, p]));
+  const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), state: prayerState(w, now), logged: (logged.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: logged.get(w.prayer)?.entered_late ?? false }));
+  const yesterdayRows: PrayerRow[] = prayerWindows(yesterdayDate, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), state: prayerState(w, now), logged: (loggedY.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: loggedY.get(w.prayer)?.entered_late ?? false }));
   const openPrayer = prayerRows.find((r) => r.state === "open" && !r.logged) ?? null;
-  const onTimeCount = [...logged.values()].filter((s) => s === "on_time").length;
+  const onTimeCount = [...logged.values()].filter((p) => p.status === "on_time").length;
 
   type PQ = { id: string; title: string; scheduled_for: string; plan_slot: string | null; attempts: { submitted_at: string | null }[] };
   const plannedRows = (planned ?? []) as PQ[];
@@ -118,6 +122,9 @@ export default async function TodayPage() {
     queue,
     totalToday: queue.filter((q) => q.kind !== "done").length,
     prayerRows,
+    yesterdayRows,
+    today,
+    yesterdayDate,
     onTimeCount,
     allowance,
     allowanceTone: allowance ? eligibilityHint(allowance, allowance.allowance).tone : null,

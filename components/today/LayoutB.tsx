@@ -21,7 +21,7 @@ export function LayoutB({ d }: { d: TodayData }) {
         </Link>
         <div className="h2 flex-1 truncate leading-tight">{d.firstName}</div>
         <Link href="/rewards" className="badge text-sm"><b className="text-accent-2">{d.balance.toLocaleString()}</b> ★</Link>
-        <PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} />
+        <PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} yesterday={d.yesterdayRows} today={d.today} yesterdayDate={d.yesterdayDate} />
       </div>
 
       <ConsequenceCard items={d.consequences} />

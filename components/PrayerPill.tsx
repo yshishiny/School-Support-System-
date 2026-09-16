@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { logPrayerAction } from "@/lib/actions/prayers";
+import { logPastPrayerAction, logPrayerAction } from "@/lib/actions/prayers";
 import { getPosition } from "@/lib/geo-client";
 import { recordPositionAction } from "@/lib/actions/location";
-import { PRAYER_LABEL, type PrayerName, type PrayerState, type PrayerStatus } from "@/lib/prayers";
+import { PRAYER_LABEL, type PastClaim, type PrayerName, type PrayerState, type PrayerStatus } from "@/lib/prayers";
 
 export interface PrayerRow {
   prayer: PrayerName;
@@ -12,6 +12,7 @@ export interface PrayerRow {
   startMs: number;
   state: PrayerState;
   logged: PrayerStatus | null;
+  enteredLate?: boolean;
 }
 
 function countdown(ms: number): string {
@@ -22,7 +23,7 @@ function countdown(ms: number): string {
 }
 
 /** Small pill, top-right: previous prayer status and the next one, tap to expand. */
-export function PrayerPill({ rows, onTimeCount }: { rows: PrayerRow[]; onTimeCount: number }) {
+export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yesterdayDate = "" }: { rows: PrayerRow[]; onTimeCount: number; yesterday?: PrayerRow[]; today?: string; yesterdayDate?: string }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -37,6 +38,20 @@ export function PrayerPill({ rows, onTimeCount }: { rows: PrayerRow[]; onTimeCou
   const next = rows.find((r) => r.startMs > now);
   const due = current && !current.logged ? current : null;
 
+  const logPast = (prayer: PrayerName, date: string, claim: PastClaim) => {
+    setMsg(null);
+    start(async () => {
+      const res = await logPastPrayerAction(prayer, date, claim);
+      setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+    });
+  };
+  const PastButtons = ({ prayer, date }: { prayer: PrayerName; date: string }) => (
+    <span className="inline-flex gap-1">
+      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="chip !py-0.5 text-[11px]" title="I prayed it on time (e.g. at school)">On time</button>
+      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="chip !py-0.5 text-[11px]">Late</button>
+      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="chip !py-0.5 text-[11px]">Missed</button>
+    </span>
+  );
   const log = (prayer: PrayerName) => {
     setMsg(null);
     start(async () => {
@@ -81,17 +96,29 @@ export function PrayerPill({ rows, onTimeCount }: { rows: PrayerRow[]; onTimeCou
               <span className="w-16 font-medium">{PRAYER_LABEL[r.prayer]}</span>
               <span className="muted w-11">{r.time}</span>
               <span className="flex-1 text-right">
-                {r.logged === "on_time" && <span className="text-good">✓ on time</span>}
+                {r.logged === "on_time" && <span className="text-good">✓ on time{r.enteredLate ? " (later)" : ""}</span>}
                 {r.logged === "late" && <span className="text-warn">✓ late</span>}
+                {r.logged === "missed" && <span className="text-bad">✗ missed</span>}
                 {!r.logged && r.state === "not_yet" && <span className="muted">{countdown(r.startMs - now)}</span>}
-                {!r.logged && r.state !== "not_yet" && (
-                  <button type="button" disabled={pending} onClick={() => log(r.prayer)} className={`btn-sm ${r.state === "open" ? "btn-primary" : "btn-ghost"}`}>
-                    {r.state === "open" ? "Prayed ✓" : "Late ✓"}
-                  </button>
+                {!r.logged && r.state === "open" && (
+                  <button type="button" disabled={pending} onClick={() => log(r.prayer)} className="btn-sm btn-primary">Prayed ✓</button>
                 )}
+                {!r.logged && r.state === "late_only" && <PastButtons prayer={r.prayer} date={today} />}
               </span>
             </div>
           ))}
+          {yesterday.some((r) => !r.logged) && (
+            <div className="pt-1 border-t border-line">
+              <div className="text-xs muted mb-1">Yesterday · say it honestly</div>
+              {yesterday.filter((r) => !r.logged).map((r) => (
+                <div key={r.prayer} className="flex items-center gap-2 py-1 text-sm">
+                  <span className="w-16 font-medium">{PRAYER_LABEL[r.prayer]}</span>
+                  <span className="flex-1 text-right"><PastButtons prayer={r.prayer} date={yesterdayDate} /></span>
+                </div>
+              ))}
+            </div>
+          )}
+          <p className="text-[11px] muted pt-1">Missed the moment? On time at school +3 · on time elsewhere +2 · late +1 · missed but honest +1.</p>
           {msg && <p className="text-xs muted pt-1">{msg}</p>}
         </div>
       )}

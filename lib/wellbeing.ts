@@ -4,7 +4,7 @@
  * self-report items adapted from research scales (growth mindset, academic self-efficacy, self-regulation,
  * WHO sleep/activity guidance); they guide the coach, they do not diagnose.
  */
-export type Instrument = "pulse" | "who5" | "mindset" | "habits";
+export type Instrument = "pulse" | "who5" | "mindset" | "habits" | "straight";
 export type Band = "green" | "amber" | "red";
 
 export interface CheckQuestion {
@@ -24,6 +24,7 @@ export interface InstrumentDef {
   minutes: number;
   questions: CheckQuestion[];
   freeText?: string; // optional open prompt at the end
+  shared?: boolean; // the child is told this one is shared with the parents (labels only)
 }
 
 const AGREE = [
@@ -41,6 +42,12 @@ const WHO5_SCALE = [
   { value: "2", label: "Less than half" },
   { value: "1", label: "Some of the time" },
   { value: "0", label: "At no time" },
+];
+
+const SLIP = [
+  { value: "5", label: "Never", emoji: "✅" },
+  { value: "3", label: "Once", emoji: "🤏" },
+  { value: "1", label: "A few times", emoji: "😬" },
 ];
 
 export const INSTRUMENTS: Record<Instrument, InstrumentDef> = {
@@ -115,9 +122,34 @@ export const INSTRUMENTS: Record<Instrument, InstrumentDef> = {
       { id: "h6", emoji: "💧", prompt: "Water and real meals during the day", options: [{ value: "5", label: "Yes, regularly" }, { value: "3", label: "Sometimes" }, { value: "1", label: "I forget" }] },
     ],
   },
+  straight: {
+  id: "straight",
+  title: "Straight talk",
+  emoji: "🤝",
+  intro: "Five honest taps. This one IS shared with your parents, as labels only. Saying “once” or “a few times” costs you nothing this week: honesty here is the point, and it earns the same points.",
+  everyDays: 7,
+  minutes: 1,
+  shared: true,
+  questions: [
+    { id: "marked", emoji: "✅", prompt: "This week I marked something done that I had not really done…", options: SLIP },
+    { id: "prayer", emoji: "🕌", prompt: "I logged a prayer I had not prayed, or marked it on time when it was late…", options: SLIP },
+    { id: "quiz", emoji: "⚡", prompt: "During a quiz I looked up an answer or asked someone…", options: SLIP },
+    { id: "notes", emoji: "📖", prompt: "I wrote a class note without really remembering the lesson…", options: SLIP },
+    { id: "snap", emoji: "📸", prompt: "I sent a snap that did not really show the job done…", options: SLIP },
+  ],
+  freeText: "Anything you want to say about this week? (this box stays private)",
+  },
 };
 
-export const INSTRUMENT_ORDER: Instrument[] = ["pulse", "who5", "mindset", "habits"];
+export const INSTRUMENT_ORDER: Instrument[] = ["pulse", "who5", "mindset", "habits", "straight"];
+
+/** Labels a parent may see for a straight-talk check: which areas had a slip. Never the free text. */
+export function straightTalkLabels(answers: Record<string, string>): string[] {
+  const names: Record<string, string> = { marked: "tasks", prayer: "prayers", quiz: "quizzes", notes: "class notes", snap: "snaps" };
+  return Object.entries(answers)
+    .filter(([, v]) => v !== "5")
+    .map(([k, v]) => `${names[k] ?? k}${v === "1" ? " (a few times)" : ""}`);
+}
 
 export interface ScoreResult {
   score: number; // 0-100, higher is better
@@ -143,7 +175,7 @@ export function scoreInstrument(instrument: Instrument, answers: Record<string, 
   }
   if (pts.length === 0) return { score: 0, band: "amber" };
   const score = Math.round(pts.reduce((a, b) => a + b, 0) / pts.length);
-  const band: Band = instrument === "pulse" ? (score < 30 ? "red" : score < 55 ? "amber" : "green") : score < 40 ? "amber" : "green";
+  const band: Band = instrument === "pulse" ? (score < 30 ? "red" : score < 55 ? "amber" : "green") : instrument === "straight" ? (score < 50 ? "red" : score < 100 ? "amber" : "green") : score < 40 ? "amber" : "green";
   return { score, band };
 }
 

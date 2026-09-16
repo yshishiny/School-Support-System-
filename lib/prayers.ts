@@ -4,7 +4,7 @@ import { addDays } from "./learning";
 
 export const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"] as const;
 export type PrayerName = (typeof PRAYERS)[number];
-export type PrayerStatus = "on_time" | "late";
+export type PrayerStatus = "on_time" | "late" | "missed";
 
 export const PRAYER_LABEL: Record<PrayerName, string> = {
   fajr: "Fajr",
@@ -16,7 +16,9 @@ export const PRAYER_LABEL: Record<PrayerName, string> = {
 
 export const PRAYER_POINTS = {
   ON_TIME: 3,
+  ON_TIME_LATER: 2, // said "on time" after the window, outside school hours
   LATE: 1,
+  MISSED_HONEST: 1, // saying "I missed it" still counts for honesty
   ALL_ON_TIME_BONUS: 10,
 } as const;
 
@@ -68,5 +70,34 @@ export function formatPrayerTime(d: Date, tz: string): string {
 
 /** Points for a single prayer log and the all-five bonus. */
 export function prayerPoints(status: PrayerStatus): number {
-  return status === "on_time" ? PRAYER_POINTS.ON_TIME : PRAYER_POINTS.LATE;
+  return status === "on_time" ? PRAYER_POINTS.ON_TIME : status === "late" ? PRAYER_POINTS.LATE : 0;
+}
+
+/** School hours on a date from the timetable ("HH:MM" strings), or null on a day with no lessons. */
+export function schoolSpan(date: string, timetable: { weekday: number; start_time: string; end_time: string | null }[]): { start: string; end: string } | null {
+  const wd = new Date(date + "T00:00:00Z").getUTCDay();
+  const rows = timetable.filter((t) => t.weekday === wd);
+  if (rows.length === 0) return null;
+  const starts = rows.map((r) => r.start_time.slice(0, 5)).sort();
+  const ends = rows.map((r) => (r.end_time ?? r.start_time).slice(0, 5)).sort();
+  return { start: starts[0], end: ends[ends.length - 1] };
+}
+
+/** True when the prayer's window overlaps school hours (a prayer prayed at school cannot be logged at the time). */
+export function windowAtSchool(w: PrayerWindow, span: { start: string; end: string } | null, tz: string): boolean {
+  if (!span) return false;
+  const a = formatInTimeZone(w.start, tz, "HH:mm");
+  const b = formatInTimeZone(w.end, tz, "HH:mm");
+  // Overlap of [a, b) with [school start, school end + 45 min]
+  const endPlus = ((h: string) => { const [hh, mm] = h.split(":").map(Number); const t = hh * 60 + mm + 45; return `${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`; })(span.end);
+  return a < endPlus && b > span.start;
+}
+
+export type PastClaim = "on_time" | "late" | "missed";
+
+/** Points for a prayer reported after its window, said honestly. */
+export function pastPrayerPoints(claim: PastClaim, atSchool: boolean): number {
+  if (claim === "on_time") return atSchool ? PRAYER_POINTS.ON_TIME : PRAYER_POINTS.ON_TIME_LATER;
+  if (claim === "late") return PRAYER_POINTS.LATE;
+  return PRAYER_POINTS.MISSED_HONEST;
 }

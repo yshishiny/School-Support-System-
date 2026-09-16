@@ -4,6 +4,8 @@ import { notifyParents, familyParents } from "@/lib/notify";
 import { custodianFor, parentName, type CustodyOverride } from "@/lib/custody";
 import { schoolDay, type DayOff } from "@/lib/school-day";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { computeIntegrity } from "@/lib/integrity/run";
+import { straightTalkLabels } from "@/lib/wellbeing";
 import { weekFor as allowanceWeekFor } from "@/lib/allowance";
 import { dueSnapTasks, taskDayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { computeStreak } from "@/lib/points";
@@ -69,6 +71,9 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   for (const s of students ?? []) {
     const sd = schoolDay(today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string; start_time: string; end_time: string | null }[]).filter((t) => t.student_id === s.id), (offRows ?? []) as DayOff[]);
     const mySnaps = allSnaps.filter((x) => x.student_id === s.id);
+    const integrity = await computeIntegrity(s.id, today, family.timezone).catch(() => []);
+    const { data: straightRow } = await admin.from("wellbeing_checks").select("answers, taken_on").eq("student_id", s.id).eq("instrument", "straight").gte("taken_on", shiftDate(today, -7)).order("taken_on", { ascending: false }).limit(1).maybeSingle();
+    const straightLabels = straightRow ? straightTalkLabels(straightRow.answers as Record<string, string>) : null;
     const cov = classLogCoverage(weekStart, today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string }[]).filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), (weekOff ?? []).map((d) => d.day as string));
     const snapsToday = dueSnapTasks(today, snapTasks, s.id).filter((t) => t.kind !== "handwriting").map((t) => {
       const st = taskDayState(t, mySnaps, today, "23:59");
@@ -87,7 +92,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       admin.from("attempts").select("score, total, flagged, flag_reason, quizzes(title)").eq("student_id", s.id).gte("submitted_at", dayAgoIso),
       admin.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", s.id).lte("due_date", today),
       admin.from("lesson_logs").select("subject_name, note").eq("student_id", s.id).eq("log_date", today),
-      admin.from("prayer_logs").select("prayer, status").eq("student_id", s.id).eq("log_date", today),
+      admin.from("prayer_logs").select("prayer, status, entered_late, claim").eq("student_id", s.id).eq("log_date", today),
       admin.from("coach_reports").select("headline").eq("student_id", s.id).order("created_at", { ascending: false }).limit(1).maybeSingle(),
       admin.from("attention_snapshots").select("tier, signals").eq("student_id", s.id).order("taken_on", { ascending: false }).limit(1).maybeSingle(),
     ]);
@@ -126,10 +131,11 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
         points: p.points_spent,
       })),
       covered: (covered ?? []).map((l) => ({ subject: l.subject_name, note: l.note })),
-      prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
+      prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" | "missed", enteredLate: !!p.entered_late, claim: (p.claim as string | null) ?? null })),
       coach: coach?.headline ?? null,
       school: { off: sd.off, reason: sd.reason, lessons: sd.lessons.length },
       classLog: { due: cov.due, done: cov.done, missing: cov.days.length ? missingLine(cov.days) : null },
+      askTonight: [...(straightLabels ? [straightLabels.length ? `Straight talk this week: he admitted a slip on ${straightLabels.join(", ")}. Thank him for saying so before anything else.` : "Straight talk this week: nothing to admit."] : []), ...integrity.slice(0, 2).map((x) => x.ask)],
       snaps: snapsToday,
       handwriting,
       access: accessFor(s.id),

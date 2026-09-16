@@ -18,7 +18,7 @@ describe("scoreInstrument", () => {
 
 describe("dueInstruments", () => {
   it("asks for everything at the start, then only what is due", () => {
-    expect(dueInstruments("2026-09-15", [])).toEqual(["pulse", "who5", "mindset", "habits"]);
+    expect(dueInstruments("2026-09-15", [])).toEqual(["pulse", "who5", "mindset", "habits", "straight"]);
     const history = [
       { instrument: "pulse" as const, taken_on: "2026-09-12", band: "green" as const, score: 80 },
       { instrument: "who5" as const, taken_on: "2026-09-01", band: "green" as const, score: 72 },

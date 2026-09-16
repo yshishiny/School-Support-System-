@@ -41,7 +41,7 @@ export default async function CoachPage() {
             <span className="text-4xl sticker-still">{d.emoji}</span>
             <div className="flex-1">
               <div className="font-bold">{d.title}</div>
-              <div className="text-xs muted">{d.questions.length} taps · {d.minutes} min · +5 pts · private</div>
+              <div className="text-xs muted">{d.questions.length} taps · {d.minutes} min · +5 pts · {d.shared ? "shared with your parents (labels only) · honesty is the whole point" : "private"}</div>
             </div>
             <span className="btn-primary btn-sm">Start</span>
           </Link>

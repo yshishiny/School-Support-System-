@@ -34,7 +34,7 @@ export function LayoutA({ d }: { d: TodayData }) {
           </div>
           <div className="flex items-start gap-1.5">
             <Link href="/rewards" className="badge text-base"><b className="text-accent-2">{d.balance.toLocaleString()}</b> ★</Link>
-            <PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} />
+            <PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} yesterday={d.yesterdayRows} today={d.today} yesterdayDate={d.yesterdayDate} />
           </div>
         </div>
         <div className="grid grid-cols-3 gap-2">

@@ -21,7 +21,8 @@ export interface ReportChild {
   pendingRedemptions: { title: string; points: number }[];
   practice?: { sets: number; correct: number; total: number; reviewsDue: number; flags: string[] };
   covered?: { subject: string; note: string }[];
-  prayers?: { prayer: string; status: "on_time" | "late" }[];
+  prayers?: { prayer: string; status: "on_time" | "late" | "missed"; enteredLate?: boolean; claim?: string | null }[];
+  askTonight?: string[]; // integrity signals turned into questions for the parent
   coach?: string | null; // latest coach headline
   attention?: { tier: string; labels: string[] } | null; // early-warning signals, labels only
   access?: { time: string; event: "login" | "visit"; where: string; ip: string | null }[]; // today's entries
@@ -67,11 +68,15 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       if (ck.stuckOn) lines.push(`❓ Stuck on: ${ck.stuckOn.trim()}`);
     }
     if (c.prayers) {
+      const cap = (p: string) => p[0].toUpperCase() + p.slice(1);
       const onTime = c.prayers.filter((p) => p.status === "on_time").length;
-      const late = c.prayers.filter((p) => p.status === "late").map((p) => p.prayer[0].toUpperCase() + p.prayer.slice(1));
+      const late = c.prayers.filter((p) => p.status === "late").map((p) => cap(p.prayer));
+      const missed = c.prayers.filter((p) => p.status === "missed").map((p) => cap(p.prayer));
+      const later = c.prayers.filter((p) => p.status === "on_time" && p.enteredLate).map((p) => `${cap(p.prayer)}${p.claim === "school" ? " at school" : ""}`);
       const missing = 5 - c.prayers.length;
-      lines.push(`🕌 Prayers: ${onTime}/5 on time${late.length ? ` · late: ${late.join(", ")}` : ""}${missing > 0 ? ` · ${missing} not logged` : ""}`);
+      lines.push(`🕌 Prayers: ${onTime}/5 on time${later.length ? ` (logged later: ${later.join(", ")})` : ""}${late.length ? ` · late: ${late.join(", ")}` : ""}${missed.length ? ` · missed (said so): ${missed.join(", ")}` : ""}${missing > 0 ? ` · ${missing} not logged` : ""}`);
     }
+    if (c.askTonight && c.askTonight.length) lines.push(`🔎 Worth asking tonight: ${c.askTonight.join(" · ")}`);
     if (c.classLog && c.classLog.due > 0) lines.push(`📖 Class log this week: ${c.classLog.done}/${c.classLog.due}${c.classLog.missing ? ` · still missing ${c.classLog.missing}` : " · complete"}`);
     if (c.covered && c.covered.length) {
       lines.push(`📖 Covered today: ${c.covered.map((l) => `${l.subject}: ${l.note}`).join(" · ")}`);

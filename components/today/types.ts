@@ -19,6 +19,9 @@ export interface TodayData {
   queue: QueueItem[];
   totalToday: number;
   prayerRows: PrayerRow[];
+  yesterdayRows: PrayerRow[]; // for honest late entries
+  today: string;
+  yesterdayDate: string;
   onTimeCount: number;
   allowance: WeekStatus | null;
   allowanceTone: "good" | "warn" | "bad" | null;
