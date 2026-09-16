@@ -7,7 +7,7 @@ import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import { Tabs } from "@/components/Tabs";
 import { MaterialUploader } from "@/components/MaterialUploader";
-import { PractiseFromFile } from "@/components/MaterialCards";
+import { PractiseFromFile, ReadAgainButton } from "@/components/MaterialCards";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
@@ -211,7 +211,7 @@ export default async function LearnPage() {
           </div>
           {m.instructions && <p className="text-sm"><b>Teacher says:</b> {m.instructions}</p>}
           {m.summary && <p className="text-xs muted">{m.summary}</p>}
-          {m.status === "ready" && <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} />}
+          {m.status === "ready" ? <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} /> : <ReadAgainButton materialId={m.id} />}
         </section>
       ))}
       {materials.length === 0 && <p className="card text-sm muted">No files yet. When the teacher drops a PDF in the group, save it and add it here: the coach reads it and writes practice questions from it.</p>}

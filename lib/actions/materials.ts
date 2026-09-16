@@ -40,25 +40,50 @@ export async function registerMaterialAction(studentId: string, path: string, me
     .single();
   if (error || !row) return { error: error?.message ?? "Could not save." };
 
-  const today = todayIn(family.timezone);
+  const r = await readAndStore(row.id, { path, mime: meta.mime, subject, instructions, fallbackTitle, grade: student.grade, firstName: student.full_name.split(" ")[0], today: todayIn(family.timezone) });
+  PATHS.forEach((p) => revalidatePath(p));
+  return r;
+}
+
+function friendlyAiError(msg: string): string {
+  if (/credit balance is too low/i.test(msg)) return "The AI account is out of credit. Top up at console.anthropic.com (Plans & Billing), then tap “Read again”.";
+  if (/rate limit|overloaded|529/i.test(msg)) return "The AI is busy right now. Tap “Read again” in a minute.";
+  if (/100 pages|too many pages|page limit/i.test(msg)) return "This PDF has more than 100 pages. Split it by chapter and upload the parts.";
+  return msg.length > 300 ? msg.slice(0, 300) + "…" : msg;
+}
+
+/** Runs the AI reading on a stored file and saves the result (or a friendly error). */
+async function readAndStore(id: string, o: { path: string; mime: string; subject: string | null; instructions: string | null; fallbackTitle: string; grade: number | null; firstName: string; today: string }): Promise<RegisterMaterialResult> {
+  const admin = createAdminClient();
   try {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured on the server.");
-    const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(path);
+    const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(o.path);
     if (!file) throw new Error("Could not read the uploaded file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const reading = await readMaterial({ media_type: meta.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { today, subject, instructions, grade: student.grade, studentFirstName: student.full_name.split(" ")[0] });
+    const reading = await readMaterial({ media_type: o.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { today: o.today, subject: o.subject, instructions: o.instructions, grade: o.grade, studentFirstName: o.firstName });
     await admin
       .from("materials")
-      .update({ status: "ready", title: reading.title.slice(0, 120) || fallbackTitle, subject: subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, error: null })
-      .eq("id", row.id);
-    PATHS.forEach((p) => revalidatePath(p));
-    return { id: row.id, title: reading.title, summary: reading.summary, items: reading.items.length };
+      .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null })
+      .eq("id", id);
+    return { id, title: reading.title, summary: reading.summary, items: reading.items.length };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await admin.from("materials").update({ status: "failed", error: msg }).eq("id", row.id);
-    PATHS.forEach((p) => revalidatePath(p));
-    return { id: row.id, title: fallbackTitle, summary: `Saved, but the AI could not read it: ${msg}`, items: 0 };
+    const msg = friendlyAiError(err instanceof Error ? err.message : String(err));
+    await admin.from("materials").update({ status: "failed", error: msg }).eq("id", id);
+    return { id, title: o.fallbackTitle, summary: `Saved, but the AI could not read it. ${msg}`, items: 0 };
   }
+}
+
+/** Re-runs the reading on a file that failed (out of credit, busy) or whose instructions changed. */
+export async function rereadMaterialAction(materialId: string): Promise<RegisterMaterialResult> {
+  const { profile, family } = await requireSession();
+  const admin = createAdminClient();
+  const { data } = await admin.from("materials").select("*, profiles!materials_student_id_fkey(full_name, grade)").eq("id", materialId).eq("family_id", family.id).maybeSingle();
+  const m = data as (MaterialRow & { profiles: { full_name: string; grade: number | null } | null }) | null;
+  if (!m) return { error: "File not found." };
+  if (profile.role !== "parent" && profile.id !== m.student_id) return { error: "Not allowed." };
+  const r = await readAndStore(m.id, { path: m.path, mime: m.mime, subject: m.subject, instructions: m.instructions, fallbackTitle: m.title, grade: m.profiles?.grade ?? null, firstName: m.profiles?.full_name.split(" ")[0] ?? "the student", today: todayIn(family.timezone) });
+  PATHS.forEach((p) => revalidatePath(p));
+  return r;
 }
 
 /** Parent (or the child) turns the suggested tasks into assignments. Skips duplicates by title and date. */

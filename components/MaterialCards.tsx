@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { acceptMaterialItemsAction, createMaterialQuizAction, dismissMaterialItemsAction } from "@/lib/actions/materials";
+import { acceptMaterialItemsAction, createMaterialQuizAction, dismissMaterialItemsAction, rereadMaterialAction } from "@/lib/actions/materials";
 import type { ExtractedItem } from "@/lib/ai/extract-items";
 import { KIND_EMOJI } from "@/lib/types";
 
@@ -43,5 +43,18 @@ export function PractiseFromFile({ materialId, sets }: { materialId: string; set
       <button type="button" disabled={pending} className="btn-primary btn-sm" onClick={() => start(async () => { setError(null); const r = await createMaterialQuizAction(materialId, difficulty); if (r?.error) setError(r.error); })}>{pending ? "Writing questions…" : sets ? `⚡ Another set (${sets} done)` : "⚡ Practise from this file"}</button>
       {error && <span className="text-xs text-bad">{error}</span>}
     </div>
+  );
+}
+
+/** Re-run the AI reading on a file that failed or changed. */
+export function ReadAgainButton({ materialId }: { materialId: string }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <span className="inline-flex items-center gap-2">
+      <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { setMsg(null); const r = await rereadMaterialAction(materialId); setMsg(r.error ?? (r.items !== undefined && r.summary && !r.summary.startsWith("Saved, but") ? "Read ✓" : r.summary ?? null)); router.refresh(); })}>{pending ? "Reading… (up to a minute)" : "🔁 Read again"}</button>
+      {msg && <span className="text-xs muted">{msg}</span>}
+    </span>
   );
 }

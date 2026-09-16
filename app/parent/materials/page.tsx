@@ -5,7 +5,7 @@ import { prettyDate } from "@/lib/dates";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
 import { deleteMaterialAction, updateMaterialAction } from "@/lib/actions/materials";
 import { MaterialUploader } from "@/components/MaterialUploader";
-import { MaterialItemsReview } from "@/components/MaterialCards";
+import { MaterialItemsReview, ReadAgainButton } from "@/components/MaterialCards";
 
 export const maxDuration = 300;
 
@@ -48,6 +48,7 @@ export default async function MaterialsPage() {
           </div>
           {m.summary && <p className="text-sm">{m.summary}</p>}
           {m.error && <p className="text-xs text-bad">{m.error}</p>}
+          {m.status !== "new" && <ReadAgainButton materialId={m.id} />}
           {m.instructions && <p className="text-xs"><b>Instructions:</b> {m.instructions}</p>}
           {(m.topics?.length ?? 0) > 0 && <div className="flex flex-wrap gap-1">{m.topics!.map((t) => <span key={t} className="chip text-xs">{t}</span>)}</div>}
           {m.status === "ready" && !m.items_reviewed_at && (m.items?.length ?? 0) > 0 && <MaterialItemsReview materialId={m.id} items={m.items!} />}
