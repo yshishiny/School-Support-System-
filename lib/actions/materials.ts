@@ -106,14 +106,21 @@ export async function rereadMaterialAction(materialId: string): Promise<Register
 }
 
 /** Parent (or the child) turns the suggested tasks into assignments. Skips duplicates by title and date. */
-export async function acceptMaterialItemsAction(materialId: string, keep: number[]): Promise<{ added: number }> {
+export async function acceptMaterialItemsAction(materialId: string, keep: number[], edits: Record<number, { due_date?: string | null; title?: string }> = {}): Promise<{ added: number }> {
   const { profile, family } = await requireSession();
   const admin = createAdminClient();
   const { data } = await admin.from("materials").select("*").eq("id", materialId).eq("family_id", family.id).maybeSingle();
   const m = data as MaterialRow | null;
   if (!m) return { added: 0 };
   if (profile.role !== "parent" && profile.id !== m.student_id) return { added: 0 };
-  const items = (m.items ?? []).filter((_, i) => keep.includes(i));
+  const items = (m.items ?? [])
+    .map((it, i) => {
+      const e = edits[i];
+      if (!e) return it;
+      const due = e.due_date === undefined ? it.due_date : e.due_date && /^\d{4}-\d{2}-\d{2}$/.test(e.due_date) ? e.due_date : null;
+      return { ...it, due_date: due, title: e.title?.trim().slice(0, 120) || it.title };
+    })
+    .filter((_, i) => keep.includes(i));
   const { data: subjects } = await admin.from("subjects").select("id,name").eq("student_id", m.student_id);
   const { data: existing } = await admin.from("assignments").select("title,due_date").eq("student_id", m.student_id);
   const seen = new Set((existing ?? []).map((e) => `${e.title.toLowerCase()}|${e.due_date ?? ""}`));

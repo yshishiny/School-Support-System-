@@ -10,21 +10,31 @@ import { runAction } from "@/lib/client-action";
 /** Suggested tasks from a file: tick the ones to add. */
 export function MaterialItemsReview({ materialId, items }: { materialId: string; items: ExtractedItem[] }) {
   const router = useRouter();
-  const [keep, setKeep] = useState<number[]>(items.map((_, i) => i).filter((i) => items[i].confidence !== "low" || true));
+  const [keep, setKeep] = useState<number[]>(items.map((_, i) => i));
+  const [edits, setEdits] = useState<Record<number, { due_date?: string | null; title?: string }>>({});
   const [pending, start] = useTransition();
   const [done, setDone] = useState<string | null>(null);
   if (done) return <p className="text-xs text-good">{done}</p>;
+  const edit = (i: number, patch: { due_date?: string | null; title?: string }) => setEdits({ ...edits, [i]: { ...edits[i], ...patch } });
   return (
-    <div className="space-y-1 text-sm">
-      <div className="text-xs font-semibold muted">Suggested tasks · tick what to add</div>
+    <div className="space-y-2 text-sm">
+      <div className="text-xs font-semibold muted">Suggested tasks · tick what to add, fix the title or date if needed</div>
       {items.map((it, i) => (
-        <label key={i} className="flex items-start gap-2 text-xs">
-          <input type="checkbox" className="mt-0.5" checked={keep.includes(i)} onChange={(e) => setKeep(e.target.checked ? [...keep, i] : keep.filter((k) => k !== i))} />
-          <span><b>{KIND_EMOJI[it.kind]} {it.title}</b>{it.due_date ? ` · due ${it.due_date}` : " · no date"}{it.confidence === "low" ? " · unsure" : ""}{it.details ? <span className="muted"> · {it.details}</span> : null}</span>
-        </label>
+        <div key={i} className="flex items-start gap-2 text-xs">
+          <input type="checkbox" className="mt-2" checked={keep.includes(i)} onChange={(e) => setKeep(e.target.checked ? [...keep, i] : keep.filter((k) => k !== i))} />
+          <div className="flex-1 min-w-0 space-y-1">
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-base">{KIND_EMOJI[it.kind]}</span>
+              <input className="input !py-1 text-xs flex-1 min-w-[10rem]" value={edits[i]?.title ?? it.title} onChange={(e) => edit(i, { title: e.target.value })} maxLength={120} />
+              <input type="date" className="input !py-1 !w-auto text-xs" value={edits[i]?.due_date === undefined ? it.due_date ?? "" : edits[i].due_date ?? ""} onChange={(e) => edit(i, { due_date: e.target.value || null })} title="Due date" />
+            </div>
+            {it.details ? <div className="muted">{it.details}</div> : null}
+            {it.confidence === "low" && <div className="text-warn">The AI was not sure about this one.</div>}
+          </div>
+        </div>
       ))}
       <div className="flex gap-2 pt-1">
-        <button type="button" disabled={pending || keep.length === 0} className="btn-primary btn-sm" onClick={() => start(async () => { const r = await runAction(() => acceptMaterialItemsAction(materialId, keep), setDone); if (!r) return; setDone(`${r.added} task${r.added === 1 ? "" : "s"} added.`); router.refresh(); })}>Add {keep.length}</button>
+        <button type="button" disabled={pending || keep.length === 0} className="btn-primary btn-sm" onClick={() => start(async () => { const r = await runAction(() => acceptMaterialItemsAction(materialId, keep, edits), setDone); if (!r) return; setDone(`${r.added} task${r.added === 1 ? "" : "s"} added.`); router.refresh(); })}>Add {keep.length}</button>
         <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { const r = await runAction(async () => { await dismissMaterialItemsAction(materialId); return true; }, setDone); if (!r) return; setDone("Skipped."); router.refresh(); })}>Skip</button>
       </div>
     </div>
