@@ -6,6 +6,9 @@ import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackF
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import { Tabs } from "@/components/Tabs";
+import { WeekPlanCard } from "@/components/WeekPlanCard";
+import type { PlannedQuiz } from "@/lib/plan/prepare";
+import { shiftDate } from "@/lib/dates";
 import { isArabicSubject, subjectEmoji, subjectLabel, ARABIC_SUBJECTS } from "@/lib/plan";
 import type { Topic } from "@/lib/types";
 
@@ -19,11 +22,12 @@ export default async function LearnPage() {
   const exams = examsFor(profile.target_exam, profile.grade);
   const examTracks = new Set(exams.map(trackFor));
 
-  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }] = await Promise.all([
     supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort"),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
+    supabase.from("quizzes").select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", shiftDate(today, -6)).lte("scheduled_for", shiftDate(today, 6)).order("scheduled_for"),
   ]);
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
@@ -66,14 +70,7 @@ export default async function LearnPage() {
           <div className="text-sm"><b>No weak spots found yet.</b> <span className="muted">Do a few sets and this tab fills with what to fix first.</span></div>
         </section>
       )}
-      <Link href="/today" className="card flex items-center gap-3">
-        <span className="text-4xl sticker-still">📅</span>
-        <div className="flex-1">
-          <div className="font-bold">Today&apos;s planned quizzes</div>
-          <div className="text-xs muted">They are on your home page, ready to go.</div>
-        </div>
-        <span className="btn-ghost btn-sm">Open</span>
-      </Link>
+      <WeekPlanCard quizzes={((planned ?? []) as unknown as PlannedQuiz[]).map((q) => ({ ...q, subject: q.topics?.subject ?? null }))} today={today} />
     </>
   );
 

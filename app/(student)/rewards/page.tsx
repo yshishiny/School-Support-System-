@@ -2,6 +2,8 @@ import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RedeemButton } from "@/components/RedeemButton";
 import { PointsGuide } from "@/components/PointsGuide";
+import { AllowanceMeter } from "@/components/AllowanceMeter";
+import { allowanceWeekStatus } from "@/lib/allowance/week";
 import type { PointsEntry, Redemption, Reward } from "@/lib/types";
 
 export default async function RewardsPage() {
@@ -17,9 +19,11 @@ export default async function RewardsPage() {
   const reds = (redemptions ?? []) as (Redemption & { rewards: { title: string; emoji: string } | null })[];
   const held = reds.filter((r) => r.status === "pending").reduce((s, r) => s + r.points_spent, 0);
   const available = balance - held;
+  const allowance = family.allowance_enabled ? await allowanceWeekStatus(profile.id, family).catch(() => null) : null;
 
   return (
     <main className="space-y-4">
+      {allowance && <AllowanceMeter status={allowance} />}
       <header className="card flex items-center justify-between">
         <div>
           <h1 className="h1">Rewards</h1>
