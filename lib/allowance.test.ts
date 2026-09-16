@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountFor, bandFor, mergeKpis, scoreWeek, weekFor, DEFAULT_KPIS } from "./allowance";
+import { amountFor, bandFor, eligibilityHint, mergeKpis, scoreWeek, weekFor, DEFAULT_KPIS } from "./allowance";
 
 describe("weekFor", () => {
   it("ends on the pay day and starts six days earlier", () => {
@@ -71,5 +71,24 @@ describe("scoreWeek", () => {
     expect(kpis.find((k) => k.code === "quizzes")!.enabled).toBe(false);
     expect(kpis.find((k) => k.code === "dish")!.weight).toBe(40);
     expect(DEFAULT_KPIS.find((k) => k.code === "dish")!.weight).toBe(20);
+  });
+});
+
+describe("eligibility", () => {
+  it("tells him what is still reachable and what to do", () => {
+    const r = scoreWeek({ ...base, checkinDates: [], ticks: [{ tick_date: "2026-09-12", code: "dish", value: false }] });
+    expect(r.hints[0]).toContain("No more ✗");
+    expect(r.hints).toContain("Do tonight's check-in");
+    expect(r.maxScore).toBeGreaterThan(r.score);
+    const h = eligibilityHint(r, 250);
+    expect(["good", "warn"]).toContain(h.tone);
+  });
+  it("says the week is gone when even a perfect finish stays under 50", () => {
+    const ticks = ["2026-09-11", "2026-09-12", "2026-09-13", "2026-09-14"].flatMap((d) => [
+      { tick_date: d, code: "dish", value: false }, { tick_date: d, code: "manners", value: false }, { tick_date: d, code: "phone", value: false },
+    ]);
+    const r = scoreWeek({ ...base, ticks, checkinDates: [], prayerDays: {}, plannedAttempted: 0, wellbeingDone: false });
+    expect(r.bestBand).toBe("some"); // app KPIs can still be recovered
+    expect(eligibilityHint(r, 250).tone).toBe("warn");
   });
 });

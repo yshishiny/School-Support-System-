@@ -1,4 +1,4 @@
-import { BANDS, bandFor } from "@/lib/allowance";
+import { BANDS, bandFor, eligibilityHint } from "@/lib/allowance";
 import type { WeekStatus } from "@/lib/allowance/week";
 import { prettyDate } from "@/lib/dates";
 
@@ -23,7 +23,28 @@ export function AllowanceMeter({ status, compact = false }: { status: WeekStatus
           <span key={x.band} className="absolute top-0 h-full w-0.5 bg-ink/40" style={{ left: `${x.min}%` }} title={`${x.label} from ${x.min}`} />
         ))}
       </div>
-      {next && <p className="text-xs muted">{next.min - status.score} more points this week reach “{next.label}” ({Math.round(status.allowance * next.share)} EGP).</p>}
+      {(() => {
+        const h = eligibilityHint(status, status.allowance);
+        const cls = h.tone === "good" ? "border-good/50 bg-good/10" : h.tone === "warn" ? "border-warn/50 bg-warn/10" : "border-bad/50 bg-bad/10";
+        return (
+          <div className={`rounded-xl border p-2.5 text-sm space-y-1 ${cls}`}>
+            <div className="font-semibold">{h.tone === "good" ? "✅" : h.tone === "warn" ? "⚠️" : "⛔"} {h.text}</div>
+            {status.hints.length > 0 && (
+              <ul className="text-xs space-y-0.5">
+                {status.hints.slice(0, compact ? 2 : 4).map((x) => <li key={x}>→ {x}</li>)}
+              </ul>
+            )}
+            {next && <div className="text-xs muted">{next.min - status.score} more points reach “{next.label}” ({Math.round(status.allowance * next.share)} EGP).</div>}
+          </div>
+        );
+      })()}
+      <details className="text-xs muted">
+        <summary className="cursor-pointer">How eligibility works</summary>
+        <div className="mt-1 space-y-0.5">
+          <div>Each basic has points. Dish, manners and phone are judged by your parents once a day; only a ✗ costs you. Prayers, check-ins, planned quizzes and the coach check-in are counted by the app.</div>
+          <div>Score out of 100 on {status.end ? "pay day" : "the week"}: 90+ pays the full {status.allowance} EGP · 70+ pays {Math.round(status.allowance * 0.7)} · 50+ pays {Math.round(status.allowance * 0.4)} · under 50 pays nothing. Every day counts, and a bad day can be balanced by good ones.</div>
+        </div>
+      </details>
       {!compact && (
         <ul className="text-sm divide-y divide-line">
           {status.results.map((r) => (

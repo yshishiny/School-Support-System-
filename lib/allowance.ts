@@ -85,6 +85,9 @@ export interface WeekResult {
   results: KpiResult[];
   elapsedDays: number;
   totalDays: number;
+  maxScore: number; // best score still reachable if every remaining day is perfect
+  bestBand: Band; // the band that maxScore reaches
+  hints: string[]; // what to do to stay eligible, most valuable first
 }
 
 function daysBetween(a: string, b: string): number {
@@ -100,39 +103,60 @@ export function scoreWeek(i: WeekInput): WeekResult {
   const active = i.kpis.filter((k) => k.enabled && k.weight > 0);
   const totalWeight = active.reduce((s, k) => s + k.weight, 0) || 1;
 
+  const remaining = totalDays - elapsedDays;
+  const maxByCode = new Map<string, number>();
+  const hintByCode = new Map<string, string>();
   const results: KpiResult[] = active.map((k) => {
     let fraction = 1;
     let detail = "";
+    let maxFraction = 1;
     if (k.source === "parent") {
       const bad = i.ticks.filter((t) => t.code === k.code && !t.value && days.includes(t.tick_date)).length;
       fraction = Math.max(0, 1 - bad / elapsedDays);
+      maxFraction = Math.max(0, 1 - bad / totalDays);
       detail = bad ? `${bad} day${bad === 1 ? "" : "s"} marked ✗` : "no ✗ so far";
+      if (bad) hintByCode.set(k.code, `No more ✗ on “${k.label.toLowerCase()}”`);
     } else if (k.code === "prayers") {
       const good = days.filter((d) => (i.prayerDays[d] ?? 0) >= 4).length;
       const target = Math.max(1, Math.round(elapsedDays * (5 / 7)));
       fraction = Math.min(1, good / target);
+      maxFraction = Math.min(1, (good + remaining) / 5);
       detail = `${good} of ${elapsedDays} days with 4+ prayers`;
+      if (fraction < 1) hintByCode.set(k.code, "Log at least 4 prayers today");
     } else if (k.code === "checkins") {
       const done = i.checkinDates.filter((d) => days.includes(d)).length;
       const target = Math.max(1, Math.round(elapsedDays * (5 / 7)));
       fraction = Math.min(1, done / target);
+      maxFraction = Math.min(1, (done + remaining) / 5);
       detail = `${done} check-in${done === 1 ? "" : "s"} in ${elapsedDays} days`;
+      if (fraction < 1) hintByCode.set(k.code, "Do tonight's check-in");
     } else if (k.code === "quizzes") {
       if (i.plannedTotal === 0) {
         fraction = 1;
         detail = "no planned quizzes yet";
       } else {
         fraction = Math.min(1, i.plannedAttempted / i.plannedTotal / 0.6);
+        maxFraction = 1; // missed sets stay open as catch-up
         detail = `${i.plannedAttempted} of ${i.plannedTotal} attempted`;
+        if (fraction < 1) hintByCode.set(k.code, "Attempt today's planned quiz (catch-up counts)");
       }
     } else if (k.code === "wellbeing") {
       fraction = i.wellbeingDue && !i.wellbeingDone ? 0 : 1;
+      maxFraction = 1;
       detail = i.wellbeingDue ? (i.wellbeingDone ? "done" : "due, not done yet") : "nothing due";
+      if (fraction < 1) hintByCode.set(k.code, "Do the coach check-in (2 minutes)");
     }
+    maxByCode.set(k.code, k.weight * maxFraction);
     return { code: k.code, label: k.label, emoji: k.emoji, weight: k.weight, fraction, earned: Math.round(k.weight * fraction * 10) / 10, detail };
   });
   const score = Math.round((results.reduce((s, r) => s + r.earned, 0) / totalWeight) * 100);
-  return { score, band: bandFor(score).band, results, elapsedDays, totalDays };
+  const maxScore = Math.round(([...maxByCode.values()].reduce((s, v) => s + v, 0) / totalWeight) * 100);
+  // Hints ordered by how much each KPI is still worth.
+  const hints = active
+    .filter((k) => hintByCode.has(k.code))
+    .sort((a, b) => b.weight - a.weight)
+    .map((k) => hintByCode.get(k.code)!);
+  return { score, band: bandFor(score).band, results, elapsedDays, totalDays, maxScore, bestBand: bandFor(maxScore).band, hints };
 }
 
 export function amountFor(score: number, allowance: number): number {
@@ -162,4 +186,16 @@ export const PRACTICES: PracticeDef[] = [
 
 export function practiceByCode(code: string): PracticeDef | undefined {
   return PRACTICES.find((p) => p.code === code);
+}
+
+/** One sentence about eligibility, for the child: where he stands and what is still reachable. */
+export function eligibilityHint(r: WeekResult, allowance: number): { tone: "good" | "warn" | "bad"; text: string } {
+  const now = bandFor(r.score);
+  const best = bandFor(r.maxScore);
+  const nowEgp = Math.round(allowance * now.share);
+  const bestEgp = Math.round(allowance * best.share);
+  if (now.band === "full") return { tone: "good", text: `On track for the full ${allowance} EGP. Keep every basic ✓ and it is yours.` };
+  if (best.band === "full") return { tone: "warn", text: `Heading for ${nowEgp} EGP, but the full ${allowance} is still reachable this week if the rest of the week is clean.` };
+  if (best.band === "none") return { tone: "bad", text: `This week's allowance is gone. Next week starts fresh; a clean week pays the full ${allowance}.` };
+  return { tone: "warn", text: `Heading for ${nowEgp} EGP. The best you can still reach this week is ${bestEgp} EGP (${best.label.toLowerCase()}).` };
 }
