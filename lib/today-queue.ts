@@ -4,7 +4,7 @@
  */
 import type { PrayerName } from "./prayers";
 
-export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "done";
+export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "classlog" | "done";
 
 export interface QueueItem {
   key: string;
@@ -30,6 +30,7 @@ export interface QueueInput {
   reviewsDue: number;
   learnerDone: boolean;
   snapsDue?: { id: string; label: string; emoji: string }[]; // snap tasks open now and not yet sent today
+  classLogMissing?: { count: number; line: string; deadline: string } | null; // previous days' classes still not logged this week
 }
 
 export function buildQueue(i: QueueInput): QueueItem[] {
@@ -56,6 +57,7 @@ export function buildQueue(i: QueueInput): QueueItem[] {
     cta: "Play now",
     chips: ["8 questions", "+5 on the day"],
   }));
+  if (i.classLogMissing && i.classLogMissing.count > 0) q.push({ key: "classlog", kind: "classlog", title: `${i.classLogMissing.count} class${i.classLogMissing.count === 1 ? "" : "es"} not logged yet`, subtitle: `${i.classLogMissing.line} · fill in before ${i.classLogMissing.deadline}`, href: "/checkin", cta: "Fill in", chips: ["+1 each", "keeps the allowance"] });
   if (evening && !i.checkinDone) q.push(checkin);
   q.push(...quizzes);
   if (i.dueCheck) q.push({ key: `check-${i.dueCheck.id}`, kind: "check", title: i.dueCheck.title, subtitle: `${i.dueCheck.minutes} min · private`, href: `/coach/check/${i.dueCheck.id}`, cta: "Go", chips: ["+5"] });

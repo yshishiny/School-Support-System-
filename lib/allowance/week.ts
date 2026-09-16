@@ -3,6 +3,7 @@ import { amountFor, mergeKpis, scoreWeek, weekFor, type KpiOverride, type WeekRe
 import { dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { snapCounts, type SnapLite, type SnapTask } from "@/lib/snaps";
+import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import type { Family } from "@/lib/types";
 
 export interface WeekStatus extends WeekResult {
@@ -29,6 +30,14 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     admin.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", studentId).gte("taken_on", shiftDate(start, -60)).order("taken_on", { ascending: false }),
     admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
   ]);
+  const lastDay = today < end ? today : end;
+  const [{ data: ttRows }, { data: logRows }, { data: offRows }] = await Promise.all([
+    admin.from("timetable_entries").select("weekday, subject_name").eq("student_id", studentId),
+    admin.from("lesson_logs").select("log_date, subject_name, note, homework_given").eq("student_id", studentId).gte("log_date", start).lte("log_date", lastDay),
+    admin.from("school_days_off").select("day").eq("family_id", family.id).gte("day", start).lte("day", end),
+  ]);
+  const coverage = classLogCoverage(start, lastDay, ttRows ?? [], (logRows ?? []) as ClassLogRow[], (offRows ?? []).map((d) => d.day as string));
+  const classLog = { due: coverage.due, done: coverage.done, missingLine: coverage.days.length ? missingLine(coverage.days) : null };
   const snapDays: Record<string, string[]> = {};
   for (const sn of (snapRows ?? []) as SnapLite[]) {
     if (!snapCounts(sn)) continue;
@@ -56,6 +65,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     wellbeingDue,
     wellbeingDone,
     snapDays,
+    classLog,
   });
   return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }
@@ -76,5 +86,13 @@ export async function closeAllowanceWeek(studentId: string, family: Pick<Family,
     .insert({ student_id: studentId, family_id: family.id, week_start: status.start, week_end: status.end, score: status.score, band: status.band, amount: status.amount, breakdown: status.results })
     .select("*")
     .single();
+  // Discipline rule: a week that closes with classes never logged gets the automatic practice (no way to skip it).
+  const gap = status.results.find((r) => r.code === "classlog");
+  if (gap && gap.fraction < 1) {
+    const { data: open } = await admin.from("consequences").select("id").eq("student_id", studentId).eq("code", "classlog_gap").is("closed_at", null).limit(1);
+    if (!open?.length) {
+      await admin.from("consequences").insert({ student_id: studentId, family_id: family.id, code: "classlog_gap", label: "Class log left unfinished", reason: `Week ${status.start} → ${status.end}: ${gap.detail}`, starts_on: today, ends_on: shiftDate(today, 2), earn_back_task: "Fill in every missing class in the check-in, then tell a parent." });
+    }
+  }
   return data;
 }

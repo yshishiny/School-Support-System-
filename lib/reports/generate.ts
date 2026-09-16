@@ -3,6 +3,8 @@ import { buildDailyReport, type ReportChild } from "@/lib/report";
 import { notifyParents, familyParents } from "@/lib/notify";
 import { custodianFor, parentName, type CustodyOverride } from "@/lib/custody";
 import { schoolDay, type DayOff } from "@/lib/school-day";
+import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { weekFor as allowanceWeekFor } from "@/lib/allowance";
 import { dueSnapTasks, taskDayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { computeStreak } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
@@ -51,11 +53,14 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
     return p ? { time: formatInTimeZone(new Date(p.created_at), family.timezone, "HH:mm"), lat: p.latitude as number, lng: p.longitude as number, source: p.source as string, place: places.length ? classifyPosition(p.latitude as number, p.longitude as number, places, id).label : null } : null;
   };
   const studentIds = (students ?? []).map((s) => s.id);
-  const [{ data: ttRows }, { data: offRows }, { data: taskRows }, { data: snapRows }] = await Promise.all([
+  const weekStart = allowanceWeekFor(today, family.allowance_pay_weekday).start;
+  const [{ data: ttRows }, { data: offRows }, { data: taskRows }, { data: snapRows }, { data: weekLogs }, { data: weekOff }] = await Promise.all([
     studentIds.length ? admin.from("timetable_entries").select("student_id, weekday, subject_name, start_time, end_time").in("student_id", studentIds) : { data: [] },
     admin.from("school_days_off").select("day, label").eq("family_id", familyId).eq("day", today),
     admin.from("snap_tasks").select("*").eq("family_id", familyId),
     studentIds.length ? admin.from("snaps").select("student_id, task_code, kind, taken_on, status, ai_verdict, ai_detail, created_at").in("student_id", studentIds).gte("taken_on", shiftDate(today, -14)).order("created_at") : { data: [] },
+    studentIds.length ? admin.from("lesson_logs").select("student_id, log_date, subject_name, note, homework_given").in("student_id", studentIds).gte("log_date", weekStart).lte("log_date", today) : { data: [] },
+    admin.from("school_days_off").select("day").eq("family_id", familyId).gte("day", weekStart).lte("day", today),
   ]);
   const snapTasks = (taskRows ?? []) as SnapTask[];
   type SnapRow = SnapLite & { student_id: string; kind: string; ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null };
@@ -64,6 +69,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   for (const s of students ?? []) {
     const sd = schoolDay(today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string; start_time: string; end_time: string | null }[]).filter((t) => t.student_id === s.id), (offRows ?? []) as DayOff[]);
     const mySnaps = allSnaps.filter((x) => x.student_id === s.id);
+    const cov = classLogCoverage(weekStart, today, ((ttRows ?? []) as { student_id: string; weekday: number; subject_name: string }[]).filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), (weekOff ?? []).map((d) => d.day as string));
     const snapsToday = dueSnapTasks(today, snapTasks, s.id).filter((t) => t.kind !== "handwriting").map((t) => {
       const st = taskDayState(t, mySnaps, today, "23:59");
       return { label: t.label, state: (st === "due" || st === "closed" ? "missing" : st) as "approved" | "good" | "sent" | "rejected" | "missing" };
@@ -123,6 +129,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       coach: coach?.headline ?? null,
       school: { off: sd.off, reason: sd.reason, lessons: sd.lessons.length },
+      classLog: { due: cov.due, done: cov.done, missing: cov.days.length ? missingLine(cov.days) : null },
       snaps: snapsToday,
       handwriting,
       access: accessFor(s.id),

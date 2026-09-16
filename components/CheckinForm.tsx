@@ -119,7 +119,8 @@ export function CheckinForm({
           {day.subjects.map((subject) => (
             <LessonPicker key={`${day.date}-${subject.subject}`} fieldKey={lessonFieldKey(day.date, today, subject.subject)} input={subject} />
           ))}
-          {day.date === today && <p className="text-xs muted">Tap the lesson title. Not sure? The 🤖 helper guesses it from a hint. After you submit you can take a quick recall quiz on these lessons.</p>}
+          {day.date === today && <p className="text-xs muted">Every class needs the lesson title and a homework yes/no. Homework “yes” goes straight onto your task list with its due date. Not sure of the title? The 🤖 helper guesses it from a hint.</p>}
+          {day.date !== today && <p className="text-xs text-warn">Missed days must be filled in before the week closes: after that they count against the allowance.</p>}
         </div>
       ))}
 

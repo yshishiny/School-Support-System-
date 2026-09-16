@@ -34,10 +34,17 @@ describe("buildLessonDays", () => {
     expect(days[1].subjects.map((s) => s.subject)).toEqual(["Math (GPA)"]); // P.E. skipped
   });
   it("hides a previous day once every class has a note, and suggests the next topics", () => {
-    const logs = [{ log_date: "2026-09-14", subject_name: "Math (GPA)", note: "Systems", topic_id: "m2" }];
+    const logs = [{ log_date: "2026-09-14", subject_name: "Math (GPA)", note: "Systems", topic_id: "m2", homework_given: false }];
     const days = buildLessonDays({ today: "2026-09-15", timetable, topics, logs });
     expect(days.map((d) => d.label)).toEqual(["Today", "Sun 13 Sep"]);
     expect(days[0].subjects[0].suggested).toEqual(["m2", "m3", "m4", "m5"]);
+  });
+  it("keeps a previous day visible while the homework question is unanswered, and skips days off", () => {
+    const logs = [{ log_date: "2026-09-14", subject_name: "Math (GPA)", note: "Systems", topic_id: "m2", homework_given: null }];
+    const days = buildLessonDays({ today: "2026-09-15", timetable, topics, logs, daysOff: ["2026-09-13"] });
+    expect(days.map((d) => d.label)).toEqual(["Today", "Yesterday"]);
+    expect(days[1].subjects[0].existingNote).toBe("Systems");
+    expect(days[1].subjects[0].defaultHomeworkDue).toBe("2026-09-20"); // next Math (GPA): Sunday
   });
 });
 

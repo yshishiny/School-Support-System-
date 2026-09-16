@@ -12,6 +12,8 @@ import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { classifyPosition, type Place } from "@/lib/places";
 import { signHeroUrls } from "@/lib/hero";
 import { lessonsLine, schoolDay, type DayOff } from "@/lib/school-day";
+import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
 
@@ -44,7 +46,7 @@ export default async function ParentHome() {
   }
   const ids = students.map((s) => s.id);
   const admin = createAdminClient();
-  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }, { data: parentRows }, { data: overrideRows }, { data: timetableRows }, { data: daysOffRows }, { count: snapsPending }, { data: materialsPending }] = await Promise.all([
+  const [{ data: checkins }, { data: open }, { data: ledger }, { count: pendingCount }, { data: report }, { data: prayers }, { data: alerts }, { data: pings }, { data: placeRows }, { data: todayTicks }, { count: claimsCount }, { count: findingsCount }, { data: heroRows }, { data: parentRows }, { data: overrideRows }, { data: timetableRows }, { data: daysOffRows }, { count: snapsPending }, { data: materialsPending }, { data: weekLogs }] = await Promise.all([
     supabase.from("checkins").select("*, checkin_items(*, assignments(title, kind))").in("student_id", ids).gte("checkin_date", shiftDate(today, -30)),
     supabase.from("assignments").select("*").in("student_id", ids).eq("status", "open"),
     supabase.from("points_ledger").select("student_id, delta").in("student_id", ids),
@@ -64,7 +66,9 @@ export default async function ParentHome() {
     supabase.from("school_days_off").select("day, label").eq("family_id", family.id).gte("day", today).lte("day", weekAhead),
     supabase.from("snaps").select("id", { count: "exact", head: true }).eq("family_id", family.id).eq("status", "pending"),
     supabase.from("materials").select("id, items").eq("family_id", family.id).eq("status", "ready").is("items_reviewed_at", null),
+    supabase.from("lesson_logs").select("student_id, log_date, subject_name, note, homework_given").in("student_id", ids).gte("log_date", weekFor(today, family.allowance_pay_weekday).start).lte("log_date", today),
   ]);
+  const weekStart = weekFor(today, family.allowance_pay_weekday).start;
   const filesToReview = (materialsPending ?? []).filter((m) => Array.isArray(m.items) && m.items.length > 0).length;
   const timetable = (timetableRows ?? []) as Pick<TimetableEntry, "student_id" | "weekday" | "subject_name" | "start_time" | "end_time">[];
   const daysOff = (daysOffRows ?? []) as DayOff[];
@@ -160,6 +164,7 @@ export default async function ParentHome() {
         const where = lp && places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : null;
         const school = schoolDay(today, timetable.filter((t) => t.student_id === s.id), daysOff);
         const schoolTomorrow = schoolDay(shiftDate(today, 1), timetable.filter((t) => t.student_id === s.id), daysOff);
+        const cov = classLogCoverage(weekStart, today, timetable.filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), daysOff.map((d) => d.day));
         return (
           <section key={s.id} className="card space-y-3">
             <div className="flex items-center gap-3">
@@ -183,6 +188,10 @@ export default async function ParentHome() {
                 <span><b>🏫 {school.lessons.length} lesson{school.lessons.length === 1 ? "" : "s"}</b> <span className="muted">{lessonsLine(school.lessons, 6)}</span></span>
               )}
             </Link>
+
+            {cov.due > 0 && (
+              <div className={`text-xs ${cov.done === cov.due ? "text-good" : "text-warn"}`}>📖 Class log this week: {cov.done}/{cov.due}{cov.days.length ? ` · missing ${missingLine(cov.days)}` : " · complete"}</div>
+            )}
 
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : "bg-warn") : "bg-panel-2 border border-line"}`} />; })}</div></div>

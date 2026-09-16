@@ -14,17 +14,18 @@ export default async function CheckinPage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
-  const [{ data: open }, { data: checkins }, { data: subjects }, { data: timetable }, { data: logs }, { data: topics }] = await Promise.all([
+  const [{ data: open }, { data: checkins }, { data: subjects }, { data: timetable }, { data: logs }, { data: topics }, { data: offRows }] = await Promise.all([
     supabase.from("assignments").select("*").eq("student_id", profile.id).eq("status", "open").order("due_date", { ascending: true, nullsFirst: false }),
     supabase.from("checkins").select("*, checkin_items(*)").eq("student_id", profile.id).eq("checkin_date", today).maybeSingle(),
     supabase.from("subjects").select("*").eq("student_id", profile.id).order("name"),
     supabase.from("timetable_entries").select("*").eq("student_id", profile.id).order("weekday").order("start_time"),
-    supabase.from("lesson_logs").select("log_date, subject_name, note, topic_id").eq("student_id", profile.id).gte("log_date", shiftDate(today, -30)).order("log_date"),
+    supabase.from("lesson_logs").select("log_date, subject_name, note, topic_id, homework_given, homework, homework_due").eq("student_id", profile.id).gte("log_date", shiftDate(today, -30)).order("log_date"),
     supabase.from("topics").select("id, subject, name, unit, sort").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
+    supabase.from("school_days_off").select("day").eq("family_id", family.id).gte("day", shiftDate(today, -10)).lte("day", shiftDate(today, 14)),
   ]);
   const week = (timetable ?? []) as TimetableEntry[];
   const todayRows = week.filter((t) => t.weekday === weekdayOf(today));
-  const lessonDays = buildLessonDays({ today, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null }[] });
+  const lessonDays = buildLessonDays({ today, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given: boolean | null; homework: string | null; homework_due: string | null }[], daysOff: (offRows ?? []).map((d) => d.day as string) });
   const todays = (checkins ?? null) as (Checkin & { checkin_items: CheckinItem[] }) | null;
   const existingItems: Record<string, ItemStatus> = {};
   todays?.checkin_items.forEach((i) => (existingItems[i.assignment_id] = i.status));

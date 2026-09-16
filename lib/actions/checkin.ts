@@ -38,15 +38,26 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   // Lesson notes are posted as lesson_<subject> (today) or lesson_<date>__<subject> (a previous day),
   // with lessontopic_<same key> carrying the curriculum topic id when one was picked.
   const earliest = shiftDate(today, -7);
-  const lessonNotes: { date: string; subject: string; note: string; topicId: string | null }[] = [];
+  const lessonNotes: { date: string; subject: string; note: string; topicId: string | null; homeworkGiven: boolean | null; homework: string | null; homeworkDue: string | null }[] = [];
+  const todayIncomplete: string[] = [];
   for (const [key, value] of formData.entries()) {
     if (!key.startsWith("lesson_")) continue;
+    const k = key.slice(7);
     const note = String(value).trim();
-    if (note.length < 2) continue;
-    const { date, subject } = parseLessonFieldKey(key.slice(7), today);
+    const { date, subject } = parseLessonFieldKey(k, today);
     if (date > today || date < earliest) continue;
-    const topicId = String(formData.get(`lessontopic_${key.slice(7)}`) ?? "").trim() || null;
-    lessonNotes.push({ date, subject, note: note.slice(0, 500), topicId });
+    const hwAnswer = String(formData.get(`lessonhwgiven_${k}`) ?? "");
+    const homeworkGiven = hwAnswer === "yes" ? true : hwAnswer === "no" ? false : null;
+    if (date === today && (note.length < 2 || homeworkGiven === null)) todayIncomplete.push(subject);
+    if (note.length < 2) continue;
+    const topicId = String(formData.get(`lessontopic_${k}`) ?? "").trim() || null;
+    const homework = homeworkGiven ? String(formData.get(`lessonhw_${k}`) ?? "").trim().slice(0, 200) || null : null;
+    const dueRaw = String(formData.get(`lessonhwdue_${k}`) ?? "").trim();
+    const homeworkDue = homeworkGiven && /^\d{4}-\d{2}-\d{2}$/.test(dueRaw) ? dueRaw : null;
+    lessonNotes.push({ date, subject, note: note.slice(0, 500), topicId, homeworkGiven, homework, homeworkDue });
+  }
+  if (todayIncomplete.length) {
+    return { error: `Every class today needs the lesson title and a homework yes/no: ${todayIncomplete.join(", ")}. (Tap “No class” if it did not happen.)` };
   }
 
   const ids = Object.keys(itemStatuses);
@@ -85,11 +96,35 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     const { data } = await supabase
       .from("lesson_logs")
       .upsert(
-        lessonNotes.map((l) => ({ student_id: profile.id, log_date: l.date, subject_name: l.subject, note: l.note, topic_id: l.topicId })),
+        lessonNotes.map((l) => ({ student_id: profile.id, log_date: l.date, subject_name: l.subject, note: l.note, topic_id: l.topicId, homework_given: l.homeworkGiven, homework: l.homework, homework_due: l.homeworkDue })),
         { onConflict: "student_id,log_date,subject_name" },
       )
-      .select("id, log_date");
+      .select("id, log_date, subject_name, assignment_id");
     savedLogs = data ?? [];
+    // Homework "yes" becomes a task on the list (one per class and day), so it is done on time.
+    const { data: subjectRows } = await supabase.from("subjects").select("id, name").eq("student_id", profile.id);
+    for (const l of lessonNotes) {
+      const row = (data ?? []).find((r) => r.log_date === l.date && r.subject_name === l.subject);
+      if (!row) continue;
+      if (l.homeworkGiven) {
+        const title = `${l.subject}: ${l.homework ?? "homework"}`;
+        const subject = (subjectRows ?? []).find((x) => x.name.toLowerCase() === l.subject.toLowerCase());
+        if (row.assignment_id) {
+          await supabase.from("assignments").update({ title, due_date: l.homeworkDue, subject_name: l.subject, subject_id: subject?.id ?? null }).eq("id", row.assignment_id).eq("student_id", profile.id);
+        } else {
+          const { data: a } = await supabase
+            .from("assignments")
+            .insert({ student_id: profile.id, subject_id: subject?.id ?? null, subject_name: l.subject, kind: "homework", title, details: `From the ${l.date} class log.`, due_date: l.homeworkDue, source: "student", created_by: profile.id })
+            .select("id")
+            .single();
+          if (a) await supabase.from("lesson_logs").update({ assignment_id: a.id }).eq("id", row.id);
+        }
+      } else if (row.assignment_id) {
+        // Changed his mind: the class had no homework after all.
+        await supabase.from("assignments").delete().eq("id", row.assignment_id).eq("student_id", profile.id).eq("status", "open");
+        await supabase.from("lesson_logs").update({ assignment_id: null }).eq("id", row.id);
+      }
+    }
   }
 
   // Points: written with the service role because students cannot insert into the ledger.
@@ -121,7 +156,6 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     if (!insertError) earned += award.delta;
   }
 
-  revalidatePath("/today");
-  revalidatePath("/parent");
+  ["/today", "/checkin", "/calendar", "/parent", "/parent/assignments"].forEach((p) => revalidatePath(p));
   return { earned, streak };
 }

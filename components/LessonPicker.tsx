@@ -12,6 +12,9 @@ import { subjectEmoji } from "@/lib/plan";
 export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: LessonSubjectInput }) {
   const [note, setNote] = useState(input.existingNote ?? "");
   const [topicId, setTopicId] = useState<string | null>(input.existingTopicId);
+  const [hwGiven, setHwGiven] = useState<"" | "yes" | "no">(input.existingHomeworkGiven === null ? "" : input.existingHomeworkGiven ? "yes" : "no");
+  const [hw, setHw] = useState(input.existingHomework ?? "");
+  const [hwDue, setHwDue] = useState(input.existingHomeworkDue ?? input.defaultHomeworkDue);
   const [mode, setMode] = useState<"chips" | "list" | "other" | "ask">("chips");
   const [hint, setHint] = useState("");
   const [reply, setReply] = useState<string | null>(null);
@@ -48,9 +51,12 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
     <div className="rounded-xl border border-line bg-panel-2/40 p-2.5 space-y-2" dir={/[\u0600-\u06FF]/.test(input.topics[0]?.name ?? "") ? "rtl" : undefined}>
       <input type="hidden" name={`lesson_${fieldKey}`} value={note} />
       <input type="hidden" name={`lessontopic_${fieldKey}`} value={topicId ?? ""} />
+      <input type="hidden" name={`lessonhwgiven_${fieldKey}`} value={hwGiven} />
+      <input type="hidden" name={`lessonhw_${fieldKey}`} value={hwGiven === "yes" ? hw : ""} />
+      <input type="hidden" name={`lessonhwdue_${fieldKey}`} value={hwGiven === "yes" ? hwDue : ""} />
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold truncate"><span className="text-lg align-middle">{subjectEmoji(input.subject)}</span> {input.subject}</span>
-        {note ? <span className="badge text-good truncate max-w-[60%]">✓ {note}</span> : <span className="text-xs muted">what was the lesson?</span>}
+        {note ? <span className={`badge truncate max-w-[60%] ${hwGiven ? "text-good" : "text-warn"}`}>{hwGiven ? "✓" : "…"} {note}</span> : <span className="text-xs muted">what was the lesson?</span>}
       </div>
 
       {mode === "chips" && (
@@ -65,6 +71,24 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
           )}
           <button type="button" onClick={() => setMode("other")} className="chip">✏️ Other</button>
           <button type="button" onClick={() => setMode("ask")} className="chip">🤖 Not sure</button>
+          <button type="button" onClick={() => { choose(null, "No class / absent"); setHwGiven("no"); }} className={`chip ${note === "No class / absent" ? "chip-on" : ""}`}>🚫 No class</button>
+        </div>
+      )}
+
+      {note && note !== "No class / absent" && (
+        <div className="space-y-1.5">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-semibold">Homework given?</span>
+            <button type="button" onClick={() => setHwGiven("yes")} className={`chip ${hwGiven === "yes" ? "chip-on" : ""}`}>📝 Yes</button>
+            <button type="button" onClick={() => setHwGiven("no")} className={`chip ${hwGiven === "no" ? "chip-on" : ""}`}>👍 No</button>
+          </div>
+          {hwGiven === "yes" && (
+            <div className="flex flex-wrap gap-2">
+              <input className="input py-1.5 text-sm flex-1 min-w-[10rem]" placeholder="What exactly? p.45 ex 1-10, worksheet…" value={hw} maxLength={200} onChange={(e) => setHw(e.target.value)} />
+              <label className="flex items-center gap-1 text-xs muted">due <input type="date" className="input py-1.5 text-sm !w-auto" value={hwDue} onChange={(e) => setHwDue(e.target.value)} /></label>
+            </div>
+          )}
+          {hwGiven === "" && <p className="text-[11px] text-warn">Answer yes or no so the class counts.</p>}
         </div>
       )}
 

@@ -5,6 +5,8 @@ import { todayIn, shiftDate, weekdayOf, hourIn } from "@/lib/dates";
 import { formatInTimeZone } from "date-fns-tz";
 import { dueSnapTasks, taskDayState, windowOpen, type SnapLite } from "@/lib/snaps";
 import { loadSnapTasks } from "@/lib/snaps/server";
+import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { weekFor } from "@/lib/allowance";
 import { computeStreak, levelFor } from "@/lib/points";
 import type { PrayerRow } from "@/components/PrayerPill";
 import { themeById } from "@/lib/themes";
@@ -52,6 +54,13 @@ export default async function TodayPage() {
     supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", today).order("created_at"),
   ]);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
+  const { start: weekStart, end: weekEnd } = weekFor(today, family.allowance_pay_weekday);
+  const [{ data: weekLogs }, { data: offRows }] = await Promise.all([
+    supabase.from("lesson_logs").select("log_date, subject_name, note, homework_given").eq("student_id", profile.id).gte("log_date", weekStart).lt("log_date", today),
+    supabase.from("school_days_off").select("day").eq("family_id", family.id).gte("day", weekStart).lte("day", weekEnd),
+  ]);
+  const coverage = today > weekStart ? classLogCoverage(weekStart, shiftDate(today, -1), (timetable ?? []) as { weekday: number; subject_name: string }[], (weekLogs ?? []) as ClassLogRow[], (offRows ?? []).map((d) => d.day as string)) : null;
+  const classLogMissing = coverage && coverage.due > coverage.done ? { count: coverage.due - coverage.done, line: missingLine(coverage.days), deadline: SHORT[weekdayOf(weekEnd)] } : null;
   const snapsDue = dueSnapTasks(today, snapTasks, profile.id)
     .filter((t) => windowOpen(t, hhmm) && ["due", "rejected"].includes(taskDayState(t, (snapRows ?? []) as SnapLite[], today, hhmm)))
     .map((t) => ({ id: t.id, label: t.label, emoji: t.emoji }));
@@ -84,6 +93,7 @@ export default async function TodayPage() {
     reviewsDue: dueReviews ?? 0,
     learnerDone: !!profile.learner_profile,
     snapsDue,
+    classLogMissing,
   });
 
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);

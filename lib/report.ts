@@ -28,6 +28,7 @@ export interface ReportChild {
   accessWeek?: { days: number; countries: string[]; logins: number } | null; // last 7 days summary
   lastLocation?: { time: string; lat: number; lng: number; source: string; place?: string | null } | null; // from the phone, with consent
   school?: { off: boolean; reason: string | null; lessons: number } | null;
+  classLog?: { due: number; done: number; missing: string | null } | null; // this allowance week
   snaps?: { label: string; state: "approved" | "good" | "sent" | "rejected" | "missing" }[]; // show-your-win tasks due today
   handwriting?: { score: number; before: number | null; focus: string[] } | null; // latest sample this week
 }
@@ -71,6 +72,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       const missing = 5 - c.prayers.length;
       lines.push(`🕌 Prayers: ${onTime}/5 on time${late.length ? ` · late: ${late.join(", ")}` : ""}${missing > 0 ? ` · ${missing} not logged` : ""}`);
     }
+    if (c.classLog && c.classLog.due > 0) lines.push(`📖 Class log this week: ${c.classLog.done}/${c.classLog.due}${c.classLog.missing ? ` · still missing ${c.classLog.missing}` : " · complete"}`);
     if (c.covered && c.covered.length) {
       lines.push(`📖 Covered today: ${c.covered.map((l) => `${l.subject}: ${l.note}`).join(" · ")}`);
     }

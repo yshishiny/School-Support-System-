@@ -21,7 +21,7 @@ describe("bands", () => {
 });
 
 const base = {
-  kpis: mergeKpis(null),
+  kpis: mergeKpis([{ code: "classlog", enabled: false }]), // the class-log KPI has its own test below
   start: "2026-09-11",
   end: "2026-09-17",
   today: "2026-09-14", // 4 days elapsed
@@ -65,6 +65,18 @@ describe("scoreWeek", () => {
     expect(lighter.band).toBe("most");
     const some = scoreWeek({ ...base, checkinDates: [], plannedAttempted: 1, wellbeingDone: false, prayerDays: {} });
     expect(some.band).toBe("some");
+  });
+  it("scores the class log and allows catch-up until the week closes", () => {
+    const kpis = mergeKpis(null);
+    const full = scoreWeek({ ...base, kpis, classLog: { due: 8, done: 8, missingLine: null } });
+    expect(full.results.find((r) => r.code === "classlog")!.fraction).toBe(1);
+    const half = scoreWeek({ ...base, kpis, classLog: { due: 8, done: 4, missingLine: "Mon: Math" } });
+    const r = half.results.find((x) => x.code === "classlog")!;
+    expect(r.fraction).toBe(0.5);
+    expect(half.maxScore).toBe(100); // still recoverable this week
+    expect(half.hints[0]).toContain("Fill in 4 classes");
+    const none = scoreWeek({ ...base, kpis });
+    expect(none.results.find((x) => x.code === "classlog")!.detail).toBe("no classes yet this week");
   });
   it("respects weight overrides and disabled KPIs", () => {
     const kpis = mergeKpis([{ code: "quizzes", enabled: false }, { code: "dish", weight: 40 }]);

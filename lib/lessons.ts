@@ -4,6 +4,7 @@
  */
 import { curriculumSubject } from "./plan";
 import { shiftDate, weekdayOf } from "./dates";
+import { nextClassDate } from "./class-log";
 
 export interface LessonTopicOption {
   id: string;
@@ -17,6 +18,10 @@ export interface LessonSubjectInput {
   suggested: string[]; // topic ids to show first
   existingNote: string | null;
   existingTopicId: string | null;
+  existingHomeworkGiven: boolean | null; // null = not answered yet
+  existingHomework: string | null;
+  existingHomeworkDue: string | null;
+  defaultHomeworkDue: string; // next time this subject is on the timetable
 }
 
 export interface LessonDay {
@@ -44,13 +49,14 @@ export interface BuildDaysInput {
   today: string;
   timetable: { weekday: number; subject_name: string }[];
   topics: { id: string; subject: string; name: string; unit: string | null; sort: number }[];
-  logs: { log_date: string; subject_name: string; note: string; topic_id: string | null }[];
+  logs: { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given?: boolean | null; homework?: string | null; homework_due?: string | null }[];
   lookBackDays?: number; // previous days to offer for catch-up
+  daysOff?: string[];
 }
 
 /** Today's classes plus any previous school day (within the look-back) that still has a class without a note. */
 export function buildLessonDays(input: BuildDaysInput): LessonDay[] {
-  const lookBack = input.lookBackDays ?? 3;
+  const lookBack = input.lookBackDays ?? 6; // the allowance week: a missed day is filled in before it closes
   const available = [...new Set(input.topics.map((t) => t.subject))];
   const bySubject = new Map<string, LessonTopicOption[]>();
   for (const s of available) {
@@ -62,6 +68,7 @@ export function buildLessonDays(input: BuildDaysInput): LessonDay[] {
   const days: LessonDay[] = [];
   for (let back = 0; back <= lookBack; back++) {
     const date = shiftDate(input.today, -back);
+    if (input.daysOff?.includes(date)) continue;
     const rows = input.timetable.filter((t) => t.weekday === weekdayOf(date));
     const names = [...new Set(rows.map((r) => r.subject_name))].filter((n) => !SKIP.test(n.trim()));
     if (names.length === 0) continue;
@@ -75,12 +82,23 @@ export function buildLessonDays(input: BuildDaysInput): LessonDay[] {
         .sort((a, b) => a.log_date.localeCompare(b.log_date))
         .map((l) => l.topic_id!);
       const existing = logsThatDay.find((l) => l.subject_name === name) ?? null;
-      return { subject: name, topics, suggested: suggestTopics(topics, loggedIds), existingNote: existing?.note ?? null, existingTopicId: existing?.topic_id ?? null };
+      return {
+        subject: name,
+        topics,
+        suggested: suggestTopics(topics, loggedIds),
+        existingNote: existing?.note ?? null,
+        existingTopicId: existing?.topic_id ?? null,
+        existingHomeworkGiven: existing ? existing.homework_given ?? null : null,
+        existingHomework: existing?.homework ?? null,
+        existingHomeworkDue: existing?.homework_due ?? null,
+        defaultHomeworkDue: nextClassDate(name, input.timetable, date, input.daysOff),
+      };
     });
-    // Previous days are only shown while something is still missing.
-    if (back > 0 && subjects.every((s) => s.existingNote)) continue;
+    const complete = (s: LessonSubjectInput) => !!s.existingNote && s.existingHomeworkGiven !== null;
+    // Previous days are only shown while something is still missing (a note without the homework answer counts as missing).
+    if (back > 0 && subjects.every(complete)) continue;
     const label = back === 0 ? "Today" : back === 1 ? "Yesterday" : new Date(date + "T00:00:00Z").toUTCString().slice(0, 11).replace(",", "");
-    days.push({ date, label, subjects: back === 0 ? subjects : subjects.filter((s) => !s.existingNote) });
+    days.push({ date, label, subjects: back === 0 ? subjects : subjects.filter((s) => !complete(s)) });
   }
   return days;
 }
