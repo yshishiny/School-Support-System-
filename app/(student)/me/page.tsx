@@ -9,6 +9,7 @@ import Link from "next/link";
 import { learnerTags, type LearnerProfile } from "@/lib/learner";
 import { HeroUploader } from "@/components/HeroUploader";
 import { HeroGallery } from "@/components/HeroGallery";
+import { BannerAdjuster } from "@/components/BannerAdjuster";
 import { heroChoices, signHeroUrls, type HeroImage } from "@/lib/hero";
 import type { Checkin } from "@/lib/types";
 
@@ -22,7 +23,7 @@ export default async function MePage() {
   ]);
   const heroes = (heroRows ?? []) as HeroImage[];
   const heroUrls = await signHeroUrls(heroes);
-  const { avatar } = await heroChoices(profile);
+  const { avatar, banner } = await heroChoices(profile);
   const subjects = [...new Set((topics ?? []).map((t) => t.subject as string))].sort();
   const list = (checkins ?? []) as Checkin[];
   const totalMinutes = list.reduce((s, c) => s + c.minutes_studied, 0);
@@ -65,6 +66,12 @@ export default async function MePage() {
           <HeroUploader familyId={family.id} studentId={profile.id} compact />
         </div>
         <HeroGallery items={heroes.map((h) => ({ id: h.id, url: heroUrls.get(h.id) ?? "", caption: h.caption })).filter((x) => x.url)} avatarId={profile.avatar_image_id} bannerId={profile.banner_image_id} canDelete />
+        {banner && (
+          <div className="space-y-1 pt-1">
+            <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-display)" }}>Frame your banner</div>
+            <BannerAdjuster url={banner} zoom={Number(profile.banner_zoom ?? 1) || 1} x={profile.banner_x ?? 50} y={profile.banner_y ?? 30} />
+          </div>
+        )}
       </section>
 
       <HomeLayoutPicker current={profile.home_layout ?? "b"} />

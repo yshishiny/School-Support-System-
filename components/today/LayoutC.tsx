@@ -13,7 +13,7 @@ export function LayoutC({ d }: { d: TodayData }) {
   const missing = d.allowance ? Math.max(0, 90 - d.allowance.score) : 0;
   return (
     <main className="space-y-3 -mt-4 -mx-4">
-      <div className="relative h-[210px] overflow-hidden rounded-b-[32px]" style={d.bannerUrl ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0) 30%, var(--color-bg) 100%), url(${d.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center 20%" } : { background: "linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-panel-2)), var(--color-bg))" }}>
+      <div className="relative h-[210px] overflow-hidden rounded-b-[32px]" style={d.bannerUrl ? { backgroundImage: `linear-gradient(180deg, rgba(0,0,0,0) 30%, var(--color-bg) 100%), url(${d.bannerUrl})`, backgroundSize: `auto, ${d.banner.zoom * 100}% auto`, backgroundPosition: `center, ${d.banner.x}% ${d.banner.y}%`, backgroundRepeat: "no-repeat", backgroundColor: "var(--color-panel-2)" } : { background: "linear-gradient(180deg, color-mix(in srgb, var(--color-accent) 20%, var(--color-panel-2)), var(--color-bg))" }}>
         {!d.bannerUrl && <div className="absolute inset-0 flex items-center justify-center gap-4 text-7xl opacity-25 select-none" aria-hidden>{d.stickers.slice(0, 3).join(" ")}</div>}
         <div className="absolute top-3 right-3"><PrayerPill rows={d.prayerRows} onTimeCount={d.onTimeCount} /></div>
         <div className="absolute inset-x-4 bottom-4 flex items-end gap-3">

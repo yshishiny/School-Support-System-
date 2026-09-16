@@ -31,3 +31,15 @@ export async function heroChoices(profile: { avatar_image_id: string | null; ban
   const urls = await signHeroUrls((data ?? []) as { id: string; path: string }[]);
   return { avatar: profile.avatar_image_id ? urls.get(profile.avatar_image_id) ?? null : null, banner: profile.banner_image_id ? urls.get(profile.banner_image_id) ?? null : null };
 }
+
+export interface BannerFraming {
+  banner_zoom: number | string | null;
+  banner_x: number | null;
+  banner_y: number | null;
+}
+
+/** Background rules that honour the child's zoom and focal point. */
+export function bannerBackground(url: string, f: BannerFraming): { backgroundImage: string; backgroundSize: string; backgroundPosition: string; backgroundRepeat: string } {
+  const zoom = Math.max(1, Math.min(3, Number(f.banner_zoom ?? 1) || 1));
+  return { backgroundImage: `url(${url})`, backgroundSize: `${zoom * 100}% auto`, backgroundPosition: `${f.banner_x ?? 50}% ${f.banner_y ?? 30}%`, backgroundRepeat: "no-repeat" };
+}

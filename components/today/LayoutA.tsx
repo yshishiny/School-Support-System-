@@ -14,7 +14,7 @@ export function LayoutA({ d }: { d: TodayData }) {
   return (
     <main className="space-y-3">
       <ConsequenceCard items={d.consequences} />
-      <header className="card relative overflow-hidden space-y-3" style={d.bannerUrl ? { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, var(--color-panel) 94%, transparent) 40%, color-mix(in srgb, var(--color-panel) 60%, transparent)), url(${d.bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center 25%" } : undefined}>
+      <header className="card relative overflow-hidden space-y-3" style={d.bannerUrl ? { backgroundImage: `linear-gradient(90deg, color-mix(in srgb, var(--color-panel) 94%, transparent) 40%, color-mix(in srgb, var(--color-panel) 60%, transparent)), url(${d.bannerUrl})`, backgroundSize: `auto, ${d.banner.zoom * 100}% auto`, backgroundPosition: `center, ${d.banner.x}% ${d.banner.y}%`, backgroundRepeat: "no-repeat" } : undefined}>
         <div className="flex items-center gap-3">
           <Link href="/me" className="ring h-16 w-16 shrink-0 rounded-full p-[3px]" style={{ ["--pct" as string]: (d.level.into / d.level.span) * 100 }}>
             {d.avatarUrl ? (

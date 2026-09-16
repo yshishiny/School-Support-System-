@@ -9,6 +9,7 @@ export interface TodayData {
   avatarEmoji: string;
   avatarUrl: string | null;
   bannerUrl: string | null;
+  banner: { zoom: number; x: number; y: number };
   balance: number;
   level: { level: number; into: number; span: number };
   streak: number;
