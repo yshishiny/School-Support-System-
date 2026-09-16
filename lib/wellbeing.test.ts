@@ -24,9 +24,11 @@ describe("dueInstruments", () => {
       { instrument: "who5" as const, taken_on: "2026-09-01", band: "green" as const, score: 72 },
       { instrument: "mindset" as const, taken_on: "2026-08-01", band: "green" as const, score: 70 },
       { instrument: "habits" as const, taken_on: "2026-09-10", band: "green" as const, score: 70 },
+      { instrument: "straight" as const, taken_on: "2026-09-13", band: "green" as const, score: 100 },
     ];
     expect(dueInstruments("2026-09-15", history)).toEqual(["mindset"]);
     expect(dueInstruments("2026-09-19", history)).toEqual(["pulse", "mindset"]);
+    expect(dueInstruments("2026-09-20", history)).toEqual(["pulse", "mindset", "straight"]);
   });
 });
 
