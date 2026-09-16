@@ -4,7 +4,7 @@
  * "best" runs everything on Opus. Judgement-heavy jobs (coach report, clinician summary, confidential chat)
  * stay on Opus in every tier.
  */
-export type AiJob = "quiz" | "explain" | "snap" | "lesson-guess" | "read-material" | "extract" | "risk" | "archive" | "coach-chat" | "coach-report" | "clinician";
+export type AiJob = "quiz" | "worksheet" | "explain" | "snap" | "lesson-guess" | "read-material" | "extract" | "risk" | "archive" | "coach-chat" | "coach-report" | "clinician";
 
 const HAIKU = "claude-haiku-4-5";
 const SONNET = "claude-sonnet-5";
@@ -17,13 +17,13 @@ export function aiTier(): Tier {
   return t === "best" || t === "balanced" ? t : "saver";
 }
 
-const ROUTINE: AiJob[] = ["quiz", "explain", "snap", "lesson-guess", "read-material", "extract", "risk", "archive"];
+const ROUTINE: AiJob[] = ["quiz", "worksheet", "explain", "snap", "lesson-guess", "read-material", "extract", "risk", "archive"];
 
 export function modelFor(job: AiJob): string {
   if (!ROUTINE.includes(job)) return OPUS;
   const tier = aiTier();
   if (tier === "best") return job === "risk" ? SONNET : OPUS;
-  if (tier === "balanced") return job === "quiz" || job === "explain" || job === "extract" || job === "archive" ? OPUS : SONNET;
+  if (tier === "balanced") return job === "quiz" || job === "worksheet" || job === "explain" || job === "extract" || job === "archive" ? OPUS : SONNET;
   return HAIKU;
 }
 

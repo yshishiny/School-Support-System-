@@ -24,6 +24,7 @@ export interface MaterialRow {
   items_reviewed_at: string | null;
   error: string | null;
   pages: number | null;
+  worksheet: { questions: { prompt: string; choices: string[]; correct_index: number; explanation: string; skill_tag: string; original_type: string }[]; skipped: number; note: string; model: string; prepared_at: string } | null;
   created_at: string;
 }
 

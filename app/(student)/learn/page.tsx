@@ -7,7 +7,7 @@ import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton } from "@/components/LearnButtons";
 import { Tabs } from "@/components/Tabs";
 import { MaterialUploader } from "@/components/MaterialUploader";
-import { PractiseFromFile, ReadAgainButton } from "@/components/MaterialCards";
+import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
@@ -32,12 +32,15 @@ export default async function LearnPage() {
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
     supabase.from("quizzes").select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", shiftDate(today, -6)).lte("scheduled_for", shiftDate(today, 6)).order("scheduled_for"),
     supabase.from("materials").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(40),
-    supabase.from("quizzes").select("material_id").eq("student_id", profile.id).not("material_id", "is", null),
+    supabase.from("quizzes").select("material_id, title, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null),
     supabase.from("subjects").select("name").eq("student_id", profile.id),
   ]);
   const materials = (materialRows ?? []) as MaterialRow[];
   const materialUrls = await signMaterialUrls(materials.map((m) => ({ id: m.id, path: m.path })));
-  const setsFor = (id: string) => (materialQuizzes ?? []).filter((q) => q.material_id === id).length;
+  type MQ = { material_id: string | null; title: string; attempts: { submitted_at: string | null }[] };
+  const mq = (materialQuizzes ?? []) as MQ[];
+  const setsFor = (id: string) => mq.filter((q) => q.material_id === id && !q.title.startsWith("Worksheet:")).length;
+  const worksheetDone = (id: string) => mq.filter((q) => q.material_id === id && q.title.startsWith("Worksheet:") && q.attempts.some((a) => a.submitted_at)).length;
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
   const examTopics = all.filter((t) => examTracks.has(t.track as "act" | "sat"));
@@ -211,6 +214,8 @@ export default async function LearnPage() {
           </div>
           {m.instructions && <p className="text-sm"><b>Teacher says:</b> {m.instructions}</p>}
           {m.summary && <p className="text-xs muted">{m.summary}</p>}
+          {m.status === "ready" && m.worksheet?.questions?.length ? <DoWorksheetButton materialId={m.id} questions={m.worksheet.questions.length} attempts={worksheetDone(m.id)} /> : null}
+          {m.status === "ready" && !m.worksheet && m.kind === "worksheet" && <PrepareWorksheetButton materialId={m.id} prepared={null} />}
           {m.status === "ready" ? <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} /> : <ReadAgainButton materialId={m.id} />}
         </section>
       ))}

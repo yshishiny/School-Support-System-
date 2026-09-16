@@ -8,6 +8,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
 import { readMaterial, type MaterialInput } from "@/lib/ai/read-material";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
+import { transcribeWorksheet } from "@/lib/ai/transcribe-worksheet";
 import { learnerPromptLine } from "@/lib/learner";
 import { themeById } from "@/lib/themes";
 import { MATERIAL_BUCKET, type MaterialRow } from "@/lib/materials/server";
@@ -233,5 +234,56 @@ export async function createMaterialQuizAction(materialId: string, difficulty: "
     return { error: qErr?.message ?? "Could not save the questions." };
   }
   await admin.from("quiz_answer_keys").insert(questions.map((row) => ({ question_id: row.id, correct_index: generated.questions[row.position - 1].correct_index, explanation: generated.questions[row.position - 1].explanation })));
+  redirect(`/quiz/${quiz.id}`);
+}
+
+export interface PrepareWorksheetResult { error?: string; questions?: number; skipped?: number; note?: string }
+
+/** Parent or child: transcribe the sheet's own questions into a stored practice set (once per file). */
+export async function prepareWorksheetAction(materialId: string): Promise<PrepareWorksheetResult> {
+  const { profile, family } = await requireSession();
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
+  const admin = createAdminClient();
+  const { data } = await admin.from("materials").select("*, profiles!materials_student_id_fkey(grade)").eq("id", materialId).eq("family_id", family.id).maybeSingle();
+  const m = data as (MaterialRow & { profiles: { grade: number | null } | null }) | null;
+  if (!m) return { error: "File not found." };
+  if (profile.role !== "parent" && profile.id !== m.student_id) return { error: "Not allowed." };
+  try {
+    const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(m.path);
+    if (!file) throw new Error("Could not read the file back.");
+    const buf = Buffer.from(await file.arrayBuffer());
+    const t = await transcribeWorksheet({ media_type: m.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
+    if (t.questions.length === 0) return { error: `No question could be transcribed. ${t.note}` };
+    await admin.from("materials").update({ worksheet: { questions: t.questions, skipped: t.skipped, note: t.note, model: t.model, prepared_at: new Date().toISOString() } }).eq("id", m.id);
+    PATHS.forEach((p) => revalidatePath(p));
+    return { questions: t.questions.length, skipped: t.skipped, note: t.note };
+  } catch (err) {
+    return { error: friendlyAiError(err instanceof Error ? err.message : String(err)) };
+  }
+}
+
+/** The child does the sheet on the system: a quiz built from the stored transcription (can be redone). */
+export async function startWorksheetAction(materialId: string): Promise<{ error?: string }> {
+  const { profile } = await requireStudent();
+  const admin = createAdminClient();
+  const { data } = await admin.from("materials").select("*").eq("id", materialId).eq("student_id", profile.id).maybeSingle();
+  const m = data as MaterialRow | null;
+  if (!m?.worksheet?.questions?.length) return { error: "This sheet is not prepared yet." };
+  const qs = m.worksheet.questions;
+  const { data: quiz, error } = await admin
+    .from("quizzes")
+    .insert({ student_id: profile.id, topic_id: null, track: "school", title: `Worksheet: ${m.title}`, passage: null, difficulty: "medium", language: m.language === "arabic" ? "ar" : "en", material_id: materialId })
+    .select("id")
+    .single();
+  if (error || !quiz) return { error: error?.message ?? "Could not start." };
+  const { data: rows, error: qErr } = await admin
+    .from("quiz_questions")
+    .insert(qs.map((q, i) => ({ quiz_id: quiz.id, position: i + 1, prompt: q.prompt, choices: q.choices, skill_tag: q.skill_tag })))
+    .select("id, position");
+  if (qErr || !rows) {
+    await admin.from("quizzes").delete().eq("id", quiz.id);
+    return { error: qErr?.message ?? "Could not save the questions." };
+  }
+  await admin.from("quiz_answer_keys").insert(rows.map((r) => ({ question_id: r.id, correct_index: qs[r.position - 1].correct_index, explanation: qs[r.position - 1].explanation })));
   redirect(`/quiz/${quiz.id}`);
 }

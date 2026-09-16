@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { acceptMaterialItemsAction, createMaterialQuizAction, dismissMaterialItemsAction, rereadMaterialAction } from "@/lib/actions/materials";
+import { acceptMaterialItemsAction, createMaterialQuizAction, dismissMaterialItemsAction, prepareWorksheetAction, rereadMaterialAction, startWorksheetAction } from "@/lib/actions/materials";
 import type { ExtractedItem } from "@/lib/ai/extract-items";
 import { KIND_EMOJI } from "@/lib/types";
 import { runAction } from "@/lib/client-action";
@@ -67,5 +67,35 @@ export function ReadAgainButton({ materialId }: { materialId: string }) {
       <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => start(async () => { setMsg(null); const r = await runAction(() => rereadMaterialAction(materialId), setMsg); if (!r) return; setMsg(r.error ?? (r.items !== undefined && r.summary && !r.summary.startsWith("Saved, but") ? "Read ✓" : r.summary ?? null)); router.refresh(); })}>{pending ? "Reading… (up to a minute)" : "🔁 Read again"}</button>
       {msg && <span className="text-xs muted">{msg}</span>}
     </span>
+  );
+}
+
+/** Turn the sheet's own questions into a stored practice set (parent or child). */
+export function PrepareWorksheetButton({ materialId, prepared }: { materialId: string; prepared: { questions: number; skipped: number; note: string } | null }) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const [msg, setMsg] = useState<string | null>(null);
+  return (
+    <div className="text-xs space-y-1">
+      {prepared && <div className="text-good">📝 On-system worksheet ready: {prepared.questions} question{prepared.questions === 1 ? "" : "s"}{prepared.skipped ? ` · ${prepared.skipped} item${prepared.skipped === 1 ? "" : "s"} skipped` : ""}. <span className="muted">{prepared.note}</span></div>}
+      <button type="button" disabled={pending} className={`${prepared ? "btn-ghost" : "btn-primary"} btn-sm`} onClick={() => start(async () => { setMsg(null); const r = await runAction(() => prepareWorksheetAction(materialId), setMsg); if (!r) return; setMsg(r.error ?? `Ready: ${r.questions} questions${r.skipped ? `, ${r.skipped} skipped` : ""}.`); router.refresh(); })}>
+        {pending ? "Transcribing the sheet… (up to a minute)" : prepared ? "🔁 Transcribe again" : "📝 Turn this sheet into on-system practice"}
+      </button>
+      {msg && <span className="ml-2 muted">{msg}</span>}
+    </div>
+  );
+}
+
+/** The child's button: do the teacher's sheet on the phone. */
+export function DoWorksheetButton({ materialId, questions, attempts }: { materialId: string; questions: number; attempts: number }) {
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      <button type="button" disabled={pending} className="btn-primary btn-sm" onClick={() => start(async () => { setError(null); const r = await runAction(() => startWorksheetAction(materialId), setError); if (r?.error) setError(r.error); })}>
+        {pending ? "Opening…" : `📝 Do the worksheet · ${questions} questions${attempts ? ` (done ${attempts}×)` : ""}`}
+      </button>
+      {error && <span className="text-xs text-bad">{error}</span>}
+    </div>
   );
 }
