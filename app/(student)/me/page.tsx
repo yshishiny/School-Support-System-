@@ -8,6 +8,7 @@ import { InterestsForm } from "@/components/InterestsForm";
 import Link from "next/link";
 import { learnerTags, type LearnerProfile } from "@/lib/learner";
 import { RemindersCard } from "@/components/RemindersCard";
+import { APP_NAME, APP_VERSION } from "@/lib/version";
 import { DEFAULT_NUDGES, type NudgeSettings } from "@/lib/nudges";
 import { HeroUploader } from "@/components/HeroUploader";
 import { HeroGallery } from "@/components/HeroGallery";
@@ -106,6 +107,8 @@ export default async function MePage() {
         <div className="flex-1"><div className="font-bold">Take the tour again</div><div className="text-xs muted">Two minutes: what each tab does and how points work.</div></div>
         <span className="btn-ghost btn-sm">Open</span>
       </Link>
+
+      <Link href="/about" className="text-xs muted block text-center">{APP_NAME} v{APP_VERSION} · About</Link>
 
       <form action={logoutAction}>
         <button className="btn-ghost w-full">Sign out</button>

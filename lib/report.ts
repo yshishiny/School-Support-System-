@@ -1,6 +1,7 @@
 import { KIND_EMOJI } from "./types";
 import type { AssignmentKind, ItemStatus } from "./types";
 import { prettyDate } from "./dates";
+import { APP_NAME, APP_VERSION } from "./version";
 
 export interface ReportChild {
   name: string;
@@ -125,5 +126,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
     lines.push("*Parent accounts*");
     lines.push(...accessLines(parentAccess));
   }
+  lines.push("");
+  lines.push(`— ${APP_NAME} v${APP_VERSION}`);
   return lines.join("\n");
 }

@@ -9,6 +9,7 @@ import { PushToggle } from "@/components/PushToggle";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
+import { APP_NAME, APP_VERSION } from "@/lib/version";
 
 export default async function SettingsPage() {
   const { family, profile } = await requireParent();
@@ -41,6 +42,11 @@ export default async function SettingsPage() {
       <ParentsPanel me={profile.id} parents={(parents ?? []) as ParentRow[]} invites={(invites ?? []) as InviteRow[]} pattern={family.custody_pattern ?? {}} overrides={(overrides ?? []) as OverrideRow[]} today={today} baseUrl={baseUrl} />
       <SettingsForm family={family} />
       <PlacesForm places={(places ?? []) as PlaceRow[]} students={kids ?? []} />
+      <Link href="/parent/about" className="card flex items-center gap-3">
+        <span className="text-3xl">ℹ️</span>
+        <div className="flex-1"><div className="font-semibold">About {APP_NAME}</div><div className="text-xs muted">Version {APP_VERSION} · agreement, copyright and trademark</div></div>
+        <span className="btn-ghost btn-sm">Open</span>
+      </Link>
       <div className="card text-sm muted">Signed in as {profile.full_name}</div>
       <form action={logoutAction}><button className="btn-ghost w-full">Sign out</button></form>
     </main>
