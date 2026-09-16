@@ -5,6 +5,8 @@ import { submitCheckinAction, type CheckinResult } from "@/lib/actions/checkin";
 import { KIND_EMOJI, type Assignment, type Checkin, type ItemStatus } from "@/lib/types";
 import { relativeLabel } from "@/lib/dates";
 import { Notice } from "./ui";
+import { getPosition } from "@/lib/geo-client";
+import { recordPositionAction } from "@/lib/actions/location";
 import { LessonPicker } from "./LessonPicker";
 import { lessonFieldKey, type LessonDay } from "@/lib/lessons";
 
@@ -40,7 +42,10 @@ export function CheckinForm({
     setState(undefined);
     start(async () => {
       try {
-        setState(await submitCheckinAction(undefined, fd));
+        const pos = await getPosition(6000);
+        const result = await submitCheckinAction(undefined, fd);
+        if (result.earned !== undefined) void recordPositionAction("checkin", pos);
+        setState(result);
       } catch (err) {
         setState({ error: `Could not save (${err instanceof Error ? err.message : String(err)}). Reload the page and try again; what you typed is still here.` });
       }
@@ -145,6 +150,7 @@ export function CheckinForm({
         <textarea name="stuck_on" className="input" rows={2} defaultValue={existing?.stuck_on ?? ""} placeholder="Leave empty if everything was clear" />
       </div>
 
+      <p className="text-[11px] muted">📍 When you submit, your phone may ask to share your location. It goes with your check-in so your parents know you are safe. Saying no is fine.</p>
       <Notice error={state?.error} />
       <button type="submit" className="btn-primary w-full text-base" disabled={pending}>
         {pending ? "Saving…" : existing ? "Update check-in" : "Submit check-in  ·  +10 pts"}

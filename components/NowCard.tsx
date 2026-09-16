@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { logPrayerAction } from "@/lib/actions/prayers";
+import { getPosition } from "@/lib/geo-client";
+import { recordPositionAction } from "@/lib/actions/location";
 import type { QueueItem } from "@/lib/today-queue";
 
 const KIND_ICON: Record<string, string> = { prayer: "🕌", quiz: "⚡", check: "💓", checkin: "✅", recall: "🤔", review: "🔁", catchup: "⏰", learner: "🦸", done: "🎉" };
@@ -18,7 +20,9 @@ export function NowCard({ item, index, total, mascot }: { item: QueueItem; index
   function pray() {
     if (!item.prayer) return;
     start(async () => {
+      const pos = await getPosition(5000);
       const r = await logPrayerAction(item.prayer!);
+      if (!("error" in r && r.error)) void recordPositionAction("prayer", pos);
       setMsg("error" in r && r.error ? r.error : null);
       router.refresh();
     });

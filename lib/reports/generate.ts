@@ -36,6 +36,11 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const accessFor = (id: string) => ((accessRows ?? []) as { user_id: string; event: "login" | "visit"; ip: string | null; city: string | null; country: string | null; device_os: string | null; device_browser: string | null; created_at: string }[])
     .filter((r) => r.user_id === id)
     .map((r) => ({ time: formatInTimeZone(new Date(r.created_at), family.timezone, "HH:mm"), event: r.event, where: describeAccess(r), ip: r.ip }));
+  const { data: pingRows } = memberIds.length ? await admin.from("location_pings").select("user_id, latitude, longitude, source, created_at").in("user_id", memberIds).gte("created_at", dayStartIso).order("created_at", { ascending: false }) : { data: [] };
+  const lastLocationFor = (id: string) => {
+    const p = (pingRows ?? []).find((r) => r.user_id === id);
+    return p ? { time: formatInTimeZone(new Date(p.created_at), family.timezone, "HH:mm"), lat: p.latitude as number, lng: p.longitude as number, source: p.source as string } : null;
+  };
   const children: ReportChild[] = [];
   for (const s of students ?? []) {
     const dayAgoIso = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -91,6 +96,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       coach: coach?.headline ?? null,
       access: accessFor(s.id),
       accessWeek: weekFor(s.id),
+      lastLocation: lastLocationFor(s.id),
       attention: attention ? { tier: attention.tier as string, labels: ((attention.signals ?? []) as { label: string }[]).map((x) => x.label) } : null,
       practice: {
         sets: done.length,

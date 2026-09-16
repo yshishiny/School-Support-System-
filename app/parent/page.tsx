@@ -42,6 +42,8 @@ export default async function ParentHome() {
     supabase.from("prayer_logs").select("student_id, prayer, status").in("student_id", ids).eq("log_date", today),
     supabase.from("safety_alerts").select("*, profiles(full_name)").eq("family_id", family.id).is("acknowledged_at", null).order("created_at", { ascending: false }),
   ]);
+  const { data: pings } = await supabase.from("location_pings").select("user_id, latitude, longitude, accuracy_m, source, created_at").in("user_id", ids).order("created_at", { ascending: false }).limit(50);
+  const lastPing = (id: string) => (pings ?? []).find((p) => p.user_id === id) ?? null;
   const kpis = mergeKpis(family.allowance_kpis);
   const { data: todayTicks } = await supabase.from("kpi_ticks").select("student_id, code, value").in("student_id", ids).eq("tick_date", today);
   const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
@@ -106,6 +108,20 @@ export default async function ParentHome() {
         const aw = allowanceStatus[students.indexOf(s)];
         return (
           <section key={s.id} className="card space-y-3">
+            {(() => {
+              const lp = lastPing(s.id);
+              if (!lp) return null;
+              const when = new Date(lp.created_at);
+              const mins = Math.round((Date.now() - when.getTime()) / 60000);
+              const ago = mins < 60 ? `${mins} min ago` : mins < 1440 ? `${Math.round(mins / 60)} h ago` : `${Math.round(mins / 1440)} d ago`;
+              return (
+                <a href={`https://maps.google.com/?q=${lp.latitude},${lp.longitude}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs rounded-xl border border-line px-2.5 py-1.5">
+                  <span>📍</span>
+                  <span className="flex-1">Last seen {ago} at his {lp.source}{lp.accuracy_m ? ` · ±${lp.accuracy_m} m` : ""}</span>
+                  <span className="underline">map</span>
+                </a>
+              );
+            })()}
             {family.allowance_enabled && (
               <div className="rounded-xl border border-line p-2 space-y-1.5">
                 <div className="flex items-center justify-between text-xs">

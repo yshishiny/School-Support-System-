@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { logPrayerAction } from "@/lib/actions/prayers";
+import { getPosition } from "@/lib/geo-client";
+import { recordPositionAction } from "@/lib/actions/location";
 import { PRAYER_LABEL, type PrayerName, type PrayerState, type PrayerStatus } from "@/lib/prayers";
 
 export interface PrayerRow {
@@ -38,7 +40,9 @@ export function PrayerPill({ rows, onTimeCount }: { rows: PrayerRow[]; onTimeCou
   const log = (prayer: PrayerName) => {
     setMsg(null);
     start(async () => {
+      const pos = await getPosition(5000);
       const res = await logPrayerAction(prayer);
+      if (!("error" in res && res.error)) void recordPositionAction("prayer", pos);
       setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
     });
   };
