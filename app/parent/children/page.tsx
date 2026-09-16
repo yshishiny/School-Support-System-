@@ -2,7 +2,7 @@ import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddChildForm } from "@/components/AddChildForm";
 import { HeroUploader } from "@/components/HeroUploader";
-import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction } from "@/lib/actions/children";
+import { addSubjectAction, deleteSubjectAction, addTimetableAction, deleteTimetableAction, applyTimetableTemplateAction, setChildHomeLayoutAction } from "@/lib/actions/children";
 import type { Profile, Subject, TimetableEntry } from "@/lib/types";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -35,6 +35,16 @@ export default async function ChildrenPage() {
               </div>
               <HeroUploader familyId={family.id} studentId={s.id} compact />
             </div>
+            <form action={setChildHomeLayoutAction} className="flex items-center gap-2 text-sm">
+              <input type="hidden" name="student_id" value={s.id} />
+              <span className="muted">Home page style</span>
+              <select name="home_layout" className="input py-1 w-44" defaultValue={s.home_layout ?? "b"}>
+                <option value="a">A · Three things</option>
+                <option value="b">B · One thing now</option>
+                <option value="c">C · Picture &amp; tiles</option>
+              </select>
+              <button className="btn-ghost btn-sm">Set</button>
+            </form>
 
             <div>
               <h3 className="font-semibold mb-1">Subjects</h3>

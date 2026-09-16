@@ -152,3 +152,15 @@ export async function disconnectTelegramAction() {
   await supabase.from("families").update({ telegram_chat_id: null }).eq("id", family.id);
   revalidatePath("/parent/settings");
 }
+
+/** Parent picks a child's Today layout. */
+export async function setChildHomeLayoutAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const studentId = String(formData.get("student_id") ?? "");
+  const layout = String(formData.get("home_layout") ?? "b");
+  if (!["a", "b", "c"].includes(layout)) return;
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ home_layout: layout }).eq("id", studentId).eq("family_id", family.id).eq("role", "student");
+  revalidatePath("/parent/children");
+  revalidatePath("/today");
+}

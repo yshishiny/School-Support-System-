@@ -13,3 +13,13 @@ export async function setThemeAction(themeId: string): Promise<{ ok: boolean }> 
   ["/today", "/learn", "/calendar", "/rewards", "/me"].forEach((p) => revalidatePath(p));
   return { ok: !error };
 }
+
+/** Which Today layout the student wants: a (three things), b (one thing now), c (picture and tiles). */
+export async function setHomeLayoutAction(layout: "a" | "b" | "c"): Promise<{ ok: boolean }> {
+  const { profile } = await requireStudent();
+  if (!["a", "b", "c"].includes(layout)) return { ok: false };
+  const supabase = await createClient();
+  const { error } = await supabase.from("profiles").update({ home_layout: layout }).eq("id", profile.id);
+  ["/today", "/me"].forEach((p) => revalidatePath(p));
+  return { ok: !error };
+}

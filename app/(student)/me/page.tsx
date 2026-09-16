@@ -2,6 +2,7 @@ import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { logoutAction } from "@/lib/actions/auth";
 import { ThemePicker } from "@/components/ThemePicker";
+import { HomeLayoutPicker } from "@/components/HomeLayoutPicker";
 import { PointsGuide } from "@/components/PointsGuide";
 import { InterestsForm } from "@/components/InterestsForm";
 import Link from "next/link";
@@ -65,6 +66,8 @@ export default async function MePage() {
         </div>
         <HeroGallery items={heroes.map((h) => ({ id: h.id, url: heroUrls.get(h.id) ?? "", caption: h.caption })).filter((x) => x.url)} avatarId={profile.avatar_image_id} bannerId={profile.banner_image_id} canDelete />
       </section>
+
+      <HomeLayoutPicker current={profile.home_layout ?? "b"} />
 
       <ThemePicker current={profile.theme} />
 

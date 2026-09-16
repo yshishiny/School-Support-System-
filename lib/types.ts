@@ -56,6 +56,7 @@ export interface Profile {
   professional_guidance: string | null; // notes from a clinician or specialist, entered by the parent
   avatar_image_id: string | null;
   banner_image_id: string | null;
+  home_layout: "a" | "b" | "c";
 
 }
 
