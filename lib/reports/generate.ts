@@ -26,7 +26,13 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   // Entries today (family-local day) for every account in the family.
   const dayStartIso = new Date(`${today}T00:00:00${formatInTimeZone(new Date(), family.timezone, "xxx")}`).toISOString();
   const memberIds = [...(students ?? []).map((s) => s.id), ...(parents ?? []).map((p) => p.id)];
-  const { data: accessRows } = memberIds.length ? await admin.from("access_logs").select("user_id, event, ip, city, country, device_os, device_browser, created_at").in("user_id", memberIds).gte("created_at", dayStartIso).order("created_at") : { data: [] };
+  const weekStartIso = new Date(Date.parse(dayStartIso) - 6 * 86400000).toISOString();
+  const { data: accessAll } = memberIds.length ? await admin.from("access_logs").select("user_id, event, ip, city, country, device_os, device_browser, created_at").in("user_id", memberIds).gte("created_at", weekStartIso).order("created_at") : { data: [] };
+  const accessRows = (accessAll ?? []).filter((r) => r.created_at >= dayStartIso);
+  const weekFor = (id: string) => {
+    const mine = (accessAll ?? []).filter((r) => r.user_id === id);
+    return { logins: mine.length, days: new Set(mine.map((r) => formatInTimeZone(new Date(r.created_at), family.timezone, "yyyy-MM-dd"))).size, countries: [...new Set(mine.map((r) => r.country).filter((x): x is string => !!x))] };
+  };
   const accessFor = (id: string) => ((accessRows ?? []) as { user_id: string; event: "login" | "visit"; ip: string | null; city: string | null; country: string | null; device_os: string | null; device_browser: string | null; created_at: string }[])
     .filter((r) => r.user_id === id)
     .map((r) => ({ time: formatInTimeZone(new Date(r.created_at), family.timezone, "HH:mm"), event: r.event, where: describeAccess(r), ip: r.ip }));
@@ -84,6 +90,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       prayers: (prayers ?? []).map((p) => ({ prayer: p.prayer as string, status: p.status as "on_time" | "late" })),
       coach: coach?.headline ?? null,
       access: accessFor(s.id),
+      accessWeek: weekFor(s.id),
       attention: attention ? { tier: attention.tier as string, labels: ((attention.signals ?? []) as { label: string }[]).map((x) => x.label) } : null,
       practice: {
         sets: done.length,

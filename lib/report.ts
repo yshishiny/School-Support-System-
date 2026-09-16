@@ -25,6 +25,7 @@ export interface ReportChild {
   coach?: string | null; // latest coach headline
   attention?: { tier: string; labels: string[] } | null; // early-warning signals, labels only
   access?: { time: string; event: "login" | "visit"; where: string; ip: string | null }[]; // today's entries
+  accessWeek?: { days: number; countries: string[]; logins: number } | null; // last 7 days summary
 }
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
@@ -95,6 +96,7 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
       lines.push(`🎁 Wants to redeem: ${c.pendingRedemptions.map((r) => `${r.title} (${r.points} pts)`).join("; ")}`);
     }
     if (c.access) lines.push(...accessLines(c.access));
+    if (c.accessWeek && c.accessWeek.logins > 0) lines.push(`  Last 7 days: ${c.accessWeek.logins} entr${c.accessWeek.logins === 1 ? "y" : "ies"} on ${c.accessWeek.days} day${c.accessWeek.days === 1 ? "" : "s"} · countries: ${c.accessWeek.countries.join(", ") || "unknown"}`);
   }
   if (parentAccess) {
     lines.push("");

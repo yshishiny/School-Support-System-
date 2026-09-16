@@ -14,8 +14,17 @@ export default async function ReportsPage() {
   const supabase = await createClient();
   const { data } = await supabase.from("daily_reports").select("*").eq("family_id", family.id).order("report_date", { ascending: false }).limit(14);
   const { data: members } = await supabase.from("profiles").select("id, full_name, role").eq("family_id", family.id);
-  const { data: entries } = await supabase.from("access_logs").select("*").in("user_id", (members ?? []).map((x) => x.id)).order("created_at", { ascending: false }).limit(40);
+  const { data: entries } = await supabase.from("access_logs").select("*").in("user_id", (members ?? []).map((x) => x.id)).gte("created_at", new Date(Date.now() - 14 * 86400000).toISOString()).order("created_at", { ascending: false }).limit(300);
+  const today = formatInTimeZone(new Date(), family.timezone, "yyyy-MM-dd");
   const nameOf = (id: string) => (members ?? []).find((x) => x.id === id)?.full_name?.split(" ")[0] ?? "?";
+  type Row = { id: string; user_id: string; event: string; ip: string | null; city: string | null; country: string | null; device_os: string | null; device_browser: string | null; created_at: string };
+  const rows = (entries ?? []) as Row[];
+  const byDay = new Map<string, Row[]>();
+  for (const r of rows) {
+    const d = formatInTimeZone(new Date(r.created_at), family.timezone, "yyyy-MM-dd");
+    byDay.set(d, [...(byDay.get(d) ?? []), r]);
+  }
+  const countriesFor = (list: Row[]) => [...new Set(list.map((r) => r.country ?? "?"))].join(", ");
   const reports = (data ?? []) as DailyReport[];
 
   return (
@@ -41,21 +50,31 @@ export default async function ReportsPage() {
         </section>
       ))}
       {reports.length === 0 && <p className="card muted">No reports yet.</p>}
-          <section className="card">
-        <h2 className="h2 mb-2">📱 Entries to the system</h2>
-        <p className="text-xs muted mb-2">Every login, and the first page of the day on each device: time, who, where (from the network address) and the device. Today&apos;s entries go into the daily report automatically.</p>
-        <ul className="text-sm divide-y divide-line">
-          {(entries ?? []).map((e) => (
-            <li key={e.id} className="py-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
-              <span className="muted w-24 shrink-0">{formatInTimeZone(new Date(e.created_at), family.timezone, "d MMM HH:mm")}</span>
-              <b>{nameOf(e.user_id)}</b>
-              <span className="badge">{e.event}</span>
-              <span className="muted">{describeAccess(e)}</span>
-              {e.ip && <span className="text-[11px] muted">{e.ip}</span>}
-            </li>
-          ))}
-          {(entries ?? []).length === 0 && <li className="muted text-sm">No entries yet.</li>}
-        </ul>
+          <section className="card space-y-3">
+        <h2 className="h2">📱 Entries to the system · last 14 days</h2>
+        <p className="text-xs muted">Every login, and the first page of the day on each device: time, who, where (from the network address) and the device. Today&apos;s entries go into the daily report automatically. Tracking started on 16 Sep 2026; earlier logins were seen only through the server, so they have no address or country.</p>
+        {[...byDay.entries()].map(([day, list]) => (
+          <details key={day} open={day === today} className="rounded-xl border border-line p-2">
+            <summary className="cursor-pointer text-sm flex flex-wrap items-center gap-2">
+              <b>{prettyDate(day)}</b>
+              <span className="badge">{list.length} entr{list.length === 1 ? "y" : "ies"}</span>
+              <span className="badge">🌍 {countriesFor(list)}</span>
+              <span className="muted text-xs">{[...new Set(list.map((r) => nameOf(r.user_id)))].join(", ")}</span>
+            </summary>
+            <ul className="mt-2 text-sm divide-y divide-line">
+              {list.map((e) => (
+                <li key={e.id} className="py-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                  <span className="muted w-12 shrink-0">{formatInTimeZone(new Date(e.created_at), family.timezone, "HH:mm")}</span>
+                  <b>{nameOf(e.user_id)}</b>
+                  <span className="badge">{e.event}</span>
+                  <span className="muted">{describeAccess(e)}</span>
+                  {e.ip && <span className="text-[11px] muted">{e.ip}</span>}
+                </li>
+              ))}
+            </ul>
+          </details>
+        ))}
+        {rows.length === 0 && <p className="muted text-sm">No entries yet.</p>}
       </section>
 </main>
   );
