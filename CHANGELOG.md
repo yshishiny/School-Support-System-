@@ -1,6 +1,14 @@
 # Changelog
 
-All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
+All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers. The `v2` tree is the beta of version 2.
+
+## 2.0.0-beta.1 — Virtual teachers, phase 2.0 (17 September 2026, `v2` branch)
+
+- Four original teacher characters; the child picks one for all subjects (Teacher tab, changeable any time).
+- Lesson scripts written once per topic or school file and character, cached and reused; a flag rewrites a script on the best model.
+- The stage: the character speaks each beat with the phone's voice, captions, one visual per beat (text, steps, formula, table, SVG), checks with a hint and a second try, "raise hand" questions answered in character, resume after a reload.
+- Finishing a lesson pays 10 points, records understood / shaky / lost, and opens a 3-question quiz that feeds mastery and review.
+- Additive migration only (`20260917000000_v2_lessons.sql`): three new tables and one nullable column. Not applied to the live database; meant for the beta project.
 
 ## 1.0.0 — V1.0 baseline (16 September 2026)
 

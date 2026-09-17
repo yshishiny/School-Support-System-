@@ -64,6 +64,7 @@ export interface Profile {
   telegram_chat_id: string | null;
   whatsapp: string | null;
   parent_label: string | null; // "Dad", "Mum"…
+  character_id?: string | null; // V2: the child's virtual teacher
 }
 
 export interface Subject {
