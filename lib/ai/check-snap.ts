@@ -29,10 +29,22 @@ const HandwritingSchema = PhotoSchema.extend({
   practice_line: z.string().describe("A single sentence to copy five times next session, in the sample's language, using the letters that need work"),
 });
 
+const BagSchema = PhotoSchema.extend({
+  subjects_seen: z.array(z.string()).describe("Subjects whose books or notebooks are visibly labelled, e.g. Math, Physics; empty if none readable"),
+  matches_timetable: z.boolean().nullable().describe("Whether the visible books fit the next school day's subjects, or null if no subjects were given or none readable"),
+});
+const ScreenTimeSchema = PhotoSchema.extend({
+  total_minutes: z.number().int().nullable().describe("Total screen time shown, in minutes; null if unreadable"),
+  top_apps: z.array(z.object({ app: z.string(), minutes: z.number().int() })).describe("Up to 4 apps with the most time, as shown"),
+  is_today: z.boolean().nullable().describe("Whether the screenshot shows today's summary (a 'Today' label or today's date), or null if unclear"),
+});
+
 export type PhotoCheck = z.infer<typeof PhotoSchema>;
+export type BagCheck = z.infer<typeof BagSchema>;
+export type ScreenTimeCheck = z.infer<typeof ScreenTimeSchema>;
 export type HomeworkCheck = z.infer<typeof HomeworkSchema>;
 export type HandwritingCheck = z.infer<typeof HandwritingSchema>;
-export type SnapCheck = { kind: "photo"; result: PhotoCheck } | { kind: "homework"; result: HomeworkCheck } | { kind: "handwriting"; result: HandwritingCheck };
+export type SnapCheck = { kind: "photo"; result: PhotoCheck } | { kind: "homework"; result: HomeworkCheck } | { kind: "handwriting"; result: HandwritingCheck } | { kind: "bag"; result: BagCheck } | { kind: "screentime"; result: ScreenTimeCheck };
 
 const SYSTEM = `You screen a photo a child (grade 8-10, Egypt) took to show a small daily win at home. A parent will look at it afterwards; you only give a first opinion.
 
@@ -52,10 +64,18 @@ function textOf(m: Anthropic.Message): string {
 }
 
 /** One vision call per snap. Fast model: this runs while the child waits. */
-export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label: string; prompt: string | null }, ctx: { subjectsToday?: string[]; studentFirstName?: string } = {}): Promise<SnapCheck> {
+export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label: string; prompt: string | null }, ctx: { subjectsToday?: string[]; subjectsNext?: string[]; studentFirstName?: string; today?: string } = {}): Promise<SnapCheck> {
   const client = new Anthropic();
-  const schema = task.kind === "handwriting" ? HandwritingSchema : task.kind === "homework" ? HomeworkSchema : PhotoSchema;
-  const lines = [`Task: "${task.label}".`, task.prompt ? `What good looks like: ${task.prompt}` : "", ctx.subjectsToday?.length ? `Today's subjects at school: ${ctx.subjectsToday.join(", ")}.` : "", ctx.studentFirstName ? `The child's name is ${ctx.studentFirstName}.` : ""].filter(Boolean);
+  const schema = task.kind === "handwriting" ? HandwritingSchema : task.kind === "homework" ? HomeworkSchema : task.kind === "bag" ? BagSchema : task.kind === "screentime" ? ScreenTimeSchema : PhotoSchema;
+  const lines = [
+    `Task: "${task.label}".`,
+    task.prompt ? `What good looks like: ${task.prompt}` : "",
+    ctx.subjectsToday?.length ? `Today's subjects at school: ${ctx.subjectsToday.join(", ")}.` : "",
+    ctx.subjectsNext?.length ? `The next school day's subjects: ${ctx.subjectsNext.join(", ")}.` : "",
+    ctx.today ? `Today's date: ${ctx.today}.` : "",
+    task.kind === "screentime" ? "This is a screenshot of a phone's own screen-time summary, not a photo of a chore: 'looks_good' means the summary is readable and shows today; never judge the amount of time." : "",
+    ctx.studentFirstName ? `The child's name is ${ctx.studentFirstName}.` : "",
+  ].filter(Boolean);
   const stream = client.messages.stream({
     model: modelFor("snap"),
     max_tokens: 2000,
@@ -68,5 +88,7 @@ export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label
   const parsed = JSON.parse(textOf(message));
   if (task.kind === "handwriting") { const r = HandwritingSchema.parse(parsed); return { kind: "handwriting", result: { ...r, strengths: r.strengths.slice(0, 3), focus: r.focus.slice(0, 3) } }; }
   if (task.kind === "homework") return { kind: "homework", result: HomeworkSchema.parse(parsed) };
+  if (task.kind === "bag") { const r = BagSchema.parse(parsed); return { kind: "bag", result: { ...r, subjects_seen: r.subjects_seen.slice(0, 8) } }; }
+  if (task.kind === "screentime") { const r = ScreenTimeSchema.parse(parsed); return { kind: "screentime", result: { ...r, top_apps: r.top_apps.slice(0, 4) } }; }
   return { kind: "photo", result: PhotoSchema.parse(parsed) };
 }

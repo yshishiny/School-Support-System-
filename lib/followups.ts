@@ -68,6 +68,12 @@ BANK.syllabus_vs_log = {
   r3: (p) => `You said: “${short(p)}”. Fix the class log for those days now (Check-in → earlier days) so it matches the syllabus, and write here which days you changed.`,
 };
 
+BANK.screen_over_limit = {
+  r1: "Your screen-time screenshot was over the family limit on {detail}. What took the time that day, app by app, and what was going on at home at the same time?",
+  r2: "Same day ({detail}): which of that time was for school, and which was just scrolling? Give minutes for each, honestly.",
+  r3: (p) => `You said: “${short(p)}”. Pick one thing to change tomorrow (an app, a time of day, a place for the phone) and write it as a promise.`,
+};
+
 BANK.manners_gap = {
   r1: "You rated your own manners well on {detail}, and a parent saw it differently. Tell what happened that day, from your side, with the details: who, what was said, what came next.",
   r2: "Same day ({detail}): if you were the other person, how would you describe it? What would you have wanted to hear from you?",
@@ -86,6 +92,7 @@ export function signalDetail(sig: IntegritySignal): string {
   const paren = sig.ask.match(/\(([^)]+)\)/)?.[1];
   const subject = sig.label.match(/^The same (.+?) note/)?.[1] ?? sig.label.match(/ for (.+?) this week, but/)?.[1];
   if (sig.code === "syllabus_vs_log") { const m = sig.ask.match(/subject by subject: (.+)\.$/); return m ? m[1].slice(0, 160) : "several subjects"; }
+  if (sig.code === "screen_over_limit") { const d = sig.label.match(/\d{4}-\d{2}-\d{2}/)?.[0]; return d ?? "that day"; }
   if (sig.code === "manners_gap") { const ds = sig.label.match(/\d{4}-\d{2}-\d{2}/g) ?? []; return ds.length ? ds.join(", ") : "that day"; }
   const parts = [...new Set([...(subject ? [subject] : []), ...dates, ...(paren ? [paren] : [])])];
   return parts.length ? parts.join(", ") : "that day";

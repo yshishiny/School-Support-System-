@@ -3,6 +3,8 @@ import { requireAdmin } from "@/lib/auth";
 import { Tabs } from "@/components/Tabs";
 import { configChecks, databaseChecks, githubCommits, googleStatus, jobChecks, recentErrors, supabaseStatus, vercelDeployments, type Check } from "@/lib/ops/health";
 import { resolveErrorsAction } from "@/lib/actions/ops";
+import { schedulerStatus } from "@/lib/actions/ops-scheduler";
+import { SchedulerSwitch } from "@/components/SchedulerSwitch";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -41,6 +43,7 @@ export default async function AdminPage() {
     supabaseStatus(),
     googleStatus(),
   ]);
+  const sched = await schedulerStatus().catch(() => ({ enabled: false, appUrl: null, lastRun: null, lastOk: null }));
   const openErrors = errors.filter((e) => !e.resolved_at);
   const worst = (rows: Check[]) => (rows.some((c) => c.tone === "bad") ? "bad" : rows.some((c) => c.tone === "warn") ? "warn" : "good");
   const overall = worst([...config, ...db, ...jobs.checks]);
@@ -98,6 +101,12 @@ export default async function AdminPage() {
           ) },
           { id: "jobs", label: "Jobs", emoji: "⏰", content: (
             <div className="space-y-3">
+              <section className="card space-y-2">
+                <h2 className="h2">Hourly reminders (wake-up, morning, evening, last call)</h2>
+                <p className="text-xs muted">Vercel's free plan runs jobs once a day, so the hourly reminders are fired from inside the database (pg_cron, every hour at :05). Switching on stores the app's own cron secret and address for that job; nothing leaves the server.</p>
+                <div className="text-sm">{sched.enabled ? `🟢 On · calls ${sched.appUrl}/api/cron/nudges hourly` : "⚪ Off · no wake-up or evening reminders reach the kids yet"}{sched.lastRun ? ` · last run ${when(sched.lastRun)} ${sched.lastOk ? "ok" : "with errors"}` : ""}</div>
+                <SchedulerSwitch enabled={sched.enabled} />
+              </section>
               <section className="card"><CheckList rows={jobs.checks} /><p className="text-xs muted mt-2">daily-report 18:00 UTC and prepare-plan 00:30 UTC run on Vercel Cron (Hobby: daily only). nudges needs an external hourly call to /api/cron/nudges with the cron secret.</p></section>
               <section className="card">
                 <h2 className="h2 mb-1">Last runs</h2>

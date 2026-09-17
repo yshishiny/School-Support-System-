@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.14.0 — Morning routine, wake-up call, screen time (17 September 2026)
+
+- **Morning routine** on the kids' Today, on school days before the first lesson: Fajr, bed made (snap), sandwich ready (snap, the night before or in the morning), bag packed (snap; the AI reads the book labels against the next day's timetable), then "I'm ready, leaving on time" (+3). All done before the first lesson = **Morning champion +10** and a ping to the parents. In the evening the card shows "tonight, for tomorrow": sandwich and bag.
+- **Wake-up call** at 6 (per child, Me → Reminders) on school days: first lesson, what is left of the routine, and what it pays.
+- **Hourly reminders without an external service**: a database job (pg_cron) calls the app every hour once the administrator switches it on under Admin → Jobs. Wake-up, morning plan, evening round and last call then arrive on time.
+- **Screen time**: a new snap task "Screen time screenshot" every evening (Digital Wellbeing or Screen Time summary); the AI reads the total and the top apps. Parents set a daily limit under Snaps → Tasks; over the limit becomes an integrity signal with three follow-up questions to the child, never an automatic penalty. Reading the phone's usage directly still needs the native shell (docs/ANDROID.md).
+- New snap tasks: sandwich, bag, screen time. Migration 20260917220559.
+
 ## 1.13.1 — More page fixed, server errors captured in full (17 September 2026)
 
 - **More page crashed on the server** since 1.12.0: the sections grid imported the menu list from a client-only file, which the server sees as a reference, not a list. The list now lives in a plain module shared by the menu, the bottom bar and More.

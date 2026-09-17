@@ -70,3 +70,15 @@ describe("weekly syllabus vs class log", () => {
     expect(sig?.ask).not.toMatch(/French/);
   });
 });
+
+describe("screen time", () => {
+  it("flags days over the family limit from the evening screenshot", () => {
+    const out = integritySignals({ today: "2026-09-17", attempts: [], prayers: [], checkins: [], lessonLogs: [], screenLimit: 180, snaps: [
+      { taken_on: "2026-09-15", status: "approved", ai_verdict: "looks_good", kind: "screentime", ai_detail: { total_minutes: 250, top_apps: [{ app: "TikTok", minutes: 120 }, { app: "YouTube", minutes: 60 }] } },
+      { taken_on: "2026-09-16", status: "pending", ai_verdict: "looks_good", kind: "screentime", ai_detail: { total_minutes: 100 } },
+    ] });
+    const sig = out.find((x) => x.code === "screen_over_limit");
+    expect(sig?.label).toMatch(/over the 3h limit on 1 day/);
+    expect(sig?.ask).toMatch(/TikTok 120m/);
+  });
+});

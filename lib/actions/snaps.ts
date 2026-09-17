@@ -6,7 +6,8 @@ import { revalidatePath } from "next/cache";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { todayIn } from "@/lib/dates";
+import { shiftDate, todayIn } from "@/lib/dates";
+import { formatInTimeZone } from "date-fns-tz";
 import { checkSnap } from "@/lib/ai/check-snap";
 import { SNAP_TEMPLATES, handwritingScore, templateByCode, type SnapKind, type SnapTask } from "@/lib/snaps";
 import { SNAP_BUCKET } from "@/lib/snaps/server";
@@ -67,7 +68,17 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
       const buf = Buffer.from(await file.arrayBuffer());
       const mt = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
       const { data: logs } = t.kind === "homework" ? await admin.from("lesson_logs").select("subject_name").eq("student_id", profile.id).eq("log_date", today) : { data: [] };
-      const check = await checkSnap({ media_type: mt, data: buf.toString("base64") }, { kind: t.kind as SnapKind, label: t.label, prompt: t.prompt }, { subjectsToday: (logs ?? []).map((l) => l.subject_name), studentFirstName: profile.full_name.split(" ")[0] });
+      let subjectsNext: string[] = [];
+      if (t.kind === "bag") {
+        const { data: tt } = await admin.from("timetable_entries").select("weekday, subject_name, start_time").eq("student_id", profile.id);
+        const hhmmNow = formatInTimeZone(new Date(), family.timezone, "HH:mm");
+        // Before 08:00 the bag is for today; in the evening it is for the next school day.
+        let d = hhmmNow < "08:00" ? today : shiftDate(today, 1);
+        for (let k = 0; k < 7; k += 1) { const wd = new Date(d + "T00:00:00Z").getUTCDay(); if ((tt ?? []).some((x) => x.weekday === wd)) break; d = shiftDate(d, 1); }
+        const wd = new Date(d + "T00:00:00Z").getUTCDay();
+        subjectsNext = [...new Set((tt ?? []).filter((x) => x.weekday === wd).map((x) => x.subject_name))];
+      }
+      const check = await checkSnap({ media_type: mt, data: buf.toString("base64") }, { kind: t.kind as SnapKind, label: t.label, prompt: t.prompt }, { subjectsToday: (logs ?? []).map((l) => l.subject_name), subjectsNext, studentFirstName: profile.full_name.split(" ")[0], today });
       const r = check.result;
       verdict = r.verdict;
       kidNote = r.kid_note;
@@ -117,6 +128,15 @@ export async function reviewSnapAction(snapId: string, status: "approved" | "rej
     await awardSnapPoints(snap.student_id, snap.id, task?.label ?? snap.task_code, snap.kind, snap.taken_on);
   }
   [...STUDENT_PATHS, ...PARENT_PATHS, "/me"].forEach((p) => revalidatePath(p));
+}
+
+/** Parent: the daily screen-time limit the screenshot is compared with. */
+export async function setScreenLimitAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const minutes = Math.max(30, Math.min(600, Number(formData.get("screen_limit_minutes") ?? 180) || 180));
+  const supabase = await createClient();
+  await supabase.from("families").update({ screen_limit_minutes: minutes }).eq("id", family.id);
+  PARENT_PATHS.forEach((p) => revalidatePath(p));
 }
 
 /** Parent switch: AI first look on snaps (a few piasters per picture) or straight to a person. */

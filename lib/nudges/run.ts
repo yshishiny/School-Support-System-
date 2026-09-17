@@ -78,6 +78,12 @@ export async function sendDueNudges(only?: NudgeCode[]): Promise<Record<string, 
         weekClosesLabel: WEEKDAYS[fam.allowance_pay_weekday],
         appUrl: APP_URL,
         allowanceHint,
+        morningTodo: (() => {
+          const codes = ["bed", "sandwich", "bag"];
+          const mine = ((tasks ?? []) as SnapTask[]).filter((t) => t.enabled && (t.student_id === null || t.student_id === k.id) && codes.includes(t.code));
+          const doneCodes = new Set(((snaps ?? []) as SnapLite[]).filter((s) => s.status !== "rejected").map((s) => s.task_code));
+          return ["Fajr", ...mine.filter((t) => !doneCodes.has(t.code)).map((t) => t.label.toLowerCase())];
+        })(),
       },
       settings,
       already,
@@ -85,8 +91,8 @@ export async function sendDueNudges(only?: NudgeCode[]): Promise<Record<string, 
     if (only) due = due.filter((n) => only.includes(n.code));
     for (const n of due) {
       const body = n.text.replace(` ${APP_URL}`, "");
-      const url = n.code === "morning" ? "/today" : "/checkin";
-      const push = withPush.has(k.id) ? await sendPush(k.id, { title: n.code === "morning" ? "Today's plan" : n.code === "lastcall" ? "Last call" : n.code === "catchup" ? "Before the week closes" : "Evening round", body, url, tag: n.code }) : { sent: 0, total: 0 };
+      const url = n.code === "morning" || n.code === "wakeup" ? "/today" : "/checkin";
+      const push = withPush.has(k.id) ? await sendPush(k.id, { title: n.code === "wakeup" ? "Wake up ☀️" : n.code === "morning" ? "Today's plan" : n.code === "lastcall" ? "Last call" : n.code === "catchup" ? "Before the week closes" : "Evening round", body, url, tag: n.code }) : { sent: 0, total: 0 };
       const tg = k.telegram_chat_id ? await sendTelegram(k.telegram_chat_id, n.text) : { ok: false, channel: "telegram" as const };
       const ok = push.sent > 0 || tg.ok;
       if (ok) await admin.from("nudges_sent").insert({ student_id: k.id, day: today, code: n.code });

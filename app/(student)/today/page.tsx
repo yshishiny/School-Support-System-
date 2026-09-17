@@ -23,6 +23,10 @@ import { ensureFollowups } from "@/lib/followups/run";
 import { loadCompensations } from "@/lib/compensation/run";
 import { materialStages, nextStage } from "@/lib/materials/study";
 import { loadRevisions } from "@/lib/revision/run";
+import { MorningRoutine } from "@/components/MorningRoutine";
+import { buildMorning, isChampion, morningWindow } from "@/lib/morning";
+import { snapCounts } from "@/lib/snaps";
+import { schoolDay } from "@/lib/school-day";
 import { prettyDate } from "@/lib/dates";
 import { LayoutA } from "@/components/today/LayoutA";
 import { LayoutB } from "@/components/today/LayoutB";
@@ -62,6 +66,11 @@ export default async function TodayPage() {
     supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", today).order("created_at"),
   ]);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
+  // Morning routine: last night's sandwich and bag snaps count for this morning.
+  const [{ data: eveSnaps }, { data: morningRow }] = await Promise.all([
+    supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", shiftDate(today, -1)).in("task_code", ["sandwich", "bag"]),
+    supabase.from("morning_log").select("ready_at, champion_at").eq("student_id", profile.id).eq("day", today).maybeSingle(),
+  ]);
   const { start: weekStart, end: weekEnd } = weekFor(today, family.allowance_pay_weekday);
   const [{ data: weekLogs }, { data: offRows }] = await Promise.all([
     supabase.from("lesson_logs").select("log_date, subject_name, note, homework_given").eq("student_id", profile.id).gte("log_date", weekStart).lt("log_date", today),
@@ -182,6 +191,16 @@ export default async function TodayPage() {
     classesToday: todayRows.length,
   };
 
+  const sdToday = schoolDay(today, (timetable ?? []) as { weekday: number; subject_name: string; start_time: string; end_time: string }[], (offRows ?? []) as { day: string; label: string | null }[]);
+  const firstLesson = sdToday.lessons[0]?.start_time?.slice(0, 5) ?? null;
+  const phase = morningWindow(hhmm, firstLesson);
+  const mineTasks = snapTasks.filter((t) => t.enabled && (t.student_id === null || t.student_id === profile.id));
+  const hasTask = (c: string) => mineTasks.some((t) => t.code === c);
+  const snapDone = (c: string) => [...((snapRows ?? []) as SnapLite[]), ...((eveSnaps ?? []) as SnapLite[])].some((s) => s.task_code === c && snapCounts(s));
+  const morningItems = buildMorning({ fajrLogged: !!logged.get("fajr") && logged.get("fajr")!.status !== "missed", bedDone: snapDone("bed"), sandwichDone: snapDone("sandwich"), bagDone: snapDone("bag"), ready: !!morningRow?.ready_at, hasBedTask: hasTask("bed"), hasSandwichTask: hasTask("sandwich"), hasBagTask: hasTask("bag") });
+  const showMorning = (phase === "morning" && !sdToday.off) || (phase === "night" && (hasTask("sandwich") || hasTask("bag")) && !schoolDay(shiftDate(today, 1), (timetable ?? []) as { weekday: number; subject_name: string; start_time: string; end_time: string }[], []).off);
+  const morningCard = showMorning ? <MorningRoutine items={morningItems} phase={phase === "night" ? "night" : "morning"} firstLesson={firstLesson} champion={!!morningRow?.champion_at || (phase === "morning" && isChampion(morningItems))} /> : null;
+
   const snapBanner = snapsDue.length > 0 && (
     <Link href="/snaps" className="card flex items-center gap-3 border-2 border-accent bg-accent/10 pop">
       <span className="text-4xl sticker-still">📸</span>
@@ -193,7 +212,7 @@ export default async function TodayPage() {
     </Link>
   );
   const layout = profile.home_layout ?? "b";
-  if (layout === "a") return <>{snapBanner}<LayoutA d={d} /></>;
-  if (layout === "c") return <>{snapBanner}<LayoutC d={d} /></>;
-  return <>{snapBanner}<LayoutB d={d} /></>;
+  if (layout === "a") return <>{morningCard}{snapBanner}<LayoutA d={d} /></>;
+  if (layout === "c") return <>{morningCard}{snapBanner}<LayoutC d={d} /></>;
+  return <>{morningCard}{snapBanner}<LayoutB d={d} /></>;
 }

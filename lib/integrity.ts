@@ -9,7 +9,8 @@ export interface IntegrityInput {
   prayers: { log_date: string; logged_at: string; status: string; entered_late: boolean; claim: string | null; prayer: string }[];
   checkins: { checkin_date: string; submitted_at: string | null; hourLocal?: number }[];
   lessonLogs: { log_date: string; subject_name: string; note: string }[];
-  snaps: { taken_on: string; status: string; ai_verdict: string | null }[];
+  snaps: { taken_on: string; status: string; ai_verdict: string | null; kind?: string; ai_detail?: { total_minutes?: number | null; top_apps?: { app: string; minutes: number }[] } | null }[];
+  screenLimit?: number; // minutes per day
   materials?: { subject: string | null; title: string; topics: string[]; created_at: string; uploaded_by_student: boolean; is_week_summary?: boolean; covers_week_start?: string | null; subjects?: { subject: string; topics: string[] }[] }[]; // school files shared this week
   timetableSubjects?: { weekday: number; subject_name: string }[]; // to know which days the subject had a class
   mannersSelf?: { date: string; self: number | null }[]; // the child's own rating at check-in
@@ -116,6 +117,15 @@ export function integritySignals(i: IntegrityInput): IntegritySignal[] {
   // 9. Manners: he rated himself 4-5 on a day a parent marked ✗.
   const gaps = (i.mannersSelf ?? []).filter((m) => m.date >= weekAgo && (m.self ?? 0) >= 4 && (i.parentTicks ?? []).some((t) => t.tick_date === m.date && t.code === "manners" && t.value === false));
   if (gaps.length) out.push({ code: "manners_gap", label: `Rated his own manners ${gaps.length === 1 ? "well" : `well on ${gaps.length} days`} when a parent marked ✗ (${gaps.map((g) => g.date).join(", ")})`, ask: `Ask him, without the ✗ in view, what happened on ${gaps[gaps.length - 1].date} that a parent saw differently, and who he thinks was affected.` });
+
+  // 10. Screen time over the family limit (from the evening screenshot).
+  const limit = i.screenLimit ?? 180;
+  const over = i.snaps.filter((s) => s.kind === "screentime" && s.taken_on >= weekAgo && s.status !== "rejected" && (s.ai_detail?.total_minutes ?? 0) > limit);
+  if (over.length) {
+    const worst = [...over].sort((a, b) => (b.ai_detail?.total_minutes ?? 0) - (a.ai_detail?.total_minutes ?? 0))[0];
+    const top = worst.ai_detail?.top_apps?.slice(0, 2).map((a) => `${a.app} ${a.minutes}m`).join(", ");
+    out.push({ code: "screen_over_limit", label: `Screen time over the ${Math.round(limit / 60 * 10) / 10}h limit on ${over.length} day${over.length === 1 ? "" : "s"} this week (${Math.floor((worst.ai_detail?.total_minutes ?? 0) / 60)}h ${(worst.ai_detail?.total_minutes ?? 0) % 60}m on ${worst.taken_on})`, ask: `Ask what took the time on ${worst.taken_on}${top ? ` (${top})` : ""} and what he would cut first; agree on one change for tomorrow.` });
+  }
 
   // 7. Snaps sent back more than once.
   const rejected = i.snaps.filter((s) => s.status === "rejected" && s.taken_on >= weekAgo);
