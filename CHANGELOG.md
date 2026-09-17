@@ -2,6 +2,11 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.13.1 — More page fixed, server errors captured in full (17 September 2026)
+
+- **More page crashed on the server** since 1.12.0: the sections grid imported the menu list from a client-only file, which the server sees as a reference, not a list. The list now lives in a plain module shared by the menu, the bottom bar and More.
+- **Server-side failures are logged with their real message** (the browser only ever sees a digest in production): render and action errors go to the error log with path, route and digest, matched to the client's report.
+
 ## 1.13.0 — Ready to become an Android app (17 September 2026)
 
 - **Installable app**: full web-app manifest (name, PNG and maskable icons, standalone, portrait, home-screen shortcuts to Today, Snaps and Parent home), service worker registered on every page with an offline note, iPhone home-screen icon.

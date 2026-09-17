@@ -9,7 +9,7 @@ import { PlacesForm, type PlaceRow } from "@/components/PlacesForm";
 import { PushToggle } from "@/components/PushToggle";
 import { InstallCard } from "@/components/InstallCard";
 import { Tabs } from "@/components/Tabs";
-import { PARENT_SECTIONS } from "@/components/ParentMenu";
+import { PARENT_SECTIONS } from "@/lib/parent-sections";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
