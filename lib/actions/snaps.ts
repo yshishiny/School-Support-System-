@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireParent, requireStudent } from "@/lib/auth";
+import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
@@ -50,54 +50,78 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
     .single();
   if (error || !row) return { error: error?.message ?? "Could not save." };
 
-  // AI first opinion. Failures never block the child: the snap stays pending for the parent.
+  // AI first opinion (when the family keeps it on). Failures never block the child: the snap stays pending.
   let verdict = "error";
   let kidNote = "Sent. A parent will check it.";
   let handwriting: RegisterResult["handwriting"];
-  try {
-    const { data: file } = await admin.storage.from(SNAP_BUCKET).download(path);
-    if (!file) throw new Error("download failed");
-    const buf = Buffer.from(await file.arrayBuffer());
-    const mt = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
-    const { data: logs } = t.kind === "homework" ? await admin.from("lesson_logs").select("subject_name").eq("student_id", profile.id).eq("log_date", today) : { data: [] };
-    const check = await checkSnap({ media_type: mt, data: buf.toString("base64") }, { kind: t.kind as SnapKind, label: t.label, prompt: t.prompt }, { subjectsToday: (logs ?? []).map((l) => l.subject_name), studentFirstName: profile.full_name.split(" ")[0] });
-    const r = check.result;
-    verdict = r.verdict;
-    kidNote = r.kid_note;
-    const detail: Record<string, unknown> = { ...r };
-    delete detail.note;
-    delete detail.kid_note;
-    delete detail.verdict;
-    delete detail.score;
-    if (check.kind === "handwriting") {
-      const score = handwritingScore(check.result);
-      detail.score = score;
-      handwriting = { score, practiceLine: check.result.practice_line, focus: check.result.focus };
+  if (family.snap_ai_check === false) {
+    verdict = "skipped";
+    kidNote = "Sent ✅ · someone at home will check it and you get the points then.";
+    await admin.from("snaps").update({ ai_verdict: "skipped", ai_note: "AI check is off for this family." }).eq("id", row.id);
+  } else {
+    try {
+      const { data: file } = await admin.storage.from(SNAP_BUCKET).download(path);
+      if (!file) throw new Error("download failed");
+      const buf = Buffer.from(await file.arrayBuffer());
+      const mt = (file.type || "image/jpeg") as "image/jpeg" | "image/png" | "image/webp";
+      const { data: logs } = t.kind === "homework" ? await admin.from("lesson_logs").select("subject_name").eq("student_id", profile.id).eq("log_date", today) : { data: [] };
+      const check = await checkSnap({ media_type: mt, data: buf.toString("base64") }, { kind: t.kind as SnapKind, label: t.label, prompt: t.prompt }, { subjectsToday: (logs ?? []).map((l) => l.subject_name), studentFirstName: profile.full_name.split(" ")[0] });
+      const r = check.result;
+      verdict = r.verdict;
+      kidNote = r.kid_note;
+      const detail: Record<string, unknown> = { ...r };
+      delete detail.note;
+      delete detail.kid_note;
+      delete detail.verdict;
+      delete detail.score;
+      if (check.kind === "handwriting") {
+        const score = handwritingScore(check.result);
+        detail.score = score;
+        handwriting = { score, practiceLine: check.result.practice_line, focus: check.result.focus };
+      }
+      await admin.from("snaps").update({ ai_verdict: r.verdict, ai_score: Math.round(r.score * 100) / 100, ai_note: r.note, ai_detail: Object.keys(detail).length ? detail : null }).eq("id", row.id);
+    } catch (err) {
+      await admin.from("snaps").update({ ai_verdict: "error", ai_note: `AI check failed: ${err instanceof Error ? err.message : String(err)}` }).eq("id", row.id);
     }
-    await admin.from("snaps").update({ ai_verdict: r.verdict, ai_score: Math.round(r.score * 100) / 100, ai_note: r.note, ai_detail: Object.keys(detail).length ? detail : null }).eq("id", row.id);
-  } catch (err) {
-    await admin.from("snaps").update({ ai_verdict: "error", ai_note: `AI check failed: ${err instanceof Error ? err.message : String(err)}` }).eq("id", row.id);
   }
 
-  // Small points for showing up: once per task per day, only when the AI found it plausible.
-  let earned = 0;
-  if (verdict === "looks_good") {
-    const { data: prior } = await admin.from("points_ledger").select("id").eq("student_id", profile.id).eq("ref_type", "snap").eq("reason", `Snap: ${t.label} ${today}`).limit(1);
-    if (!prior?.length) {
-      earned = t.kind === "handwriting" ? 5 : 2;
-      await admin.from("points_ledger").insert({ student_id: profile.id, delta: earned, reason: `Snap: ${t.label} ${today}`, ref_type: "snap", ref_id: row.id });
-    }
-  }
+  // Small points for showing up: once per task per day, when the AI found it plausible (or on approval when the AI is off).
+  const earned = verdict === "looks_good" ? await awardSnapPoints(profile.id, row.id, t.label, t.kind, today) : 0;
   [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
   return { id: row.id, verdict, kidNote, earned, handwriting };
 }
 
-/** Parent's one tap: approve or send back. */
+async function awardSnapPoints(studentId: string, snapId: string, label: string, kind: string, day: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data: prior } = await admin.from("points_ledger").select("id").eq("student_id", studentId).eq("ref_type", "snap").eq("reason", `Snap: ${label} ${day}`).limit(1);
+  if (prior?.length) return 0;
+  const earned = kind === "handwriting" ? 5 : 2;
+  await admin.from("points_ledger").insert({ student_id: studentId, delta: earned, reason: `Snap: ${label} ${day}`, ref_type: "snap", ref_id: snapId });
+  return earned;
+}
+
+/** One tap by a parent, or by an older sibling the parent marked as a rater (never on his own snaps). */
 export async function reviewSnapAction(snapId: string, status: "approved" | "rejected", note?: string): Promise<void> {
-  const { family, profile } = await requireParent();
+  const { family, profile } = await requireSession();
+  const isRater = profile.role === "student" && !!(profile as { rater?: boolean }).rater;
+  if (profile.role !== "parent" && !isRater) return;
+  const admin = createAdminClient();
+  const { data: snap } = await admin.from("snaps").select("id, student_id, task_code, kind, taken_on, status").eq("id", snapId).eq("family_id", family.id).maybeSingle();
+  if (!snap || snap.student_id === profile.id) return;
+  await admin.from("snaps").update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString(), review_note: (note ?? "").trim().slice(0, 200) || null }).eq("id", snapId);
+  if (status === "approved") {
+    const { data: task } = await admin.from("snap_tasks").select("label").eq("family_id", family.id).eq("code", snap.task_code).maybeSingle();
+    await awardSnapPoints(snap.student_id, snap.id, task?.label ?? snap.task_code, snap.kind, snap.taken_on);
+  }
+  [...STUDENT_PATHS, ...PARENT_PATHS, "/me"].forEach((p) => revalidatePath(p));
+}
+
+/** Parent switch: AI first look on snaps (a few piasters per picture) or straight to a person. */
+export async function setSnapAiCheckAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
   const supabase = await createClient();
-  await supabase.from("snaps").update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString(), review_note: (note ?? "").trim().slice(0, 200) || null }).eq("id", snapId).eq("family_id", family.id);
-  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+  await supabase.from("families").update({ snap_ai_check: formData.get("snap_ai_check") === "on" }).eq("id", family.id);
+  PARENT_PATHS.forEach((p) => revalidatePath(p));
 }
 
 /** Adds a task from a template (for every child, or one). */

@@ -19,6 +19,9 @@ import { HeroGallery } from "@/components/HeroGallery";
 import { BannerAdjuster } from "@/components/BannerAdjuster";
 import { heroChoices, signHeroUrls, type HeroImage } from "@/lib/hero";
 import type { Checkin } from "@/lib/types";
+import { SnapReview } from "@/components/SnapReview";
+import { signSnapUrls } from "@/lib/snaps/server";
+import { prettyDate, shiftDate } from "@/lib/dates";
 
 export default async function MePage() {
   const { profile, family } = await requireStudent();
@@ -35,6 +38,11 @@ export default async function MePage() {
     supabase.from("topics").select("subject").eq("track", "school").eq("grade", profile.grade ?? 0),
     supabase.from("hero_images").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }),
   ]);
+  type SibSnap = { id: string; student_id: string; task_code: string; kind: string; path: string; taken_on: string; ai_verdict: string | null; ai_note: string | null; created_at: string };
+  const sibIds = (siblings ?? []).map((x) => x.id);
+  const { data: sibSnapRows } = sibIds.length ? await supabase.from("snaps").select("id, student_id, task_code, kind, path, taken_on, ai_verdict, ai_note, created_at").in("student_id", sibIds).eq("status", "pending").gte("taken_on", shiftDate(today, -3)).order("created_at", { ascending: false }).limit(12) : { data: [] as SibSnap[] };
+  const sibSnaps = (sibSnapRows ?? []) as SibSnap[];
+  const sibSnapUrls = await signSnapUrls(sibSnaps.map((x) => ({ id: x.id, path: x.path })));
   const heroes = (heroRows ?? []) as HeroImage[];
   const heroUrls = await signHeroUrls(heroes);
   const { avatar, banner } = await heroChoices(profile);
@@ -125,6 +133,29 @@ export default async function MePage() {
             const ticks: Record<string, boolean> = {};
             (sibTicks ?? []).filter((t) => t.student_id === sib.id).forEach((t) => (ticks[t.code] = t.value));
             return <div key={sib.id} className="space-y-1"><div className="text-sm font-semibold">{sib.avatar_emoji} {sib.full_name.split(" ")[0]}</div><KpiTicks studentId={sib.id} kpis={mergeKpis(family.allowance_kpis)} ticks={ticks} /></div>;
+          })}
+        </section>
+      )}
+
+      {(siblings ?? []).length > 0 && (
+        <section className="card space-y-2">
+          <h2 className="h2">📸 Snaps to check{sibSnaps.length ? ` (${sibSnaps.length})` : ""}</h2>
+          <p className="text-xs muted">Look at the picture and decide: done or not. A ✓ gives the points; a ✗ sends it back with your note.</p>
+          {sibSnaps.length === 0 && <p className="text-sm muted">Nothing waiting.</p>}
+          {sibSnaps.map((x) => {
+            const sib = (siblings ?? []).find((z) => z.id === x.student_id);
+            const url = sibSnapUrls.get(x.id);
+            return (
+              <div key={x.id} className="tile space-y-2">
+                <div className="text-sm"><b>{sib?.avatar_emoji} {sib?.full_name.split(" ")[0]}</b> · {x.task_code} · <span className="muted">{prettyDate(x.taken_on)} {x.created_at.slice(11, 16)}</span></div>
+                {url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="" className="w-full max-h-64 object-contain rounded-xl bg-panel-2" /></a>
+                )}
+                {x.ai_verdict && x.ai_verdict !== "skipped" && <div className="text-xs muted">Coach: {x.ai_note}</div>}
+                <SnapReview snapId={x.id} />
+              </div>
+            );
           })}
         </section>
       )}

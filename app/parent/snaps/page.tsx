@@ -5,7 +5,7 @@ import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { SNAP_TEMPLATES, type HandwritingAnalysis, type SnapTask } from "@/lib/snaps";
 import { WEEKDAYS } from "@/lib/custody";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
-import { addSnapTaskAction, deleteSnapTaskAction, updateSnapTaskAction } from "@/lib/actions/snaps";
+import { addSnapTaskAction, deleteSnapTaskAction, setSnapAiCheckAction, updateSnapTaskAction } from "@/lib/actions/snaps";
 import { SnapReview } from "@/components/SnapReview";
 import { Tabs } from "@/components/Tabs";
 import type { Profile } from "@/lib/types";
@@ -109,6 +109,14 @@ export default async function ParentSnapsPage() {
             {recent.length === 0 && <p className="card text-sm muted">Nothing reviewed yet.</p>}
           </>) },
           { id: "tasks", label: "Tasks", emoji: "⚙️", badge: tasks.length || null, content: (<>
+      <section className="card space-y-2">
+        <h2 className="h2">Who checks the pictures</h2>
+        <form action={setSnapAiCheckAction} className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" name="snap_ai_check" defaultChecked={family.snap_ai_check !== false} /> AI first look (about 0.3 piaster a picture)</label>
+          <button className="btn-ghost btn-sm">Save</button>
+        </form>
+        <p className="text-xs muted">On: the coach screens each picture in seconds, the child hears "looks good" or "try again", and you or a rater give the final tick. Anything the AI is not sure about waits for a person. Off: no AI at all, every picture goes straight to you and to any older sibling you marked as a rater (Kids → Profile); the points come with the tick.</p>
+      </section>
       <section className="card space-y-3">
         <h2 className="h2">Snap tasks</h2>
         <p className="text-xs muted">Each task is a basic in the allowance score (weight below). Time windows are in your timezone. Switch a task off instead of deleting it to keep history.</p>

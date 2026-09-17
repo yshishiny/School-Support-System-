@@ -9,6 +9,7 @@ import { checkDueSources } from "@/lib/sources/check";
 import { pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
+import { prepareWeekMaterial } from "@/lib/learning/resources";
 import { todayIn } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,16 @@ export async function GET(request: Request) {
         (results[id] ??= []).push(`error: ${err instanceof Error ? err.message : String(err)}`);
         pending.delete(id);
       }
+    }
+  }
+  // This week's lessons, diagrams and videos, so the child never waits for the AI (a few topics per night).
+  for (const s of students ?? []) {
+    if (Date.now() - started >= TIME_BUDGET_MS) break;
+    try {
+      const r = await prepareWeekMaterial(s.id, { limit: 4, budgetMs: Math.max(0, TIME_BUDGET_MS - (Date.now() - started)) });
+      if (r.prepared || r.errors.length) (results[s.id] ??= []).push(`week material: ${r.prepared} ready, ${r.remaining} left${r.errors.length ? `, errors: ${r.errors.join("; ")}` : ""}`);
+    } catch (err) {
+      (results[s.id] ??= []).push(`week material error: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
   // Allowance: close last week the morning after pay day and tell the parent.

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, hourIn } from "@/lib/dates";
@@ -155,8 +156,18 @@ export default async function TodayPage() {
     classesToday: todayRows.length,
   };
 
+  const snapBanner = snapsDue.length > 0 && (
+    <Link href="/snaps" className="card flex items-center gap-3 border-2 border-accent bg-accent/10 pop">
+      <span className="text-4xl sticker-still">📸</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold">{snapsDue.length} snap{snapsDue.length === 1 ? "" : "s"} waiting now: {snapsDue.map((t) => `${t.emoji} ${t.label}`).join(" · ")}</div>
+        <div className="text-xs muted">Show your win before the time window closes. Counts for your allowance.</div>
+      </div>
+      <span className="btn-primary btn-sm shrink-0">Snap</span>
+    </Link>
+  );
   const layout = profile.home_layout ?? "b";
-  if (layout === "a") return <LayoutA d={d} />;
-  if (layout === "c") return <LayoutC d={d} />;
-  return <LayoutB d={d} />;
+  if (layout === "a") return <>{snapBanner}<LayoutA d={d} /></>;
+  if (layout === "c") return <>{snapBanner}<LayoutC d={d} /></>;
+  return <>{snapBanner}<LayoutB d={d} /></>;
 }

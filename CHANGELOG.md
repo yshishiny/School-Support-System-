@@ -2,6 +2,15 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.4.0 — Snaps front and centre, this week's lessons ready before you open them (17 September 2026)
+
+- **Snaps is its own tab** in the kids' bottom bar, with a week meter (done/due per task), "N to snap now", and a bright banner at the top of Today whenever a snap window is open. A saved picture or screenshot can be sent as well as a fresh camera shot.
+- **Who checks the pictures**: a parent switch (Snaps → Tasks) turns the AI first look off; every snap then goes straight to a person, and the points come with the tick. Anything the AI is unsure about already waits for a person.
+- **Rater siblings check snaps**: an older sibling marked as a rater sees the pending pictures on his Me page and approves or sends back like a parent.
+- **Learn → This week**: the topics the child logged in class this week and the ones planned next, each with a written lesson, two or three diagrams drawn for it, and the same idea explained by different teachers on video (Khan Academy, CrashCourse, TED-Ed, Professor Dave, The Organic Chemistry Tutor; نفهم, مدرستنا, ذاكرلي عربي for Arabic subjects).
+- **No waiting**: the nightly job prepares this week's topics in advance; "Get this week ready" fills the gaps three topics at a time, and a lesson's text and diagrams are written side by side. With a YouTube API key the videos play inside the app; without it each channel is a one-tap search.
+- Migrations 20260917143529 (topic_resources) and 20260917143650 (families.snap_ai_check).
+
 ## 1.3.0 — One parent design (17 September 2026)
 
 - **Colourful side menu for the whole parent area**: Home, Kids, Tasks, Quiz plan, Progress, School files, Import, Allowance, Snaps, Rewards, Reports, Guide and More, grouped, always on the left (a strip on phones). The old bottom bar is gone.

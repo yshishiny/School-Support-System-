@@ -4,7 +4,9 @@ import { createClient } from "@/lib/supabase/server";
 import { todayIn, prettyDate } from "@/lib/dates";
 import { EXAM_INFO, EXAM_SECTIONS, examsFor, scaledEstimate, sectionsFor, trackFor } from "@/lib/exams";
 import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
-import { PracticeButton } from "@/components/LearnButtons";
+import { PracticeButton, PrepareWeekButton } from "@/components/LearnButtons";
+import { weekTopicsFor } from "@/lib/learning/resources";
+import { weekdayOf } from "@/lib/dates";
 import { Tabs } from "@/components/Tabs";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
@@ -35,6 +37,8 @@ export default async function LearnPage() {
     supabase.from("quizzes").select("material_id, title, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null),
     supabase.from("subjects").select("name").eq("student_id", profile.id),
   ]);
+  const week = await weekTopicsFor(profile.id, profile.grade, family.timezone);
+  const weekMissing = week.filter((w) => !w.hasLesson || !w.hasResources).length;
   const materials = (materialRows ?? []) as MaterialRow[];
   const materialUrls = await signMaterialUrls(materials.map((m) => ({ id: m.id, path: m.path })));
   type MQ = { material_id: string | null; title: string; attempts: { submitted_at: string | null }[] };
@@ -224,6 +228,41 @@ export default async function LearnPage() {
     </div>
   );
 
+  const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const thisWeek = (
+    <div className="space-y-3">
+      {week.length === 0 ? (
+        <section className="card flex items-center gap-3">
+          <span className="text-4xl sticker-still">🗓️</span>
+          <div className="text-sm"><b>Nothing logged yet this week.</b> <span className="muted">Fill in your classes at check-in (what you took in each lesson) and this tab fills with a lesson, diagrams and videos for each one, ready before you open it.</span></div>
+        </section>
+      ) : (
+        <>
+          <p className="text-xs muted">What you took at school this week and what is planned next: each topic with a written lesson, diagrams to see it, and the same idea explained by different teachers on video.</p>
+          {weekMissing > 0 && <PrepareWeekButton missing={weekMissing} />}
+          <ul className="space-y-2">
+            {week.map((w) => (
+              <li key={w.topic.id}>
+                <Link href={`/learn/topic/${w.topic.id}?tab=lesson`} className="card !py-3 flex items-center gap-3 hover:border-accent/60" dir={w.topic.language === "ar" ? "rtl" : undefined}>
+                  <span className="text-3xl">{subjectEmoji(w.topic.subject)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-bold leading-tight">{w.topic.name}</div>
+                    <div className="text-xs muted">{subjectLabel(w.topic.subject)} · {w.why === "logged" ? `taken ${w.when === today ? "today" : DAY[weekdayOf(w.when)]}` : `quiz ${w.when === today ? "today" : DAY[weekdayOf(w.when)]}`}{mastery.has(w.topic.id) ? ` · ${mastery.get(w.topic.id)}%` : ""}</div>
+                  </div>
+                  <div className="flex gap-1 text-base shrink-0" title="lesson · diagrams · videos">
+                    <span className={w.hasLesson ? "" : "opacity-25"}>📖</span>
+                    <span className={w.hasResources ? "" : "opacity-25"}>🖼️</span>
+                    <span className={w.hasResources ? "" : "opacity-25"}>▶️</span>
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+
   const arabicCount = subjects.filter((s) => ARABIC_SUBJECTS.includes(s)).length;
   return (
     <main className="space-y-4">
@@ -231,6 +270,7 @@ export default async function LearnPage() {
       <Tabs
         storageKey="learn"
         tabs={[
+          { id: "week", label: "This week", emoji: "🗓️", badge: week.length || null, content: thisWeek },
           { id: "me", label: "For me", emoji: "⭐", badge: dueCount ?? 0, content: forMe },
           { id: "subjects", label: "Subjects", emoji: "📚", badge: null, content: subjects.length ? subjectTabs : <p className="card muted">No curriculum loaded for grade {profile.grade}.</p> },
           ...(exams.length ? [{ id: "exams", label: exams.join(" & "), emoji: "🎓", badge: null, content: examTab }] : []),

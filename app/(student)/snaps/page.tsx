@@ -3,7 +3,8 @@ import { formatInTimeZone } from "date-fns-tz";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
-import { dueSnapTasks, handwritingScore, taskDayState, windowOpen, type DayState, type HandwritingAnalysis, type SnapLite } from "@/lib/snaps";
+import { dueSnapTasks, handwritingScore, snapDaysDone, taskDayState, windowOpen, type DayState, type HandwritingAnalysis, type SnapLite } from "@/lib/snaps";
+import { weekFor } from "@/lib/allowance";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
 import { SnapCapture } from "@/components/SnapCapture";
 
@@ -37,6 +38,15 @@ export default async function SnapsPage() {
   const lastHw = hwSamples[hwSamples.length - 1] ?? null;
   const hwUrls = await signSnapUrls(hwSamples.slice(-2).map((s) => ({ id: s.id, path: s.path })));
   const hwDueToday = !!hwTask && due.some((t) => t.id === hwTask.id);
+  const week = weekFor(today, family.allowance_pay_weekday ?? 5);
+  const weekDays: string[] = [];
+  for (let d = week.start; d <= today; d = shiftDate(d, 1)) weekDays.push(d);
+  const mine = tasks.filter((t) => t.enabled && (t.student_id === null || t.student_id === profile.id));
+  const meter = mine.map((t) => ({ t, ...snapDaysDone(t, snaps, weekDays) })).filter((m) => m.due > 0);
+  const weekDue = meter.reduce((s, m) => s + m.due, 0);
+  const weekDone = meter.reduce((s, m) => s + m.done, 0);
+  const openNow = dailyTasks.filter((t) => windowOpen(t, hhmm) && ["due", "rejected"].includes(taskDayState(t, snaps, today, hhmm)));
+  const pendingCount = snaps.filter((s) => s.status === "pending").length;
 
   return (
     <main className="space-y-4">
@@ -49,7 +59,21 @@ export default async function SnapsPage() {
         <Link href="/today" className="btn-ghost btn-sm">Today</Link>
       </header>
 
-      {tasks.length === 0 && <p className="card muted text-sm">No snap tasks yet. Ask a parent to switch some on under Allowance.</p>}
+      {tasks.length === 0 && <p className="card muted text-sm">No snap tasks yet. Ask a parent to switch some on under Snaps → Tasks.</p>}
+
+      {meter.length > 0 && (
+        <section className={`card space-y-2 ${openNow.length ? "border-2 border-accent" : ""}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{openNow.length ? `${openNow.length} to snap now` : "Nothing open right now"}</div>
+            <span className="text-xs muted">This week {weekDone}/{weekDue}{pendingCount ? ` · ${pendingCount} waiting for a tick` : ""}</span>
+          </div>
+          <div className="h-2 rounded-full bg-panel-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${weekDue ? Math.round((weekDone / weekDue) * 100) : 0}%` }} /></div>
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            {meter.map((m) => <span key={m.t.id} className={`chip ${m.done >= m.due ? "text-good" : ""}`}>{m.t.emoji} {m.done}/{m.due}</span>)}
+          </div>
+          <p className="text-xs muted">{family.snap_ai_check === false ? "A parent or your rater checks each picture and ticks it." : "The coach has a first look in seconds; a parent gives the final tick."} Every due day you snap keeps the allowance meter full.</p>
+        </section>
+      )}
 
       {dailyTasks.length > 0 && (
         <section className="space-y-2">

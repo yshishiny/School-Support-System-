@@ -17,6 +17,7 @@ export interface Family {
   allowance_amount: number;
   allowance_pay_weekday: number;
   allowance_kpis: { code: string; weight?: number; enabled?: boolean }[] | null;
+  snap_ai_check?: boolean;
   practices_enabled: string[];
   custody_pattern: Record<string, string | null>; // weekday ("0".."6") -> parent id; empty = shared
 }
