@@ -7,6 +7,7 @@ import { SettingsForm, TelegramSettings } from "@/components/SettingsForm";
 import { MyParentCard, ParentsPanel, type InviteRow, type OverrideRow, type ParentRow } from "@/components/ParentsPanel";
 import { PlacesForm, type PlaceRow } from "@/components/PlacesForm";
 import { PushToggle } from "@/components/PushToggle";
+import { InstallCard } from "@/components/InstallCard";
 import { Tabs } from "@/components/Tabs";
 import { PARENT_SECTIONS } from "@/components/ParentMenu";
 import { createClient } from "@/lib/supabase/server";
@@ -77,6 +78,7 @@ export default async function SettingsPage() {
       <section className="card space-y-2">
         <h2 className="h2">🔔 Notifications on this phone</h2>
         <p className="text-xs muted">Daily report headline and safety alerts as browser notifications on this device. Telegram below stays the full-text channel.</p>
+        <InstallCard compact />
         <PushToggle />
       </section>
       <TelegramSettings chatId={(profile as Profile).telegram_chat_id} botUsername={process.env.TELEGRAM_BOT_USERNAME ?? null} />

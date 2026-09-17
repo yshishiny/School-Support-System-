@@ -58,6 +58,8 @@ export interface Profile {
   banner_image_id: string | null;
   home_layout: "a" | "b" | "c";
   is_admin?: boolean;
+  device?: { platform: string; standalone: boolean; screen: string; battery: number | null; charging: boolean | null; connection: string | null; updated_at: string } | null;
+  app_installed_at?: string | null;
   banner_fit: "cover" | "full";
   banner_zoom: number;
   banner_x: number;

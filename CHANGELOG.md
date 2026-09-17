@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.13.0 — Ready to become an Android app (17 September 2026)
+
+- **Installable app**: full web-app manifest (name, PNG and maskable icons, standalone, portrait, home-screen shortcuts to Today, Snaps and Parent home), service worker registered on every page with an offline note, iPhone home-screen icon.
+- **Install the app** card on the kids' Me page and the parents' More page: one tap on Android Chrome, instructions on iPhone and laptops, a tick once it runs from the icon.
+- **Device dimension**: each session reports platform, app-or-browser, screen, battery and charging, network type, language and timezone; parents see it on Kids → Profile. First launch from the icon is recorded.
+- **APK path**: `/.well-known/assetlinks.json` served from `ANDROID_PACKAGE` and `ANDROID_SHA256`; `docs/ANDROID.md` walks through packaging with PWABuilder (Trusted Web Activity) in ten minutes, and the later native step for screen time.
+- Migration 20260917212836 (profiles.device, app_installed_at).
+
 ## 1.12.0 — A phone layout of its own for parents (17 September 2026)
 
 - **Root cause of the wide page found and fixed**: the scrolling menu strip sat in a grid column and forced that column to the strip's full width (about 930 px), so every card below stretched past the screen. Scrolling strips (menu, kid tabs, page tabs) can no longer size their column.

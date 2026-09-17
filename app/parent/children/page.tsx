@@ -53,6 +53,16 @@ export default async function ChildrenPage() {
               <>
                 {toBirthday !== null && toBirthday <= 7 && <p className="card !py-2 text-sm border-warn/60">🎂 {toBirthday === 0 ? `Birthday today! ${s.full_name.split(" ")[0]} turns ${age}.` : `Birthday in ${toBirthday} day${toBirthday === 1 ? "" : "s"}.`}</p>}
                 <ChildProfileForm s={s} age={age} username={usernameOf(s.id)} />
+                {(() => {
+                  const d = (s as { device?: { platform: string; standalone: boolean; screen: string; battery: number | null; charging: boolean | null; connection: string | null; updated_at: string } | null }).device;
+                  const installed = (s as { app_installed_at?: string | null }).app_installed_at;
+                  if (!d) return <p className="card !py-2 text-xs muted">📱 No device seen yet. It shows here after his next visit: phone type, app or browser, battery, network.</p>;
+                  return (
+                    <p className="card !py-2 text-xs">
+                      📱 <b>{d.platform}</b> · {d.standalone ? "the installed app" : "a browser tab"}{installed ? ` (app since ${installed.slice(0, 10)})` : ""} · screen {d.screen}{d.battery !== null ? ` · battery ${d.battery}%${d.charging ? " charging" : ""}` : ""}{d.connection ? ` · ${d.connection}` : ""} · <span className="muted">seen {d.updated_at.slice(0, 16).replace("T", " ")}</span>
+                    </p>
+                  );
+                })()}
               </>
             );
             const subjectsTab = (

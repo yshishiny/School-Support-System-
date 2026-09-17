@@ -8,6 +8,7 @@ import { InterestsForm } from "@/components/InterestsForm";
 import Link from "next/link";
 import { learnerTags, type LearnerProfile } from "@/lib/learner";
 import { RemindersCard } from "@/components/RemindersCard";
+import { InstallCard } from "@/components/InstallCard";
 import { GradeSheetUploader } from "@/components/GradeSheetUploader";
 import { KpiTicks } from "@/components/KpiTicks";
 import { mergeKpis } from "@/lib/allowance";
@@ -160,6 +161,7 @@ export default async function MePage() {
         </section>
       )}
 
+      <InstallCard compact />
       <RemindersCard settings={{ ...DEFAULT_NUDGES, ...(((profile as { nudges?: Partial<NudgeSettings> }).nudges) ?? {}) }} />
 
       <Link href="/snaps" className="card flex items-center gap-3">
