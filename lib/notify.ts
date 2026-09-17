@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTelegram, sendWhatsApp, type SendResult } from "@/lib/whatsapp/send";
 import { sendPush } from "@/lib/push/server";
 import { addToInbox, inboxKindFor, splitText, type InboxKind } from "@/lib/inbox";
+import { logError } from "@/lib/ops/log";
 
 export interface ParentChannels { id: string; full_name: string; parent_label: string | null; telegram_chat_id: string | null; whatsapp: string | null }
 
@@ -35,7 +36,9 @@ export async function sendToParent(p: Pick<ParentChannels, "id" | "telegram_chat
   if (results.length === 1 && results[0].channel === "inbox") return { channel: "inbox", ok: true };
   const ok = results.filter((r) => r.ok);
   if (ok.length) return { channel: ok.map((r) => r.channel).join("+"), ok: true };
-  return { channel: results.map((r) => r.channel).join("+"), ok: false, error: results.map((r) => `${r.channel}: ${r.error}`).join(" | ") };
+  const error = results.map((r) => `${r.channel}: ${r.error}`).join(" | ");
+  await logError("notify.deliver", new Error(error), { familyId: opts.familyId ?? null, userId: p.id });
+  return { channel: results.map((r) => r.channel).join("+"), ok: false, error };
 }
 
 /**

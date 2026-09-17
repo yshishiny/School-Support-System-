@@ -1,3 +1,4 @@
+import { logError } from "@/lib/ops/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { fetchAyahs, type Ayah } from "@/lib/quran";
 import { FALLBACK_PASSAGES, buildQuestion, pickFromSegments, pickIndex, type CompensationRow } from "@/lib/compensation";
@@ -32,7 +33,7 @@ export async function openCompensation(studentId: string, familyId: string, kind
     const question = buildQuestion(verses, pool, ref);
     await admin.from("late_compensations").insert({ student_id: studentId, family_id: familyId, kind, ref, label, verses, question });
   } catch (err) {
-    console.warn("[compensation] could not open", ref, err instanceof Error ? err.message : err);
+    await logError("compensation.open", err, { familyId, userId: studentId, meta: { ref } });
   }
 }
 

@@ -1,5 +1,7 @@
 "use server";
 
+import { logError } from "@/lib/ops/log";
+
 import { revalidatePath } from "next/cache";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -81,6 +83,7 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
       }
       await admin.from("snaps").update({ ai_verdict: r.verdict, ai_score: Math.round(r.score * 100) / 100, ai_note: r.note, ai_detail: Object.keys(detail).length ? detail : null }).eq("id", row.id);
     } catch (err) {
+      await logError("snaps.check", err, { familyId: family.id, userId: profile.id, meta: { snapId: row.id, task: t.code } });
       await admin.from("snaps").update({ ai_verdict: "error", ai_note: `AI check failed: ${err instanceof Error ? err.message : String(err)}` }).eq("id", row.id);
     }
   }

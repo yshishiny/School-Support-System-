@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { sendDueNudges } from "@/lib/nudges/run";
 
 export const dynamic = "force-dynamic";
@@ -14,11 +15,14 @@ export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const started = Date.now();
   try {
     const results = await sendDueNudges();
     console.log("[nudges] results", JSON.stringify(results));
+    await recordCronRun("nudges", started, results as Record<string, unknown>);
     return NextResponse.json({ ok: true, results });
   } catch (err) {
+    await recordCronRun("nudges", started, {}, err);
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

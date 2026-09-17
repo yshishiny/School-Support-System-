@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.10.0 — Admin page and error log (17 September 2026)
+
+- **Every caught failure is recorded** (file reading, snap check, lessons and diagrams, compensation, message delivery, grades reading, nightly jobs, browser crashes) with area, message, stack and who was affected. The administrator gets one inbox note per area per hour.
+- **More → Admin** (administrator only): Health (configuration keys, database latency and row counts, storage buckets), Errors (open and resolved, one tap to resolve), Jobs (every cron run with its results and age), Services (Vercel deployments, Supabase project status, GitHub commits, Google/YouTube key check, Anthropic). Optional tokens VERCEL_TOKEN, GITHUB_TOKEN and SUPABASE_ACCESS_TOKEN light up the service lists.
+- Migration 20260917154427 (profiles.is_admin, app_errors, cron_runs).
+
 ## 1.9.0 — The school's file versus the class log (17 September 2026)
 
 - **New integrity signal "log vs school"**: when a school file for a subject is uploaded this week (by a parent or the child) and his class log for that subject says "no class", has nothing, or never mentions any of the file's topics, the parent sees it under "Worth asking tonight" with the file's topics and the dates he marked "no class".

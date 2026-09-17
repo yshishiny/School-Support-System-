@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { reportClientErrorAction } from "@/lib/actions/ops";
 
 const ONCE = "auto-reloaded-for";
 
@@ -24,6 +25,7 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     }
     setReal(!stale);
     console.error("[app] error boundary", error);
+    if (!stale) void reportClientErrorAction(error.message ?? "unknown", error.digest ?? null, window.location.pathname).catch(() => null);
   }, [error]);
 
   return (

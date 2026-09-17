@@ -1,5 +1,7 @@
 "use server";
 
+import { logError } from "@/lib/ops/log";
+
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,6 +36,7 @@ export async function registerGradeSheetAction(studentId: string, path: string, 
     return { average: r.average, appraisal: r.appraisal };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    await logError("grades.read", err, { meta: { sheetId: row.id } });
     await admin.from("grade_sheets").update({ status: "failed", error: msg }).eq("id", row.id);
     PATHS.forEach((p) => revalidatePath(p));
     return { error: `Saved, but it could not be read: ${msg}` };

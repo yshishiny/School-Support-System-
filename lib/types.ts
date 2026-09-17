@@ -57,6 +57,7 @@ export interface Profile {
   avatar_image_id: string | null;
   banner_image_id: string | null;
   home_layout: "a" | "b" | "c";
+  is_admin?: boolean;
   banner_fit: "cover" | "full";
   banner_zoom: number;
   banner_x: number;

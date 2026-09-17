@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
 import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
@@ -125,5 +126,6 @@ export async function GET(request: Request) {
     results.snaps = [`prune error: ${err instanceof Error ? err.message : String(err)}`];
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));
+  await recordCronRun("prepare-plan", started, results);
   return NextResponse.json({ ok: true, seconds: Math.round((Date.now() - started) / 1000), results });
 }

@@ -1,5 +1,7 @@
 "use server";
 
+import { logError } from "@/lib/ops/log";
+
 import { ACCEPT_LABEL, FILE_KINDS } from "@/lib/materials/files";
 import { extractText } from "@/lib/materials/extract-text";
 
@@ -79,6 +81,7 @@ async function readAndStore(id: string, o: { path: string; mime: string; subject
     return { id, title: reading.title, summary: reading.summary, items: reading.items.length };
   } catch (err) {
     const msg = friendlyAiError(err instanceof Error ? err.message : String(err));
+    await logError("materials.read", err, { meta: { materialId: id, mime: o.mime, title: o.fallbackTitle } });
     await admin.from("materials").update({ status: "failed", error: msg }).eq("id", id);
     return { id, title: o.fallbackTitle, summary: `Saved, but the AI could not read it. ${msg}`, items: 0 };
   }

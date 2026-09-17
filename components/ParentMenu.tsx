@@ -24,21 +24,23 @@ const ITEMS: { href: string; label: string; emoji: string; color: string; group:
  * The parent's menu. Wide screens: one quiet panel, items grouped, each with a small coloured icon disc; the
  * current page gets a soft fill and a colour bar. Phones: a compact scrolling strip at the top.
  */
-export function ParentMenu({ unread = 0 }: { unread?: number }) {
+export function ParentMenu({ unread = 0, isAdmin = false, openErrors = 0 }: { unread?: number; isAdmin?: boolean; openErrors?: number }) {
   const path = usePathname();
   const isActive = (href: string) => path === href || (href !== "/parent" && path.startsWith(href));
-  const groups = [...new Set(ITEMS.map((i) => i.group))];
+  const items = isAdmin ? [...ITEMS, { href: "/parent/admin", label: "Admin", emoji: "🛠️", color: "#495057", group: "Family" }] : ITEMS;
+  const groups = [...new Set(items.map((i) => i.group))];
   const Badge = ({ n }: { n: number }) => (n > 0 ? <span className="ml-auto rounded-full bg-bad text-white text-[10px] font-bold px-1.5 py-0.5 leading-none">{n}</span> : null);
   return (
     <nav className="sm:sticky sm:top-3 sm:self-start" aria-label="Parent sections">
       {/* phone: one scrolling strip */}
       <div className="sm:hidden -mx-4 px-4 flex gap-1.5 overflow-x-auto pb-2 sticky top-0 z-20 bg-bg/90 backdrop-blur pt-1">
-        {ITEMS.map((it) => {
+        {items.map((it) => {
           const on = isActive(it.href);
           return (
             <Link key={it.href} href={it.href} className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-bold flex items-center gap-1 transition border ${on ? "text-ink border-transparent" : "text-muted border-line bg-panel"}`} style={{ background: on ? `${it.color}33` : undefined, fontFamily: "var(--font-display)" }}>
               <span className="text-base leading-none">{it.emoji}</span>{it.label}
               {it.href === "/parent/notifications" && unread > 0 && <span className="rounded-full bg-bad text-white text-[9px] px-1 leading-3">{unread}</span>}
+              {it.href === "/parent/admin" && openErrors > 0 && <span className="rounded-full bg-bad text-white text-[9px] px-1 leading-3">{openErrors}</span>}
             </Link>
           );
         })}
@@ -49,7 +51,7 @@ export function ParentMenu({ unread = 0 }: { unread?: number }) {
           <div key={g}>
             <div className="text-[10px] uppercase tracking-wider muted px-2 pt-1 pb-0.5">{g}</div>
             <ul className="space-y-0.5">
-              {ITEMS.filter((i) => i.group === g).map((it) => {
+              {items.filter((i) => i.group === g).map((it) => {
                 const on = isActive(it.href);
                 return (
                   <li key={it.href}>
@@ -63,6 +65,7 @@ export function ParentMenu({ unread = 0 }: { unread?: number }) {
                       <span className="grid place-items-center h-7 w-7 rounded-lg text-base leading-none shrink-0" style={{ background: `${it.color}${on ? "40" : "22"}` }}>{it.emoji}</span>
                       <span className={`text-sm ${on ? "font-bold" : "font-semibold"}`} style={{ fontFamily: "var(--font-display)" }}>{it.label}</span>
                       {it.href === "/parent/notifications" && <Badge n={unread} />}
+                      {it.href === "/parent/admin" && <Badge n={openErrors} />}
                     </Link>
                   </li>
                 );

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndSendReport } from "@/lib/reports/generate";
 import { hourIn } from "@/lib/dates";
@@ -13,6 +14,7 @@ export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  const started = Date.now();
   const admin = createAdminClient();
   const { data: families } = await admin.from("families").select("id, timezone, report_hour");
   const results: Record<string, unknown> = {};
@@ -36,5 +38,6 @@ export async function GET(request: Request) {
     }
   }
   console.log("[daily-report] cron results", JSON.stringify(results));
+  await recordCronRun("daily-report", started, results);
   return NextResponse.json({ ok: true, results });
 }
