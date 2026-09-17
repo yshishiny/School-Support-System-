@@ -1,22 +1,15 @@
 import { requireParent } from "@/lib/auth";
-import { BottomNav } from "@/components/Nav";
+import { ParentMenu } from "@/components/ParentMenu";
 
+/** Parent area: a colourful side menu (left on wide screens, a strip on phones) and the page beside it. */
 export default async function ParentLayout({ children }: { children: React.ReactNode }) {
   await requireParent();
   return (
-    <div className="mx-auto max-w-3xl px-4 pt-4 pb-24">
-      {children}
-      <BottomNav
-        items={[
-          { href: "/parent", label: "Home", emoji: "🏠" },
-          { href: "/parent/plan", label: "Plan", emoji: "📅" },
-          { href: "/parent/progress", label: "Progress", emoji: "🧠" },
-          { href: "/parent/assignments", label: "Tasks", emoji: "📝" },
-          { href: "/parent/import", label: "WhatsApp", emoji: "💬" },
-          { href: "/parent/rewards", label: "Rewards", emoji: "🎁" },
-          { href: "/parent/settings", label: "More", emoji: "⚙️" },
-        ]}
-      />
+    <div className="mx-auto max-w-6xl px-4 pt-3 pb-10">
+      <div className="grid gap-4 sm:grid-cols-[11rem_1fr]">
+        <ParentMenu />
+        <div className="min-w-0">{children}</div>
+      </div>
     </div>
   );
 }

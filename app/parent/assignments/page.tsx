@@ -2,6 +2,8 @@ import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, prettyDate, relativeLabel } from "@/lib/dates";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
+import { SideTabs } from "@/components/SideTabs";
+import { kidColor } from "@/lib/kid-tabs";
 import { deleteAssignmentAction, setAssignmentStatusAction } from "@/lib/actions/assignments";
 import { KIND_EMOJI, type Assignment, type Profile, type Subject } from "@/lib/types";
 
@@ -22,13 +24,12 @@ export default async function AssignmentsPage() {
     <main className="space-y-4">
       <h1 className="h1">Tasks</h1>
       {students.length > 0 && <AddAssignmentForm students={students} subjects={(subjects ?? []) as Subject[]} defaultDate={shiftDate(today, 1)} />}
-      {students.map((s) => {
+      <SideTabs storageKey="tasks-kids" tabs={students.map((s, idx) => {
         const mine = all.filter((a) => a.student_id === s.id);
         const open = mine.filter((a) => a.status === "open");
         const done = mine.filter((a) => a.status !== "open").slice(-10).reverse();
-        return (
-          <section key={s.id} className="card">
-            <h2 className="h2 mb-2">{s.avatar_emoji} {s.full_name}</h2>
+        return { id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(idx), sub: `${open.length} open`, content: (
+          <section className="card">
             {open.length === 0 && <p className="muted text-sm">No open tasks.</p>}
             <ul className="divide-y divide-line">
               {open.map((a) => (
@@ -54,8 +55,8 @@ export default async function AssignmentsPage() {
               </details>
             )}
           </section>
-        );
-      })}
+        ) };
+      })} />
     </main>
   );
 }

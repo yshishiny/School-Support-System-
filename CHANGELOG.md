@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.3.0 — One parent design (17 September 2026)
+
+- **Colourful side menu for the whole parent area**: Home, Kids, Tasks, Quiz plan, Progress, School files, Import, Allowance, Snaps, Rewards, Reports, Guide and More, grouped, always on the left (a strip on phones). The old bottom bar is gone.
+- **Tabs on every parent page**, in the same style as the Kids page: one colourful tab per child on Home, Progress, Tasks, Quiz plan and School files, and content tabs on Allowance (This week, History, Consequences, Settings), Snaps (To review, Handwriting, Recent, Tasks), Rewards (Requests, Catalog, Ideas, Balances), Reports (Reports, Entries), Import (WhatsApp, Timetable photo, School website, Recent), School files (Upload, To review, All files) and More (You, Parents, Family & places, About).
+- **Same colour per child everywhere**, so Youssef and Omar keep their colour on every page; each child's tab shows online/checked-in status on Home.
+- **Guide** is one step per tab instead of a long scroll.
+- The chosen tab is remembered per page for the session and can be opened directly with `?tab=`.
+
 ## 1.2.0 — The allowance loop, closed (17 September 2026)
 
 - **Two more basics**: homework done by its due date (weight 10) and the monthly grades sheet (weight 5, counted from the 21st).

@@ -16,6 +16,8 @@ import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log
 import { computeIntegrity } from "@/lib/integrity/run";
 import { liveFeedAction } from "@/lib/actions/live";
 import { LiveFeed } from "@/components/LiveFeed";
+import { SideTabs } from "@/components/SideTabs";
+import { kidColor } from "@/lib/kid-tabs";
 import { presence } from "@/lib/activity";
 import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
@@ -152,7 +154,7 @@ export default async function ParentHome() {
       )}
 
       {/* Kids */}
-      {students.map((s, idx) => {
+      <SideTabs storageKey="home-kids" tabs={students.map((s, idx) => {
         const mine = allCk.filter((c) => c.student_id === s.id);
         const ck = mine.find((c) => c.checkin_date === today) ?? null;
         const streak = computeStreak(mine.map((c) => c.checkin_date), today) || computeStreak(mine.map((c) => c.checkin_date), shiftDate(today, -1));
@@ -174,8 +176,9 @@ export default async function ParentHome() {
         const school = schoolDay(today, timetable.filter((t) => t.student_id === s.id), daysOff);
         const schoolTomorrow = schoolDay(shiftDate(today, 1), timetable.filter((t) => t.student_id === s.id), daysOff);
         const cov = classLogCoverage(weekStart, today, timetable.filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), daysOff.map((d) => d.day));
-        return (
-          <section key={s.id} className="card space-y-3">
+        const pr = presence(s.last_seen_at, s.last_path);
+        return { id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(idx), avatarUrl: avatar, sub: pr.online ? "🟢 online" : ck ? "✓ checked in" : "no check-in", content: (
+          <section className="card space-y-3">
             <div className="flex items-center gap-3">
               <Link href="/parent/children" className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
                 {avatar ? (
@@ -260,8 +263,8 @@ export default async function ParentHome() {
               </details>
             )}
           </section>
-        );
-      })}
+        ) };
+      })} />
 
       {/* Report line */}
       <Link href="/parent/reports" className="flex items-center gap-2 text-xs muted px-1">

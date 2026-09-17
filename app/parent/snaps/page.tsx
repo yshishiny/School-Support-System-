@@ -7,6 +7,7 @@ import { WEEKDAYS } from "@/lib/custody";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
 import { addSnapTaskAction, deleteSnapTaskAction, updateSnapTaskAction } from "@/lib/actions/snaps";
 import { SnapReview } from "@/components/SnapReview";
+import { Tabs } from "@/components/Tabs";
 import type { Profile } from "@/lib/types";
 
 const VERDICT: Record<string, { icon: string; text: string }> = {
@@ -72,11 +73,17 @@ export default async function ParentSnapsPage() {
       </div>
       <p className="text-sm muted">The boys snap their bed, desk, dish or homework page when nobody is home. The AI gives a first opinion; your tap is what counts for the allowance. Handwriting samples get a score and a line to practise.</p>
 
+      <Tabs
+        storageKey="snaps"
+        tabs={[
+          { id: "review", label: "To review", emoji: "📸", badge: pending.length || null, content: (<>
       <section className="space-y-2">
         <h2 className="h2">To review {pending.length ? <span className="badge">{pending.length}</span> : null}</h2>
         {pending.length === 0 ? <p className="card text-sm muted">Nothing waiting. Pending snaps the AI found plausible already count until you say otherwise.</p> : pending.map((s) => <Card key={s.id} s={s} />)}
       </section>
 
+          </>) },
+          { id: "handwriting", label: "Handwriting", emoji: "✍️", content: (<>
       {hwByKid.some((x) => x.samples.length) && (
         <section className="card space-y-2">
           <h2 className="h2">✍️ Handwriting trend</h2>
@@ -89,13 +96,19 @@ export default async function ParentSnapsPage() {
         </section>
       )}
 
+            {!hwByKid.some((x) => x.samples.length) && <p className="card text-sm muted">No handwriting samples yet.</p>}
+          </>) },
+          { id: "recent", label: "Recent", emoji: "🕓", content: (<>
       {recent.length > 0 && (
-        <details className="space-y-2">
-          <summary className="h2 cursor-pointer">Recent · {recent.length}</summary>
+        <div className="space-y-2">
+          <h2 className="h2">Recent · {recent.length}</h2>
           <div className="grid gap-2 sm:grid-cols-2 mt-2">{recent.map((s) => <Card key={s.id} s={s} />)}</div>
-        </details>
+        </div>
       )}
 
+            {recent.length === 0 && <p className="card text-sm muted">Nothing reviewed yet.</p>}
+          </>) },
+          { id: "tasks", label: "Tasks", emoji: "⚙️", badge: tasks.length || null, content: (<>
       <section className="card space-y-3">
         <h2 className="h2">Snap tasks</h2>
         <p className="text-xs muted">Each task is a basic in the allowance score (weight below). Time windows are in your timezone. Switch a task off instead of deleting it to keep history.</p>
@@ -131,6 +144,9 @@ export default async function ParentSnapsPage() {
           <button className="btn-primary">Add task</button>
         </form>
       </section>
+          </>) },
+        ]}
+      />
     </main>
   );
 }

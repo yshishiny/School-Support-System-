@@ -3,6 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { SendReportButton } from "@/components/SendReportButton";
+import { Tabs } from "@/components/Tabs";
 import { waShareLink } from "@/lib/whatsapp/send";
 import { prettyDate } from "@/lib/dates";
 import type { DailyReport } from "@/lib/types";
@@ -30,6 +31,10 @@ export default async function ReportsPage() {
   return (
     <main className="space-y-4">
       <h1 className="h1">Daily reports</h1>
+      <Tabs
+        storageKey="reports"
+        tabs={[
+          { id: "reports", label: "Reports", emoji: "📨", content: (<>
       <div className="card space-y-3">
         <p className="text-sm muted">
           A report is generated automatically every evening and sent to every parent who connected Telegram (or WhatsApp) under More. You can also trigger it now.
@@ -50,6 +55,8 @@ export default async function ReportsPage() {
         </section>
       ))}
       {reports.length === 0 && <p className="card muted">No reports yet.</p>}
+          </>) },
+          { id: "entries", label: "Entries", emoji: "📱", badge: rows.length || null, content: (<>
           <section className="card space-y-3">
         <h2 className="h2">📱 Entries to the system · last 14 days</h2>
         <p className="text-xs muted">Every login, and the first page of the day on each device: time, who, where (from the network address) and the device. Today&apos;s entries go into the daily report automatically. Tracking started on 16 Sep 2026; earlier logins were seen only through the server, so they have no address or country.</p>
@@ -76,6 +83,9 @@ export default async function ReportsPage() {
         ))}
         {rows.length === 0 && <p className="muted text-sm">No entries yet.</p>}
       </section>
-</main>
+          </>) },
+        ]}
+      />
+    </main>
   );
 }

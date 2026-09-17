@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ImportWizard } from "@/components/ImportWizard";
 import { TimetablePhotoWizard } from "@/components/TimetablePhotoWizard";
 import { SourcesPanel, type FindingRow, type SourceRow } from "@/components/SourcesPanel";
+import { Tabs } from "@/components/Tabs";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 
 export const maxDuration = 300;
@@ -23,8 +24,8 @@ export default async function ImportPage() {
   return (
     <main className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="h1">Import from WhatsApp</h1>
-        <Link href="/parent/import/archive" className="btn-ghost btn-sm">🗄️ Chat archive</Link>
+        <h1 className="h1">Import</h1>
+        <div className="flex gap-2"><Link href="/parent/materials" className="btn-ghost btn-sm">📎 School files</Link><Link href="/parent/import/archive" className="btn-ghost btn-sm">🗄️ Chat archive</Link></div>
       </div>
       <div className="card text-sm space-y-1 muted">
         <p><b className="text-ink">PDFs and worksheets:</b> the files teachers drop in the group go to <Link href="/parent/materials" className="text-accent-2">School files</Link>, with the subject and the teacher&apos;s instructions. The boys practise straight from them.</p>
@@ -36,21 +37,26 @@ export default async function ImportPage() {
       {(kids ?? []).length === 0 ? (
         <p className="card">Add a child first.</p>
       ) : (
-        <>
-          <ImportWizard students={kids ?? []} defaultSince={last} />
-          <TimetablePhotoWizard students={kids ?? []} />
-          <SourcesPanel sources={(sources ?? []) as SourceRow[]} findings={(findings ?? []) as FindingRow[]} students={kids ?? []} />
-        </>
-      )}
-      {(imports ?? []).length > 0 && (
-        <section className="card">
-          <h2 className="h2 mb-2">Recent imports</h2>
-          <ul className="text-sm space-y-1 muted">
-            {(imports ?? []).map((i) => (
-              <li key={i.id}>{prettyDate(String(i.imported_at).slice(0, 10))} · {(i as { profiles?: { full_name?: string } }).profiles?.full_name} · {i.message_count} messages → {i.items_added} added</li>
-            ))}
-          </ul>
-        </section>
+        <Tabs
+          storageKey="import"
+          tabs={[
+            { id: "whatsapp", label: "WhatsApp", emoji: "💬", content: <ImportWizard students={kids ?? []} defaultSince={last} /> },
+            { id: "timetable", label: "Timetable photo", emoji: "🗓️", content: <TimetablePhotoWizard students={kids ?? []} /> },
+            { id: "sources", label: "School website", emoji: "🏫", badge: (findings ?? []).filter((f) => f.status === "new").length || null, content: <SourcesPanel sources={(sources ?? []) as SourceRow[]} findings={(findings ?? []) as FindingRow[]} students={kids ?? []} /> },
+            { id: "recent", label: "Recent", emoji: "🕓", content: (
+              <section className="card">
+                <h2 className="h2 mb-2">Recent imports</h2>
+                {(imports ?? []).length === 0 ? <p className="text-sm muted">None yet.</p> : (
+                  <ul className="text-sm space-y-1 muted">
+                    {(imports ?? []).map((i) => (
+                      <li key={i.id}>{prettyDate(String(i.imported_at).slice(0, 10))} · {(i as { profiles?: { full_name?: string } }).profiles?.full_name} · {i.message_count} messages → {i.items_added} added</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ) },
+          ]}
+        />
       )}
     </main>
   );

@@ -14,6 +14,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { wellbeingStatus, straightTalkLabels, type CheckHistoryRow } from "@/lib/wellbeing";
 import { CheckpointPanel, type CheckpointRow } from "@/components/CheckpointPanel";
 import { GradeSheetUploader } from "@/components/GradeSheetUploader";
+import { SideTabs } from "@/components/SideTabs";
+import { kidColor } from "@/lib/kid-tabs";
 import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
 export default async function ProgressPage() {
@@ -52,7 +54,7 @@ export default async function ProgressPage() {
   return (
     <main className="space-y-4">
       <h1 className="h1">Progress</h1>
-      {students.map((s) => {
+      <SideTabs storageKey="progress-kids" tabs={students.map((s, idx) => {
         const mine = allAttempts.filter((a) => a.student_id === s.id);
         const { topic: mastery, section } = masteryMaps(mine);
         const school = allTopics.filter((t) => t.track === "school" && t.grade === s.grade);
@@ -63,8 +65,8 @@ export default async function ProgressPage() {
         const dueCount = (due ?? []).filter((d) => d.student_id === s.id).length;
         const exams = examsFor(s.target_exam, s.grade);
         const coach = coachByStudent.get(s.id) ?? null;
-        return (
-          <section key={s.id} className="card space-y-4">
+        const content = (
+          <section className="card space-y-4">
             <div className="flex items-center gap-3">
               <div className="text-3xl">{s.avatar_emoji}</div>
               <div className="flex-1">
@@ -259,7 +261,8 @@ export default async function ProgressPage() {
             </form>
           </section>
         );
-      })}
+        return { id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(idx), sub: `Grade ${s.grade ?? "—"}`, content };
+      })} />
     </main>
   );
 }

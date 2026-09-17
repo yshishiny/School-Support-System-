@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { Tabs } from "@/components/Tabs";
+import { SideTabs } from "@/components/SideTabs";
+import { kidColor } from "@/lib/kid-tabs";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_KPIS, PRACTICES, mergeKpis } from "@/lib/allowance";
@@ -36,13 +39,13 @@ export default async function AllowancePage() {
         <p className="card text-sm border-warn/60"><b>Allowance is off.</b> Turn it on below; the boys then see the meter on their home page and the week closes automatically the morning after pay day.</p>
       )}
 
-      {students.map((s, i) => (
-        <section key={s.id} className="space-y-2">
-          <div className="flex items-center gap-2"><span className="text-2xl">{s.avatar_emoji}</span><span className="font-bold">{s.full_name}</span></div>
-          <AllowanceMeter status={statuses[i]} />
-        </section>
-      ))}
-
+      <Tabs
+        storageKey="allowance"
+        tabs={[
+          { id: "kids", label: "This week", emoji: "💵", content: (<>
+      <SideTabs storageKey="allowance-kids" tabs={students.map((s, i) => ({ id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(i), sub: `${statuses[i].amount} EGP · ${statuses[i].score}`, content: <AllowanceMeter status={statuses[i]} /> }))} />
+          </>) },
+          { id: "history", label: "History", emoji: "🗓️", badge: (weeks ?? []).filter((w) => !w.paid_at && w.claimed_at).length || null, content: (<>
       <section className="card space-y-3">
         <h2 className="h2">History</h2>
         {(weeks ?? []).length === 0 ? <p className="text-sm muted">The first week closes the morning after pay day.</p> : (
@@ -63,6 +66,43 @@ export default async function AllowancePage() {
         )}
       </section>
 
+          </>) },
+          { id: "consequences", label: "Consequences", emoji: "🪞", badge: open.length || null, content: (<>
+      <section className="card space-y-3">
+        <h2 className="h2">Assign a consequence</h2>
+        {enabledPractices.length === 0 ? <p className="text-sm muted">Enable some in Settings first.</p> : (
+          <form action={assignConsequenceAction} className="grid gap-2 sm:grid-cols-2">
+            <select name="student_id" className="input">{students.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select>
+            <select name="code" className="input">{enabledPractices.map((p) => <option key={p.code} value={p.code}>{p.emoji} {p.label}</option>)}</select>
+            <input name="reason" className="input" placeholder="Why (he sees this)" maxLength={300} />
+            <input name="days" type="number" min={1} max={14} className="input" placeholder="Days (default per practice)" />
+            <input name="earn_back" className="input sm:col-span-2" placeholder="Earn-back task (optional; default per practice)" maxLength={300} />
+            <button className="btn-primary sm:col-span-2">Assign</button>
+          </form>
+        )}
+        {open.length > 0 && (
+          <ul className="divide-y divide-line text-sm">
+            {open.map((c) => {
+              const s = students.find((x) => x.id === c.student_id);
+              return (
+                <li key={c.id} className="py-2 space-y-1">
+                  <div className="flex items-center gap-2">
+                    <span className="flex-1"><b>{s?.full_name.split(" ")[0]}</b> · {c.label} · until {prettyDate(c.ends_on)}{c.reason ? ` · ${c.reason}` : ""}</span>
+                    {c.student_claimed_at && <span className="badge text-warn">says earn-back done</span>}
+                  </div>
+                  <div className="text-xs muted">Way back: {c.earn_back_task}</div>
+                  <div className="flex gap-2">
+                    <form action={closeConsequenceAction.bind(null, c.id, true)}><button className="btn-ghost btn-sm">Earned back, close</button></form>
+                    <form action={closeConsequenceAction.bind(null, c.id, false)}><button className="text-xs muted">Close (served)</button></form>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </section>
+          </>) },
+          { id: "settings", label: "Settings", emoji: "⚙️", content: (<>
       <form action={saveAllowanceSettingsAction} className="card space-y-3">
         <h2 className="h2">Settings</h2>
         <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="enabled" defaultChecked={family.allowance_enabled} /> Allowance is earned through the basics</label>
@@ -104,39 +144,9 @@ export default async function AllowancePage() {
         <button className="btn-primary w-full">Save</button>
       </form>
 
-      <section className="card space-y-3">
-        <h2 className="h2">Assign a consequence</h2>
-        {enabledPractices.length === 0 ? <p className="text-sm muted">Enable some in Settings first.</p> : (
-          <form action={assignConsequenceAction} className="grid gap-2 sm:grid-cols-2">
-            <select name="student_id" className="input">{students.map((s) => <option key={s.id} value={s.id}>{s.full_name}</option>)}</select>
-            <select name="code" className="input">{enabledPractices.map((p) => <option key={p.code} value={p.code}>{p.emoji} {p.label}</option>)}</select>
-            <input name="reason" className="input" placeholder="Why (he sees this)" maxLength={300} />
-            <input name="days" type="number" min={1} max={14} className="input" placeholder="Days (default per practice)" />
-            <input name="earn_back" className="input sm:col-span-2" placeholder="Earn-back task (optional; default per practice)" maxLength={300} />
-            <button className="btn-primary sm:col-span-2">Assign</button>
-          </form>
-        )}
-        {open.length > 0 && (
-          <ul className="divide-y divide-line text-sm">
-            {open.map((c) => {
-              const s = students.find((x) => x.id === c.student_id);
-              return (
-                <li key={c.id} className="py-2 space-y-1">
-                  <div className="flex items-center gap-2">
-                    <span className="flex-1"><b>{s?.full_name.split(" ")[0]}</b> · {c.label} · until {prettyDate(c.ends_on)}{c.reason ? ` · ${c.reason}` : ""}</span>
-                    {c.student_claimed_at && <span className="badge text-warn">says earn-back done</span>}
-                  </div>
-                  <div className="text-xs muted">Way back: {c.earn_back_task}</div>
-                  <div className="flex gap-2">
-                    <form action={closeConsequenceAction.bind(null, c.id, true)}><button className="btn-ghost btn-sm">Earned back, close</button></form>
-                    <form action={closeConsequenceAction.bind(null, c.id, false)}><button className="text-xs muted">Close (served)</button></form>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </section>
+          </>) },
+        ]}
+      />
       <p className="text-xs muted">Today is {prettyDate(today)}. Daily ✓/✗ taps live on your Home page under each child.</p>
     </main>
   );
