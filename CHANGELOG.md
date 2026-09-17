@@ -2,6 +2,10 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.11.2 — Fits the phone (17 September 2026)
+
+- The parent area (and the kids' area) can no longer grow wider than the screen: the page clips at the edge, long words and links wrap, badges and chips may break onto two lines, code blocks wrap, and the phone menu strip stays inside the padded column.
+
 ## 1.11.1 — Weekly syllabus with a date check (17 September 2026)
 
 - **Upload asks "weekly syllabus / week summary? this week or last week"**. The reader extracts the dates printed in the file (D/M/YYYY) and one entry per subject; the app checks the dates against your choice, or against this and last week, and flags a typo instead of trusting it. The card shows the week it covers, what the file says, and a selector to correct it.

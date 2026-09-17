@@ -34,7 +34,7 @@ export function ParentMenu({ unread = 0, isAdmin = false, openErrors = 0 }: { un
   return (
     <nav className="sm:sticky sm:top-3 sm:self-start" aria-label="Parent sections">
       {/* phone: one scrolling strip */}
-      <div className="sm:hidden -mx-4 px-4 flex gap-1.5 overflow-x-auto pb-2 sticky top-0 z-20 bg-bg/90 backdrop-blur pt-1">
+      <div className="sm:hidden flex gap-1.5 overflow-x-auto pb-2 sticky top-0 z-20 bg-bg/90 backdrop-blur pt-1 max-w-full">
         {items.map((it) => {
           const on = isActive(it.href);
           return (

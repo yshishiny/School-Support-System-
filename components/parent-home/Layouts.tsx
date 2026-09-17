@@ -48,7 +48,7 @@ function NeedsList({ d, compact = false }: { d: HomeData; compact?: boolean }) {
 
 function KidStat({ k }: { k: KidView }) {
   return (
-    <div className="grid grid-cols-4 gap-1.5 text-center">
+    <div className="grid grid-cols-4 gap-1.5 text-center min-w-0">
       <div className="tile !p-1.5"><div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{k.prayersOnTime}/5</div><div className="text-[10px] muted">prayers</div></div>
       <div className="tile !p-1.5"><div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{k.classLog.done}/{k.classLog.due}</div><div className="text-[10px] muted">classes</div></div>
       <div className="tile !p-1.5"><div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{k.quizzesDone}/{k.quizzesTotal}</div><div className="text-[10px] muted">quizzes</div></div>

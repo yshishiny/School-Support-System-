@@ -7,7 +7,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const theme = themeById(profile.theme);
   return (
     <div className="theme-root" style={themeStyle(theme) as React.CSSProperties} data-theme={theme.id}>
-      <div className="mx-auto max-w-3xl px-4 pt-4 pb-24">
+      <div className="mx-auto max-w-3xl px-4 pt-4 pb-24 overflow-x-clip">
       {children}
       <BottomNav
         items={[
