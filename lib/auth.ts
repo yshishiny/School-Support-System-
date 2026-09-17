@@ -34,3 +34,10 @@ export async function requireStudent(): Promise<Session> {
   if (s.profile.role !== "student") redirect("/parent");
   return s;
 }
+
+/** Administrator only (profiles.is_admin): the operations page. */
+export async function requireAdmin(): Promise<Session> {
+  const s = await requireParent();
+  if (!(s.profile as { is_admin?: boolean }).is_admin) redirect("/parent");
+  return s;
+}

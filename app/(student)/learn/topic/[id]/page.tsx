@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { ExplainButton, PracticeButton } from "@/components/LearnButtons";
+import { AddResourcesButton, ExplainButton, PracticeButton } from "@/components/LearnButtons";
+import { TopicVideos, TopicVisuals } from "@/components/TopicResources";
+import { loadTopicResources } from "@/lib/learning/resources";
 import { masteryFor } from "@/lib/learning";
 import type { Topic } from "@/lib/types";
 import { subjectEmoji, subjectLabel } from "@/lib/plan";
@@ -19,8 +21,9 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   if (!topic) notFound();
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
-  const [{ data: lesson }, { data: quizzes }] = await Promise.all([
+  const [{ data: lesson }, resources, { data: quizzes }] = await Promise.all([
     supabase.from("lessons").select("content_md").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle(),
+    loadTopicResources(id, grade),
     supabase.from("quizzes").select("id, title, created_at, attempts(score, total, submitted_at, flagged)").eq("topic_id", id).eq("student_id", profile.id).order("created_at", { ascending: false }),
   ]);
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };
@@ -68,9 +71,19 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
             content: (
               <section className="card space-y-3">
                 {lesson ? (
-                  <article className="prose-lesson text-sm leading-relaxed space-y-2">
-                    <ReactMarkdown>{lesson.content_md}</ReactMarkdown>
-                  </article>
+                  <>
+                    <article className="prose-lesson text-sm leading-relaxed space-y-2">
+                      <ReactMarkdown>{lesson.content_md}</ReactMarkdown>
+                    </article>
+                    {resources ? (
+                      <>
+                        <TopicVisuals visuals={resources.visuals} />
+                        <TopicVideos videos={resources.videos} />
+                      </>
+                    ) : (
+                      <AddResourcesButton topicId={t.id} />
+                    )}
+                  </>
                 ) : (
                   <>
                     <p className="text-sm muted">Missed this at school, or did not get it? Get an explanation with worked examples, written the way you like to learn.</p>

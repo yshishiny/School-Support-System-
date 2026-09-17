@@ -1,5 +1,8 @@
 "use server";
 
+import { weekFor } from "@/lib/allowance";
+import { openCompensation } from "@/lib/compensation/run";
+
 import { revalidatePath } from "next/cache";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -68,7 +71,8 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
   const { profile, family } = await requireStudent();
   if (!PRAYERS.includes(prayer) || !["on_time", "late", "missed"].includes(claim)) return { error: "Unknown prayer." };
   const today = todayIn(family.timezone);
-  if (date !== today && date !== shiftDate(today, -1)) return { error: "Only today and yesterday can be filled in." };
+  const weekStart = weekFor(today, family.allowance_pay_weekday).start;
+  if (date > today || date < weekStart) return { error: "Only days of this allowance week can be filled in." };
   const lat = family.latitude ?? 30.0444;
   const lng = family.longitude ?? 31.2357;
   const window = prayerWindows(date, lat, lng).find((w) => w.prayer === prayer)!;
@@ -90,6 +94,8 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
   const reason = claim === "missed" ? `${prayer[0].toUpperCase() + prayer.slice(1)}: missed, said honestly` : `${prayer[0].toUpperCase() + prayer.slice(1)} prayer ${claim === "on_time" ? (atSchool ? "on time at school" : "on time (logged later)") : "(late)"}`;
   const { error: pErr } = await admin.from("points_ledger").insert({ student_id: profile.id, delta, reason, ref_type: "prayer", ref_id: row.id });
   if (!pErr) earned = delta;
-  ["/today", "/parent", "/me"].forEach((p) => revalidatePath(p));
+  // A prayer reported later counts for the allowance once it is balanced: two ayahs read, one question right.
+  if (claim !== "missed") await openCompensation(profile.id, family.id, "prayer", `prayer:${date}:${prayer}`, `${prayer[0].toUpperCase() + prayer.slice(1)} on ${date}, reported later`);
+  ["/today", "/parent", "/me", "/allowance"].forEach((p) => revalidatePath(p));
   return { status: status as "on_time" | "late", earned };
 }

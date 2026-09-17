@@ -16,7 +16,7 @@ export async function updateParentProfileAction(_prev: { error?: string; ok?: st
   const label = String(formData.get("parent_label") ?? "").trim().slice(0, 24) || null;
   const whatsapp = String(formData.get("whatsapp") ?? "").replace(/[^\d]/g, "") || null;
   const fullName = String(formData.get("full_name") ?? "").trim().slice(0, 80) || profile.full_name;
-  const { error } = await supabase.from("profiles").update({ parent_label: label, whatsapp, full_name: fullName }).eq("id", profile.id);
+  const { error } = await supabase.from("profiles").update({ parent_label: label, whatsapp, full_name: fullName, live_pings: formData.get("live_pings") === "on" }).eq("id", profile.id);
   if (error) return { error: error.message };
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: "Saved." };
@@ -93,4 +93,26 @@ export async function removeParentAction(parentId: string): Promise<void> {
 export async function familyToday(): Promise<string> {
   const { family } = await requireParent();
   return todayIn(family.timezone);
+}
+
+/** Inbox: mark one or every notification read. */
+export async function markNotificationsReadAction(id: string | null): Promise<void> {
+  const { profile } = await requireParent();
+  const supabase = await createClient();
+  let q = supabase.from("parent_notifications").update({ read_at: new Date().toISOString() }).eq("parent_id", profile.id).is("read_at", null);
+  if (id) q = q.eq("id", id);
+  await q;
+  revalidatePath("/parent/notifications");
+  revalidatePath("/parent");
+}
+
+/** Parent home layout: a (command centre), b (kid-first) or c (day timeline). */
+export async function setParentHomeLayoutAction(formData: FormData): Promise<void> {
+  const { profile } = await requireParent();
+  const layout = String(formData.get("home_layout") ?? "b");
+  if (!["a", "b", "c"].includes(layout)) return;
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ home_layout: layout }).eq("id", profile.id);
+  revalidatePath("/parent");
+  revalidatePath("/parent/settings");
 }

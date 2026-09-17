@@ -67,6 +67,18 @@ export function SnapCapture({ familyId, studentId, taskId, label, done, compact 
         {busy ?? (done ? "📷 Send another" : `📷 Snap ${label.toLowerCase()}`)}
         <input type="file" accept="image/*" capture="environment" className="sr-only" disabled={!!busy} onChange={(e) => onFile(e.target.files)} />
       </label>
+      {!compact && !busy && (
+        <label className="block text-[11px] muted cursor-pointer underline">
+          or pick a saved picture / screenshot
+          <input type="file" accept="image/*" className="sr-only" disabled={!!busy} onChange={(e) => onFile(e.target.files)} />
+        </label>
+      )}
+      {compact && !busy && (
+        <label className="block text-[10px] muted cursor-pointer underline text-center">
+          gallery
+          <input type="file" accept="image/*" className="sr-only" disabled={!!busy} onChange={(e) => onFile(e.target.files)} />
+        </label>
+      )}
       {error && <p className="text-xs text-bad">{error}</p>}
       {result && (
         <div className="text-xs space-y-0.5">

@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { sendTelegram, sendWhatsApp, type SendResult } from "@/lib/whatsapp/send";
 import { sendPush } from "@/lib/push/server";
+import { addToInbox, inboxKindFor, splitText, type InboxKind } from "@/lib/inbox";
+import { logError } from "@/lib/ops/log";
 
 export interface ParentChannels { id: string; full_name: string; parent_label: string | null; telegram_chat_id: string | null; whatsapp: string | null }
 
@@ -17,30 +19,47 @@ function whatsappReady(): boolean {
 }
 
 /** Sends one text to a parent on every channel they connected. Success if any channel delivered. */
-export async function sendToParent(p: Pick<ParentChannels, "id" | "telegram_chat_id" | "whatsapp">, text: string): Promise<SendResult> {
+export async function sendToParent(p: Pick<ParentChannels, "id" | "telegram_chat_id" | "whatsapp">, text: string, opts: { familyId?: string; kind?: InboxKind; url?: string } = {}): Promise<SendResult> {
   const results: SendResult[] = [];
+  // The in-app inbox always gets a copy, so nothing is lost when Telegram or push are not connected.
+  if (opts.familyId) {
+    const { title, body } = splitText(text);
+    await addToInbox(opts.familyId, p.id, { kind: opts.kind ?? inboxKindFor(text), title, body, url: opts.url ?? "/parent/notifications" });
+    results.push({ channel: "inbox", ok: true });
+  }
   if (p.telegram_chat_id) results.push(await sendTelegram(p.telegram_chat_id, text));
   // Browser notification with the first lines; the full text lives in the app.
   const push = await sendPush(p.id, { title: text.split("\n")[0].replace(/[*_]/g, "").slice(0, 60) || "Study Portal", body: text.split("\n").slice(1).join("\n").replace(/[*_]/g, "").slice(0, 300), url: "/parent", tag: "parent" });
   if (push.total > 0) results.push({ channel: "push", ok: push.sent > 0, error: push.error });
   if (whatsappReady() && p.whatsapp) results.push(await sendWhatsApp(p.whatsapp, text));
   if (results.length === 0) return { channel: "none", ok: false, error: "No delivery channel connected" };
+  if (results.length === 1 && results[0].channel === "inbox") return { channel: "inbox", ok: true };
   const ok = results.filter((r) => r.ok);
   if (ok.length) return { channel: ok.map((r) => r.channel).join("+"), ok: true };
-  return { channel: results.map((r) => r.channel).join("+"), ok: false, error: results.map((r) => `${r.channel}: ${r.error}`).join(" | ") };
+  const error = results.map((r) => `${r.channel}: ${r.error}`).join(" | ");
+  await logError("notify.deliver", new Error(error), { familyId: opts.familyId ?? null, userId: p.id });
+  return { channel: results.map((r) => r.channel).join("+"), ok: false, error };
 }
 
 /**
  * Sends a text to every parent in the family (both parents always get safety alerts and reports).
  * `textFor` lets the report differ per parent (e.g. "the boys are with you tonight").
  */
-export async function notifyParents(familyId: string, textFor: string | ((p: ParentChannels) => string)): Promise<SendResult & { delivered: number; parents: number }> {
+export async function notifyParents(familyId: string, textFor: string | ((p: ParentChannels) => string), opts: { kind?: InboxKind; url?: string } = {}): Promise<SendResult & { delivered: number; parents: number }> {
   const parents = await familyParents(familyId);
   if (parents.length === 0) return { channel: "none", ok: false, error: "No parent account", delivered: 0, parents: 0 };
-  const results = await Promise.all(parents.map((p) => sendToParent(p, typeof textFor === "string" ? textFor : textFor(p))));
+  const results = await Promise.all(parents.map((p) => sendToParent(p, typeof textFor === "string" ? textFor : textFor(p), { familyId, ...opts })));
   const ok = results.filter((r) => r.ok);
   const channels = [...new Set(results.filter((r) => r.channel !== "none").map((r) => r.channel))];
   if (ok.length) return { channel: channels.join("+"), ok: true, delivered: ok.length, parents: parents.length };
   if (channels.length === 0) return { channel: "none", ok: false, error: "No delivery channel configured: connect Telegram under More", delivered: 0, parents: parents.length };
   return { channel: channels.join("+"), ok: false, error: results.map((r, i) => `${parents[i].full_name.split(" ")[0]}: ${r.error}`).join(" | "), delivered: 0, parents: parents.length };
+}
+
+/** Instant browser ping to the parents who want them: "Youssef finished Fractions 7/8". Push only, never Telegram. */
+export async function pingParents(familyId: string, title: string, body: string, url = "/parent"): Promise<void> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("profiles").select("id, live_pings").eq("family_id", familyId).eq("role", "parent");
+  await Promise.all((data ?? []).map((p) => addToInbox(familyId, p.id, { kind: "ping", title, body, url })));
+  await Promise.all((data ?? []).filter((p) => p.live_pings !== false).map((p) => sendPush(p.id, { title, body, url, tag: "live" }).catch(() => null)));
 }

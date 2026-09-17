@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { SideTabs } from "@/components/SideTabs";
+import { kidColor } from "@/lib/kid-tabs";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { loadPlan, type PlanOverview } from "@/lib/plan/prepare";
@@ -27,9 +29,7 @@ export default async function PlanPage() {
         One school quiz per school day, chosen from that day&apos;s timetable and the topics each child is weakest in, plus a daily SAT/ACT set in high school.
         Quizzes are written ahead of time so the kids never wait. The plan also tops itself up every night.
       </p>
-      {plans.map((plan) => (
-        <StudentPlan key={plan.profile.id} plan={plan} />
-      ))}
+      <SideTabs storageKey="plan-kids" tabs={plans.map((plan, idx) => ({ id: plan.profile.id, label: plan.profile.full_name.split(" ")[0], emoji: plan.profile.avatar_emoji, color: kidColor(idx), sub: `${plan.missing.length ? `${plan.missing.length} to prepare` : "ready"}`, content: <StudentPlan plan={plan} /> }))} />
       {students.length === 0 && <p className="card muted">Add your kids first.</p>}
     </main>
   );

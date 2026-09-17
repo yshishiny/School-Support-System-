@@ -1,13 +1,16 @@
 "use server";
 
+import { logError } from "@/lib/ops/log";
+
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { settleCheckpoint } from "@/lib/checkpoint/build";
+import { pingParents } from "@/lib/notify";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
-import { explainTopic } from "@/lib/ai/explain-topic";
+import { ensureTopicMaterial, ensureTopicResources, gradeKey, prepareWeekMaterial } from "@/lib/learning/resources";
 import { integrityFlag, nextReview, quizPoints, QUIZ_POINTS } from "@/lib/learning";
 import { EXAM_SECTIONS, secondsPerQuestion } from "@/lib/exams";
 import { todayIn } from "@/lib/dates";
@@ -31,13 +34,46 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
   if (existing) return {};
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   try {
-    const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner: learnerPromptLine(profile.learner_profile) });
-    await admin.from("lessons").upsert({ topic_id: topicId, grade, content_md: content, model }, { onConflict: "topic_id,grade" });
+    // Lesson and diagrams are written side by side, so the wait is one job long, not two.
+    await ensureTopicMaterial(t, grade, learnerPromptLine(profile.learner_profile));
   } catch (err) {
+    await logError("learning.explain", err, { userId: profile.id, meta: { topicId } });
     return { error: err instanceof Error ? err.message : "Could not write the lesson." };
   }
   revalidatePath(`/learn/topic/${topicId}`);
   return {};
+}
+
+/** Diagrams and video lessons for a topic that already has its lesson. */
+export async function addResourcesAction(_prev: { error?: string } | undefined, formData: FormData) {
+  const { profile } = await requireSession();
+  const topicId = String(formData.get("topic_id"));
+  const supabase = await createClient();
+  const { data: topic } = await supabase.from("topics").select("*").eq("id", topicId).single();
+  if (!topic) return { error: "Topic not found." };
+  const t = topic as Topic;
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
+  try {
+    const grade = gradeKey(t, profile.grade);
+    const { data: lesson } = await createAdminClient().from("lessons").select("content_md").eq("topic_id", topicId).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
+    await ensureTopicResources(t, grade, lesson?.content_md ?? null);
+  } catch (err) {
+    await logError("learning.resources", err, { userId: profile.id, meta: { topicId } });
+    return { error: err instanceof Error ? err.message : "Could not draw this topic." };
+  }
+  revalidatePath(`/learn/topic/${topicId}`);
+  return {};
+}
+
+/** "Get this week ready": lessons, diagrams and videos for every topic the child is on, a few per press. */
+export async function prepareWeekAction(): Promise<{ error?: string; prepared?: number; remaining?: number }> {
+  const { profile } = await requireStudent();
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
+  const r = await prepareWeekMaterial(profile.id, { limit: 3, budgetMs: 240_000 });
+  if (r.errors.length) await logError("learning.prepareWeek", new Error(r.errors.join(" | ")), { userId: profile.id });
+  revalidatePath("/learn");
+  if (r.errors.length && r.prepared === 0) return { error: r.errors[0] };
+  return { prepared: r.prepared, remaining: r.remaining };
 }
 
 /** Generates a practice set for a topic or a mixed ACT section and sends the student to it. */
@@ -259,6 +295,10 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
     }
   }
   if (quizMeta?.checkpoint_id) await settleCheckpoint(quizMeta.checkpoint_id, attemptId).catch((err) => console.error("[checkpoint] settle failed", err));
+  if (attempt.kind !== "review") {
+    const { data: qz } = await admin.from("quizzes").select("title").eq("id", attempt.quiz_id).maybeSingle();
+    void pingParents(family.id, `${profile.full_name.split(" ")[0]} · ${quizMeta?.checkpoint_id ? "checkpoint" : "quiz"} done`, `${qz?.title ?? "Quiz"}: ${score}/${total}${flag ? ` · ⚠️ ${flag}` : ""}`, quizMeta?.checkpoint_id ? "/parent/progress" : "/parent");
+  }
   ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
 }
@@ -292,4 +332,17 @@ export async function setTargetExamAction(formData: FormData) {
   revalidatePath("/parent/progress");
   revalidatePath("/learn");
   revalidatePath("/today");
+}
+
+/** The child says a quiz topic has not been taught yet: the planner skips it until the class log says otherwise. */
+export async function flagTopicNotTakenAction(topicId: string): Promise<void> {
+  const { profile } = await requireStudent();
+  const admin = createAdminClient();
+  await admin.from("topic_flags").upsert({ student_id: profile.id, topic_id: topicId, kind: "not_taken" }, { onConflict: "student_id,topic_id,kind" });
+  // Today's planned quiz on that topic is retired, so tomorrow's top-up picks something he has taken.
+  const { data: q } = await admin.from("quizzes").select("id, attempts(submitted_at)").eq("student_id", profile.id).eq("topic_id", topicId).not("scheduled_for", "is", null).gte("scheduled_for", new Date().toISOString().slice(0, 10));
+  for (const row of (q ?? []) as { id: string; attempts: { submitted_at: string | null }[] }[]) {
+    if (!row.attempts.some((a) => a.submitted_at)) await admin.from("quizzes").update({ scheduled_for: null, plan_slot: null }).eq("id", row.id);
+  }
+  ["/today", "/learn", "/parent/plan"].forEach((p) => revalidatePath(p));
 }

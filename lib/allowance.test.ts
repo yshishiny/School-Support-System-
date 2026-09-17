@@ -21,7 +21,7 @@ describe("bands", () => {
 });
 
 const base = {
-  kpis: mergeKpis([{ code: "classlog", enabled: false }, { code: "checkpoint", enabled: false }]), // these two have their own tests below
+  kpis: mergeKpis([{ code: "classlog", enabled: false }, { code: "checkpoint", enabled: false }, { code: "homework", enabled: false }, { code: "grades", enabled: false }, { code: "materials", enabled: false }]), // these have their own tests below
   start: "2026-09-11",
   end: "2026-09-17",
   today: "2026-09-14", // 4 days elapsed
@@ -79,10 +79,19 @@ describe("scoreWeek", () => {
     expect(none.results.find((x) => x.code === "classlog")!.detail).toBe("no classes yet this week");
   });
   it("gives the checkpoint the benefit of the doubt until it expires", () => {
-    const kpis = mergeKpis([{ code: "classlog", enabled: false }]);
+    const kpis = mergeKpis([{ code: "classlog", enabled: false }, { code: "materials", enabled: false }]);
     expect(scoreWeek({ ...base, kpis, checkpoint: { status: "ready" } }).results.find((r) => r.code === "checkpoint")!.fraction).toBe(1);
     expect(scoreWeek({ ...base, kpis, checkpoint: { status: "expired" } }).results.find((r) => r.code === "checkpoint")!.fraction).toBe(0);
     expect(scoreWeek({ ...base, kpis, checkpoint: { status: "ready" } }).hints).toContain("Do the weekly checkpoint (20 min, one attempt)");
+  });
+  it("scores homework by due date and the monthly grades sheet from the 21st", () => {
+    const kpis = mergeKpis([{ code: "classlog", enabled: false }, { code: "checkpoint", enabled: false }, { code: "materials", enabled: false }]);
+    const hw = scoreWeek({ ...base, kpis, homework: { due: 4, doneOnTime: 3, open: 1 } }).results.find((r) => r.code === "homework")!;
+    expect(hw.fraction).toBe(0.75);
+    expect(scoreWeek({ ...base, kpis, homework: { due: 4, doneOnTime: 3, open: 1 } }).hints.some((h) => h.startsWith("Finish 1 open homework"))).toBe(true);
+    expect(scoreWeek({ ...base, kpis, gradesSheet: { uploaded: false, dayOfMonth: 10 } }).results.find((r) => r.code === "grades")!.fraction).toBe(1);
+    expect(scoreWeek({ ...base, kpis, gradesSheet: { uploaded: false, dayOfMonth: 25 } }).results.find((r) => r.code === "grades")!.fraction).toBe(0);
+    expect(scoreWeek({ ...base, kpis, gradesSheet: { uploaded: true, dayOfMonth: 25 } }).results.find((r) => r.code === "grades")!.fraction).toBe(1);
   });
   it("respects weight overrides and disabled KPIs", () => {
     const kpis = mergeKpis([{ code: "quizzes", enabled: false }, { code: "dish", weight: 40 }]);

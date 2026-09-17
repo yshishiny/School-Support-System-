@@ -66,7 +66,7 @@ export function LayoutC({ d }: { d: TodayData }) {
         )}
 
         <div className="grid grid-cols-2 gap-2.5">
-          <Link href="/rewards" className="tile space-y-1.5">
+          <Link href="/allowance" className="tile space-y-1.5">
             <div className="text-[11px] muted">Allowance</div>
             <div className="font-bold text-2xl leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{d.allowance ? d.allowance.amount : "—"}<span className="text-xs muted font-semibold"> {d.allowance ? "EGP" : ""}</span></div>
             <div className="h-1.5 rounded-full bg-panel-2 overflow-hidden"><div className={`h-full ${d.allowanceTone === "good" ? "bg-good" : d.allowanceTone === "warn" ? "bg-warn" : "bg-bad"}`} style={{ width: `${d.allowance?.score ?? 0}%` }} /></div>

@@ -39,7 +39,7 @@ export function LayoutA({ d }: { d: TodayData }) {
         </div>
         <div className="grid grid-cols-3 gap-2">
           <div className="tile !p-2.5"><div className="text-[11px] muted">Streak</div><div className="font-bold text-lg" style={{ fontFamily: "var(--font-display)" }}>{d.streak} 🔥</div></div>
-          <Link href="/rewards" className="tile !p-2.5"><div className="text-[11px] muted">Allowance</div><div className="font-bold text-lg text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{d.allowance ? `${d.allowance.amount} EGP` : `Lvl ${d.level.level}`}</div></Link>
+          <Link href="/allowance" className="tile !p-2.5"><div className="text-[11px] muted">Allowance</div><div className="font-bold text-lg text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{d.allowance ? `${d.allowance.amount} EGP` : `Lvl ${d.level.level}`}</div></Link>
           <div className="tile !p-2.5"><div className="text-[11px] muted">Next prayer</div><div className="font-bold text-lg" style={{ fontFamily: "var(--font-display)" }}>{next ? `${next.prayer[0].toUpperCase()}${next.prayer.slice(1, 3)} ${next.time}` : "Done ✓"}</div></div>
         </div>
       </header>

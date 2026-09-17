@@ -1,11 +1,17 @@
 "use server";
 
+import { logError } from "@/lib/ops/log";
+
+import { ACCEPT_LABEL, FILE_KINDS } from "@/lib/materials/files";
+import { extractText } from "@/lib/materials/extract-text";
+import { decideWeek, schoolWeekStart } from "@/lib/materials/week";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { requireSession, requireStudent } from "@/lib/auth";
+import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { todayIn } from "@/lib/dates";
+import { shiftDate, todayIn } from "@/lib/dates";
 import { readMaterial, type MaterialInput } from "@/lib/ai/read-material";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
 import { transcribeWorksheet } from "@/lib/ai/transcribe-worksheet";
@@ -15,7 +21,7 @@ import { MATERIAL_BUCKET, type MaterialRow } from "@/lib/materials/server";
 import type { ExtractedItem } from "@/lib/ai/extract-items";
 
 const PATHS = ["/parent", "/parent/materials", "/parent/assignments", "/learn", "/today", "/calendar"];
-const MIMES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const MIMES = new Set(FILE_KINDS.map((k) => k.mime));
 
 export interface RegisterMaterialResult { error?: string; id?: string; title?: string; summary?: string; items?: number }
 
@@ -23,11 +29,11 @@ export interface RegisterMaterialResult { error?: string; id?: string; title?: s
  * After the browser uploaded the file to Storage: record it, then read it with the AI.
  * Parents may add for any child; a child only for himself. Reading failures keep the file (status "failed").
  */
-export async function registerMaterialAction(studentId: string, path: string, meta: { mime: string; size: number; name: string; subject: string; instructions: string }): Promise<RegisterMaterialResult> {
+export async function registerMaterialAction(studentId: string, path: string, meta: { mime: string; size: number; name: string; subject: string; instructions: string; weekSummary?: "this" | "last" | null }): Promise<RegisterMaterialResult> {
   const { profile, family } = await requireSession();
   if (!path.startsWith(`${family.id}/${studentId}/`)) return { error: "Bad upload path." };
   if (profile.role !== "parent" && profile.id !== studentId) return { error: "Not allowed." };
-  if (!MIMES.has(meta.mime)) return { error: "Only PDF, JPG, PNG or WEBP files." };
+  if (!MIMES.has(meta.mime)) return { error: `Only ${ACCEPT_LABEL} files.` };
   const admin = createAdminClient();
   const { data: student } = await admin.from("profiles").select("full_name, grade").eq("id", studentId).eq("family_id", family.id).maybeSingle();
   if (!student) return { error: "Child not found." };
@@ -36,12 +42,12 @@ export async function registerMaterialAction(studentId: string, path: string, me
   const fallbackTitle = meta.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim().slice(0, 80) || "School file";
   const { data: row, error } = await admin
     .from("materials")
-    .insert({ family_id: family.id, student_id: studentId, uploaded_by: profile.id, subject, title: fallbackTitle, instructions, path, mime: meta.mime, size_bytes: meta.size })
+    .insert({ family_id: family.id, student_id: studentId, uploaded_by: profile.id, subject, title: fallbackTitle, instructions, path, mime: meta.mime, size_bytes: meta.size, is_week_summary: !!meta.weekSummary, covers_week_start: meta.weekSummary ? (meta.weekSummary === "this" ? schoolWeekStart(todayIn(family.timezone)) : shiftDate(schoolWeekStart(todayIn(family.timezone)), -7)) : null })
     .select("id")
     .single();
   if (error || !row) return { error: error?.message ?? "Could not save." };
 
-  const r = await readAndStore(row.id, { path, mime: meta.mime, subject, instructions, fallbackTitle, grade: student.grade, firstName: student.full_name.split(" ")[0], today: todayIn(family.timezone) });
+  const r = await readAndStore(row.id, { path, mime: meta.mime, subject, instructions, fallbackTitle, grade: student.grade, firstName: student.full_name.split(" ")[0], today: todayIn(family.timezone), weekChoice: meta.weekSummary ?? null });
   PATHS.forEach((p) => revalidatePath(p));
   return r;
 }
@@ -54,21 +60,34 @@ function friendlyAiError(msg: string): string {
 }
 
 /** Runs the AI reading on a stored file and saves the result (or a friendly error). */
-async function readAndStore(id: string, o: { path: string; mime: string; subject: string | null; instructions: string | null; fallbackTitle: string; grade: number | null; firstName: string; today: string }): Promise<RegisterMaterialResult> {
+/** PDFs and images go to the model as they are; Office, CSV and text files as extracted text. */
+function toInput(buf: Buffer, mime: string, name: string): MaterialInput {
+  const text = extractText(buf, mime);
+  if (text !== null) return { media_type: "text/plain", text, name };
+  return { media_type: mime as "application/pdf" | "image/jpeg" | "image/png" | "image/webp", data: buf.toString("base64") };
+}
+
+async function readAndStore(id: string, o: { path: string; mime: string; subject: string | null; instructions: string | null; fallbackTitle: string; grade: number | null; firstName: string; today: string; weekChoice?: "this" | "last" | null }): Promise<RegisterMaterialResult> {
   const admin = createAdminClient();
   try {
     if (!process.env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not configured on the server.");
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(o.path);
     if (!file) throw new Error("Could not read the uploaded file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const reading = await readMaterial({ media_type: o.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { today: o.today, subject: o.subject, instructions: o.instructions, grade: o.grade, studentFirstName: o.firstName });
+    const reading0 = await readMaterial(toInput(buf, o.mime, o.fallbackTitle), { today: o.today, subject: o.subject, instructions: o.instructions, grade: o.grade, studentFirstName: o.firstName });
+    const reading = reading0;
+    // Week summaries: which week the syllabus covers, and a note when the dates in the file look wrong.
+    const isWeek = !!o.weekChoice || reading.is_week_summary;
+    const decision = isWeek ? decideWeek(o.today, o.weekChoice ?? null, reading.covers_from, reading.covers_to) : null;
+    const weekFields = isWeek ? { is_week_summary: true, covers_week_start: decision!.coversWeekStart, covers_from: reading.covers_from, covers_to: reading.covers_to, date_note: decision!.note, subjects: reading.subjects } : { subjects: reading.subjects };
     await admin
       .from("materials")
-      .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null })
+      .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null, ...weekFields })
       .eq("id", id);
     return { id, title: reading.title, summary: reading.summary, items: reading.items.length };
   } catch (err) {
     const msg = friendlyAiError(err instanceof Error ? err.message : String(err));
+    await logError("materials.read", err, { meta: { materialId: id, mime: o.mime, title: o.fallbackTitle } });
     await admin.from("materials").update({ status: "failed", error: msg }).eq("id", id);
     return { id, title: o.fallbackTitle, summary: `Saved, but the AI could not read it. ${msg}`, items: 0 };
   }
@@ -101,7 +120,7 @@ export async function rereadMaterialAction(materialId: string): Promise<Register
   const m = data as (MaterialRow & { profiles: { full_name: string; grade: number | null } | null }) | null;
   if (!m) return { error: "File not found." };
   if (profile.role !== "parent" && profile.id !== m.student_id) return { error: "Not allowed." };
-  const r = await readAndStore(m.id, { path: m.path, mime: m.mime, subject: m.subject, instructions: m.instructions, fallbackTitle: m.title, grade: m.profiles?.grade ?? null, firstName: m.profiles?.full_name.split(" ")[0] ?? "the student", today: todayIn(family.timezone) });
+  const r = await readAndStore(m.id, { path: m.path, mime: m.mime, subject: m.subject, instructions: m.instructions, fallbackTitle: m.title, grade: m.profiles?.grade ?? null, firstName: m.profiles?.full_name.split(" ")[0] ?? "the student", today: todayIn(family.timezone), weekChoice: m.covers_week_start ? (m.covers_week_start === schoolWeekStart(todayIn(family.timezone)) ? "this" : "last") : null });
   PATHS.forEach((p) => revalidatePath(p));
   return r;
 }
@@ -252,7 +271,7 @@ export async function prepareWorksheetAction(materialId: string): Promise<Prepar
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(m.path);
     if (!file) throw new Error("Could not read the file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const t = await transcribeWorksheet({ media_type: m.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
+    const t = await transcribeWorksheet(toInput(buf, m.mime, m.title), { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
     if (t.questions.length === 0) return { error: `No question could be transcribed. ${t.note}` };
     await admin.from("materials").update({ worksheet: { questions: t.questions, skipped: t.skipped, note: t.note, model: t.model, prepared_at: new Date().toISOString() } }).eq("id", m.id);
     PATHS.forEach((p) => revalidatePath(p));
@@ -286,4 +305,17 @@ export async function startWorksheetAction(materialId: string): Promise<{ error?
   }
   await admin.from("quiz_answer_keys").insert(rows.map((r) => ({ question_id: r.id, correct_index: qs[r.position - 1].correct_index, explanation: qs[r.position - 1].explanation })));
   redirect(`/quiz/${quiz.id}`);
+}
+
+/** Parent corrects which week a syllabus covers ("this", "last", or a Sunday date), or says it is not a week summary. */
+export async function setMaterialWeekAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const id = String(formData.get("id") ?? "");
+  const choice = String(formData.get("week") ?? "");
+  const today = todayIn(family.timezone);
+  const thisWeek = schoolWeekStart(today);
+  const start = choice === "this" ? thisWeek : choice === "last" ? shiftDate(thisWeek, -7) : /^\d{4}-\d{2}-\d{2}$/.test(choice) ? schoolWeekStart(choice) : null;
+  const supabase = await createClient();
+  await supabase.from("materials").update(start ? { is_week_summary: true, covers_week_start: start, date_note: `Week set by a parent to ${start}.` } : { is_week_summary: false, covers_week_start: null, date_note: null }).eq("id", id).eq("family_id", family.id);
+  ["/parent/materials", "/learn", "/checkin", "/parent"].forEach((p) => revalidatePath(p));
 }

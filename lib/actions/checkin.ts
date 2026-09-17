@@ -7,6 +7,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { computeAwards, computeStreak, POINTS } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { parseLessonFieldKey } from "@/lib/lessons";
+import { pingParents } from "@/lib/notify";
+import { openCompensation } from "@/lib/compensation/run";
 import type { Assignment, ItemStatus } from "@/lib/types";
 
 export interface CheckinResult {
@@ -26,6 +28,8 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   const enteredLate = checkinDate !== today;
 
   const mood = Number(formData.get("mood") ?? 0) || null;
+  const mannersSelf = Number(formData.get("manners_self") ?? 0) || null;
+  const mannersNote = String(formData.get("manners_note") ?? "").trim().slice(0, 200) || null;
   const minutes = Math.max(0, Math.min(600, Number(formData.get("minutes_studied") ?? 0) || 0));
   const learned = String(formData.get("learned") ?? "").trim() || null;
   const stuckOn = String(formData.get("stuck_on") ?? "").trim() || null;
@@ -73,7 +77,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
   const { data: checkin, error } = await supabase
     .from("checkins")
     .upsert(
-      { student_id: profile.id, checkin_date: checkinDate, mood, minutes_studied: minutes, learned, stuck_on: stuckOn, submitted_at: new Date().toISOString(), entered_late: enteredLate },
+      { student_id: profile.id, checkin_date: checkinDate, mood, minutes_studied: minutes, learned, stuck_on: stuckOn, submitted_at: new Date().toISOString(), entered_late: enteredLate, manners_self: mannersSelf, manners_note: mannersNote },
       { onConflict: "student_id,checkin_date" },
     )
     .select()
@@ -161,6 +165,8 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     if (!insertError) earned += award.delta;
   }
 
+  if (enteredLate) await openCompensation(profile.id, family.id, "checkin", `checkin:${checkinDate}`, `Check-in for ${checkinDate}, filled in later`);
+  void pingParents(family.id, `${profile.full_name.split(" ")[0]} checked in`, `${minutes} min studied · ${lessonNotes.length} class${lessonNotes.length === 1 ? "" : "es"} logged · +${earned} points${enteredLate ? " · filled in later" : ""}`);
   ["/today", "/checkin", "/calendar", "/parent", "/parent/assignments"].forEach((p) => revalidatePath(p));
   return { earned, streak };
 }

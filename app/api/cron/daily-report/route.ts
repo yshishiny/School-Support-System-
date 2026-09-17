@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateAndSendReport } from "@/lib/reports/generate";
 import { hourIn } from "@/lib/dates";
@@ -15,6 +16,7 @@ export async function GET(request: Request) {
   }
   // The beta site shares the live database: its crons stay off (CRON_DISABLED=1) so nothing runs twice.
   if (process.env.CRON_DISABLED === "1") return NextResponse.json({ ok: true, skipped: "crons disabled on this deployment" });
+  const started = Date.now();
   const admin = createAdminClient();
   const { data: families } = await admin.from("families").select("id, timezone, report_hour");
   const results: Record<string, unknown> = {};
@@ -38,5 +40,6 @@ export async function GET(request: Request) {
     }
   }
   console.log("[daily-report] cron results", JSON.stringify(results));
+  await recordCronRun("daily-report", started, results);
   return NextResponse.json({ ok: true, results });
 }

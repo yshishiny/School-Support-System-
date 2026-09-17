@@ -3,7 +3,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { modelFor } from "./models";
 import { normaliseQuestions } from "./generate-quiz";
-import type { MaterialInput } from "./read-material";
+import { materialBlocks, type MaterialInput } from "./read-material";
 
 const QuestionSchema = z.object({
   prompt: z.string().describe("The question exactly as written on the sheet (fix only obvious typos). Keep the sheet's number at the start, e.g. '12. …'"),
@@ -34,10 +34,7 @@ Rules:
 export async function transcribeWorksheet(doc: MaterialInput, ctx: { title: string; subject: string | null; grade: number | null }): Promise<WorksheetTranscription & { model: string }> {
   const client = new Anthropic();
   const model = modelFor("worksheet");
-  const content: Anthropic.ContentBlockParam[] =
-    doc.media_type === "application/pdf"
-      ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: doc.data } }]
-      : [{ type: "image", source: { type: "base64", media_type: doc.media_type, data: doc.data } }];
+  const content: Anthropic.ContentBlockParam[] = materialBlocks(doc);
   content.push({ type: "text", text: `Worksheet: ${ctx.title}${ctx.subject ? ` (${ctx.subject})` : ""}${ctx.grade ? `, grade ${ctx.grade}` : ""}. Transcribe it into practice questions.` });
   const stream = client.messages.stream({
     model,

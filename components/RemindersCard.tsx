@@ -5,7 +5,8 @@ import { PushToggle } from "./PushToggle";
 import { setNudgesAction } from "@/lib/actions/push";
 import type { NudgeSettings } from "@/lib/nudges";
 
-const ITEMS: { key: keyof NudgeSettings; label: string; hint: string }[] = [
+const ITEMS: { key: "wakeup" | "morning" | "evening" | "lastcall" | "prayers"; label: string; hint: string }[] = [
+  { key: "wakeup", label: "⏰ Wake-up call", hint: "at 6 on school days: Fajr, bed, sandwich, bag, then “I'm ready”" },
   { key: "morning", label: "☀️ Morning plan", hint: "around 7: today's classes, quizzes and snaps" },
   { key: "evening", label: "🌙 Evening round", hint: "around 19: check-in, classes to log, quizzes" },
   { key: "lastcall", label: "⏰ Last call", hint: "around 21:30 if the check-in is still missing" },
@@ -29,7 +30,7 @@ export function RemindersCard({ settings }: { settings: NudgeSettings }) {
               <div className="font-medium">{it.label}</div>
               <div className="text-xs muted">{it.hint}</div>
             </label>
-            <input type="checkbox" checked={state[it.key]} disabled={pending} onChange={(e) => { const v = e.target.checked; start(async () => { setState({ ...state, [it.key]: v }); await setNudgesAction({ [it.key]: v }); }); }} />
+            <input type="checkbox" checked={state[it.key] !== false} disabled={pending} onChange={(e) => { const v = e.target.checked; start(async () => { setState({ ...state, [it.key]: v }); await setNudgesAction({ [it.key]: v }); }); }} />
           </li>
         ))}
       </ul>

@@ -36,3 +36,49 @@ describe("integrity signals", () => {
     expect(integritySignals({ ...base, lessonLogs: logs.slice(0, 2) })).toEqual([]);
   });
 });
+
+describe("school file vs class log", () => {
+  const base = { today: "2026-09-18", attempts: [], prayers: [], checkins: [], snaps: [], timetableSubjects: [{ weekday: 0, subject_name: "English (GPA)" }, { weekday: 2, subject_name: "English (GPA)" }] };
+  const file = { subject: "English (GPA)", title: "Grade 10 Quarter 1 Literature", topics: ["Of Mice and Men", "Foreshadowing", "Character arc"], created_at: "2026-09-18T10:00:00Z", uploaded_by_student: false };
+  it("flags a file for a subject he marked 'no class'", () => {
+    const out = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "No class" }], materials: [file] });
+    const sig = out.find((x) => x.code === "log_vs_school");
+    expect(sig?.label).toMatch(/1 of his English \(GPA\) classes marked/);
+    expect(sig?.ask).toMatch(/Of Mice and Men/);
+  });
+  it("flags notes that never mention the file's topics, and stays quiet when they do", () => {
+    const off = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "grammar drills" }], materials: [file] });
+    expect(off.find((x) => x.code === "log_vs_school")?.label).toMatch(/do not mention/);
+    const ok = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "Of Mice and Men chapter 2, foreshadowing" }], materials: [file] });
+    expect(ok.find((x) => x.code === "log_vs_school")).toBeUndefined();
+  });
+});
+
+describe("weekly syllabus vs class log", () => {
+  it("compares every subject the syllabus lists with that week's log", () => {
+    const out = integritySignals({
+      today: "2026-09-17", attempts: [], prayers: [], checkins: [], snaps: [],
+      timetableSubjects: [{ weekday: 0, subject_name: "Math (GPA)" }, { weekday: 1, subject_name: "English (GPA)" }, { weekday: 2, subject_name: "Physics" }],
+      lessonLogs: [{ log_date: "2026-09-14", subject_name: "Math (GPA)", note: "multi-step equations" }, { log_date: "2026-09-15", subject_name: "English (GPA)", note: "No class / absent" }],
+      materials: [{ subject: null, title: "Grade 10 Weekly Syllabus", topics: [], created_at: "2026-09-17T10:00:00Z", uploaded_by_student: false, is_week_summary: true, covers_week_start: "2026-09-13", subjects: [{ subject: "Math", topics: ["Solving multi-step equations"] }, { subject: "English", topics: ["Parts of speech"] }, { subject: "Physics", topics: ["Atomic structure"] }, { subject: "French", topics: ["Verbs"] }] }],
+    });
+    const sig = out.find((x) => x.code === "syllabus_vs_log");
+    expect(sig?.label).toMatch(/2 subjects/);
+    expect(sig?.ask).toMatch(/English: “no class” ×1/);
+    expect(sig?.ask).toMatch(/Physics: nothing logged/);
+    expect(sig?.ask).not.toMatch(/Math/);
+    expect(sig?.ask).not.toMatch(/French/);
+  });
+});
+
+describe("screen time", () => {
+  it("flags days over the family limit from the evening screenshot", () => {
+    const out = integritySignals({ today: "2026-09-17", attempts: [], prayers: [], checkins: [], lessonLogs: [], screenLimit: 180, snaps: [
+      { taken_on: "2026-09-15", status: "approved", ai_verdict: "looks_good", kind: "screentime", ai_detail: { total_minutes: 250, top_apps: [{ app: "TikTok", minutes: 120 }, { app: "YouTube", minutes: 60 }] } },
+      { taken_on: "2026-09-16", status: "pending", ai_verdict: "looks_good", kind: "screentime", ai_detail: { total_minutes: 100 } },
+    ] });
+    const sig = out.find((x) => x.code === "screen_over_limit");
+    expect(sig?.label).toMatch(/over the 3h limit on 1 day/);
+    expect(sig?.ask).toMatch(/TikTok 120m/);
+  });
+});

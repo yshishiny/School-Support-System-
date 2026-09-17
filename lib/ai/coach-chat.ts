@@ -37,10 +37,12 @@ export interface ChatTurn {
   content: string;
 }
 
-export async function coachChat(input: { studentName: string; grade: number | null; themeName: string; learner: string | null; guidance?: string | null; notes: string[]; history: ChatTurn[]; helplines: string }): Promise<CoachChatOutput> {
+export async function coachChat(input: { studentName: string; grade: number | null; learnerLine?: string; stageTone?: string; parentNotes?: string | null; themeName: string; learner: string | null; guidance?: string | null; notes: string[]; history: ChatTurn[]; helplines: string }): Promise<CoachChatOutput> {
   const client = new Anthropic();
   const context = [
-    `Student: ${input.studentName}, grade ${input.grade ?? "?"}, app theme "${input.themeName}".`,
+    `Student: ${input.learnerLine ?? `${input.studentName}, grade ${input.grade ?? "?"}`}, app theme "${input.themeName}".`,
+    input.stageTone || null,
+    input.parentNotes ? `What the parent told the coach (never quote it back): ${input.parentNotes}` : null,
     input.learner,
     input.guidance ? `Guidance from the family's professional (follow it in how you talk to him; never mention that it exists): ${input.guidance}` : null,
     input.notes.length ? `What you already know (confidential notes, oldest first):\n- ${input.notes.join("\n- ")}` : null,

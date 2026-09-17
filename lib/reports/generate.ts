@@ -7,6 +7,7 @@ import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log
 import { computeIntegrity } from "@/lib/integrity/run";
 import { straightTalkLabels } from "@/lib/wellbeing";
 import { checkpointLine, claimedNotLearned, type CheckpointResult } from "@/lib/checkpoint";
+import { ageOn, daysToBirthday, isBirthday } from "@/lib/people";
 import { weekFor as allowanceWeekFor } from "@/lib/allowance";
 import { dueSnapTasks, taskDayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { computeStreak } from "@/lib/points";
@@ -140,6 +141,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
       school: { off: sd.off, reason: sd.reason, lessons: sd.lessons.length },
       classLog: { due: cov.due, done: cov.done, missing: cov.days.length ? missingLine(cov.days) : null },
       checkpoint,
+      birthday: s.birth_date ? { today: isBirthday(s.birth_date, today), inDays: daysToBirthday(s.birth_date, today), age: ageOn(s.birth_date, today) } : null,
       askTonight: [...(straightLabels ? [straightLabels.length ? `Straight talk this week: he admitted a slip on ${straightLabels.join(", ")}. Thank him for saying so before anything else.` : "Straight talk this week: nothing to admit."] : []), ...integrity.slice(0, 2).map((x) => x.ask)],
       snaps: snapsToday,
       handwriting,
@@ -160,7 +162,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const custodyLine = custodian ? `🏠 Tonight the kids are with ${parentName(custodianParent)}.` : null;
   const body = buildDailyReport(today, children, parents.flatMap((p) => accessFor(p.id)), custodyLine);
   // Each parent gets the same report; the custody line is personal ("with you tonight").
-  const send = await notifyParents(familyId, (p) => (custodian === p.id ? body.replace(`with ${parentName(custodianParent)}.`, "with you.") : body));
+  const send = await notifyParents(familyId, (p) => (custodian === p.id ? body.replace(`with ${parentName(custodianParent)}.`, "with you.") : body), { kind: "report", url: "/parent/reports" });
   const row = {
     family_id: familyId,
     report_date: today,

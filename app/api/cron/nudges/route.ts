@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { sendDueNudges } from "@/lib/nudges/run";
 
 export const dynamic = "force-dynamic";
@@ -16,11 +17,14 @@ export async function GET(request: Request) {
   }
   // The beta site shares the live database: its crons stay off (CRON_DISABLED=1) so nothing runs twice.
   if (process.env.CRON_DISABLED === "1") return NextResponse.json({ ok: true, skipped: "crons disabled on this deployment" });
+  const started = Date.now();
   try {
     const results = await sendDueNudges();
     console.log("[nudges] results", JSON.stringify(results));
+    await recordCronRun("nudges", started, results as Record<string, unknown>);
     return NextResponse.json({ ok: true, results });
   } catch (err) {
+    await recordCronRun("nudges", started, {}, err);
     return NextResponse.json({ ok: false, error: err instanceof Error ? err.message : String(err) }, { status: 500 });
   }
 }

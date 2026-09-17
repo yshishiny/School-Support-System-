@@ -5,8 +5,9 @@ import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { SNAP_TEMPLATES, type HandwritingAnalysis, type SnapTask } from "@/lib/snaps";
 import { WEEKDAYS } from "@/lib/custody";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
-import { addSnapTaskAction, deleteSnapTaskAction, updateSnapTaskAction } from "@/lib/actions/snaps";
+import { addSnapTaskAction, deleteSnapTaskAction, setScreenLimitAction, setSnapAiCheckAction, updateSnapTaskAction } from "@/lib/actions/snaps";
 import { SnapReview } from "@/components/SnapReview";
+import { Tabs } from "@/components/Tabs";
 import type { Profile } from "@/lib/types";
 
 const VERDICT: Record<string, { icon: string; text: string }> = {
@@ -57,6 +58,8 @@ export default async function ParentSnapsPage() {
           <div>{v.icon} {v.text}{s.ai_score !== null ? ` (${Math.round(Number(s.ai_score) * 100)}%)` : ""}{s.ai_note ? ` · ${s.ai_note}` : ""}</div>
           {s.kind === "homework" && s.ai_detail && <div className="muted">{s.ai_detail.subject_guess ? `Subject: ${s.ai_detail.subject_guess}` : ""}{s.ai_detail.matches_today === false ? " · does not match today's subjects" : s.ai_detail.matches_today ? " · matches today" : ""}{typeof s.ai_detail.filled_fraction === "number" ? ` · ${Math.round(s.ai_detail.filled_fraction * 100)}% of the page written` : ""}</div>}
           {s.kind === "handwriting" && s.ai_detail && <div className="muted">Score {s.ai_detail.score}/100 · {s.ai_detail.language} · focus: {(s.ai_detail.focus ?? []).join(", ") || "—"}</div>}
+          {s.kind === "bag" && s.ai_detail && <div className="muted">Books seen: {((s.ai_detail as { subjects_seen?: string[] }).subjects_seen ?? []).join(", ") || "none readable"}{(s.ai_detail as { matches_timetable?: boolean | null }).matches_timetable === false ? " · does not match the next day's timetable" : (s.ai_detail as { matches_timetable?: boolean | null }).matches_timetable ? " · matches the timetable" : ""}</div>}
+          {s.kind === "screentime" && s.ai_detail && (() => { const d = s.ai_detail as { total_minutes?: number | null; top_apps?: { app: string; minutes: number }[]; is_today?: boolean | null }; const limit = family.screen_limit_minutes ?? 180; return <div className={d.total_minutes !== null && d.total_minutes !== undefined && d.total_minutes > limit ? "text-warn" : "muted"}>Screen time {d.total_minutes !== null && d.total_minutes !== undefined ? `${Math.floor(d.total_minutes / 60)}h ${d.total_minutes % 60}m` : "unreadable"} (limit {Math.floor(limit / 60)}h {limit % 60}m){d.is_today === false ? " · not today's summary" : ""}{d.top_apps?.length ? ` · ${d.top_apps.map((a) => `${a.app} ${a.minutes}m`).join(", ")}` : ""}</div>; })()}
           {s.review_note && <div className="text-warn">Your note: {s.review_note}</div>}
         </div>
         {s.status === "pending" && <SnapReview snapId={s.id} />}
@@ -72,11 +75,17 @@ export default async function ParentSnapsPage() {
       </div>
       <p className="text-sm muted">The boys snap their bed, desk, dish or homework page when nobody is home. The AI gives a first opinion; your tap is what counts for the allowance. Handwriting samples get a score and a line to practise.</p>
 
+      <Tabs
+        storageKey="snaps"
+        tabs={[
+          { id: "review", label: "To review", emoji: "📸", badge: pending.length || null, content: (<>
       <section className="space-y-2">
         <h2 className="h2">To review {pending.length ? <span className="badge">{pending.length}</span> : null}</h2>
         {pending.length === 0 ? <p className="card text-sm muted">Nothing waiting. Pending snaps the AI found plausible already count until you say otherwise.</p> : pending.map((s) => <Card key={s.id} s={s} />)}
       </section>
 
+          </>) },
+          { id: "handwriting", label: "Handwriting", emoji: "✍️", content: (<>
       {hwByKid.some((x) => x.samples.length) && (
         <section className="card space-y-2">
           <h2 className="h2">✍️ Handwriting trend</h2>
@@ -89,15 +98,36 @@ export default async function ParentSnapsPage() {
         </section>
       )}
 
+            {!hwByKid.some((x) => x.samples.length) && <p className="card text-sm muted">No handwriting samples yet.</p>}
+          </>) },
+          { id: "recent", label: "Recent", emoji: "🕓", content: (<>
       {recent.length > 0 && (
-        <details className="space-y-2">
-          <summary className="h2 cursor-pointer">Recent · {recent.length}</summary>
+        <div className="space-y-2">
+          <h2 className="h2">Recent · {recent.length}</h2>
           <div className="grid gap-2 sm:grid-cols-2 mt-2">{recent.map((s) => <Card key={s.id} s={s} />)}</div>
-        </details>
+        </div>
       )}
 
+            {recent.length === 0 && <p className="card text-sm muted">Nothing reviewed yet.</p>}
+          </>) },
+          { id: "tasks", label: "Tasks", emoji: "⚙️", badge: tasks.length || null, content: (<>
+      <section className="card space-y-2">
+        <h2 className="h2">Who checks the pictures</h2>
+        <form action={setSnapAiCheckAction} className="flex flex-wrap items-center gap-3 text-sm">
+          <label className="flex items-center gap-2"><input type="checkbox" name="snap_ai_check" defaultChecked={family.snap_ai_check !== false} /> AI first look (about 0.3 piaster a picture)</label>
+          <button className="btn-ghost btn-sm">Save</button>
+        </form>
+        <p className="text-xs muted">On: the coach screens each picture in seconds, the child hears "looks good" or "try again", and you or a rater give the final tick. Anything the AI is not sure about waits for a person. Off: no AI at all, every picture goes straight to you and to any older sibling you marked as a rater (Kids → Profile); the points come with the tick.</p>
+      </section>
       <section className="card space-y-3">
         <h2 className="h2">Snap tasks</h2>
+        <form action={setScreenLimitAction} className="flex flex-wrap items-center gap-2 text-sm">
+          <span>⏱️ Screen-time limit per day</span>
+          <input name="screen_limit_minutes" type="number" min={30} max={600} step={15} className="input !py-1 w-24" defaultValue={family.screen_limit_minutes ?? 180} />
+          <span className="muted text-xs">minutes</span>
+          <button className="btn-ghost btn-sm">Save</button>
+          <span className="text-xs muted">Used with the “Screen time screenshot” task: over the limit becomes a question to him, not a punishment.</span>
+        </form>
         <p className="text-xs muted">Each task is a basic in the allowance score (weight below). Time windows are in your timezone. Switch a task off instead of deleting it to keep history.</p>
         {tasks.length > 0 && (
           <ul className="divide-y divide-line">
@@ -131,6 +161,9 @@ export default async function ParentSnapsPage() {
           <button className="btn-primary">Add task</button>
         </form>
       </section>
+          </>) },
+        ]}
+      />
     </main>
   );
 }

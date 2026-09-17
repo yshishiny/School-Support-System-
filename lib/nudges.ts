@@ -2,10 +2,10 @@
  * Reminders for the kids. Pure: given the hour and the day's state, which messages are due and what they say.
  * Short, warm, never nagging: at most three a day, and nothing once the job is done.
  */
-export type NudgeCode = "morning" | "evening" | "lastcall" | "catchup";
+export type NudgeCode = "wakeup" | "morning" | "evening" | "lastcall" | "catchup";
 
-export interface NudgeSettings { morning: boolean; evening: boolean; lastcall: boolean; prayers: boolean }
-export const DEFAULT_NUDGES: NudgeSettings = { morning: true, evening: true, lastcall: true, prayers: false };
+export interface NudgeSettings { wakeup?: boolean; wakeHour?: number; morning: boolean; evening: boolean; lastcall: boolean; prayers: boolean }
+export const DEFAULT_NUDGES: NudgeSettings = { wakeup: true, wakeHour: 6, morning: true, evening: true, lastcall: true, prayers: false };
 
 export interface NudgeState {
   firstName: string;
@@ -23,17 +23,26 @@ export interface NudgeState {
   missedClasses: number; // earlier days this week
   weekClosesLabel: string; // "Thursday"
   appUrl: string;
+  allowanceHint?: string | null; // the most valuable missing basic, from the allowance meter
+  morningTodo?: string[]; // the routine items still to do (fajr, bed, sandwich, bag)
 }
 
 export interface Nudge { code: NudgeCode; text: string }
 
-const WINDOWS: Record<NudgeCode, [number, number]> = { morning: [6, 9], evening: [19, 21], lastcall: [21, 23], catchup: [17, 21] };
+const WINDOWS: Record<NudgeCode, [number, number]> = { wakeup: [5, 8], morning: [6, 9], evening: [19, 21], lastcall: [21, 23], catchup: [17, 21] };
 
 /** Which nudges fall in this hour. Each is sent at most once a day by the caller. */
 export function dueNudges(s: NudgeState, settings: NudgeSettings, alreadySent: string[]): Nudge[] {
   const out: Nudge[] = [];
   const inWindow = (c: NudgeCode) => s.hourLocal >= WINDOWS[c][0] && s.hourLocal < WINDOWS[c][1];
   const sent = (c: NudgeCode) => alreadySent.includes(c);
+
+  // Wake-up at the family's hour on a school day: the routine, and what it pays.
+  if (settings.wakeup !== false && !s.schoolOff && s.hourLocal === (settings.wakeHour ?? 6) && !sent("wakeup")) {
+    const first = s.lessons[0];
+    const todo = s.morningTodo?.length ? s.morningTodo.join(", ") : "Fajr, bed, sandwich, bag";
+    out.push({ code: "wakeup", text: `⏰ Wake up, ${s.firstName}!${first ? ` First lesson ${first.subject_name} at ${first.start_time.slice(0, 5)}.` : ""} Before you leave: ${todo}, then tap “I'm ready” = points and the +10 morning champion bonus. ${s.appUrl}` });
+  }
 
   if (settings.morning && inWindow("morning") && !sent("morning") && !s.schoolOff) {
     const first = s.lessons[0];
@@ -48,7 +57,7 @@ export function dueNudges(s: NudgeState, settings: NudgeSettings, alreadySent: s
     if (s.classesToLog) todo.push(`${s.classesToLog} class${s.classesToLog === 1 ? "" : "es"} to log`);
     if (s.quizzesToday > s.quizzesDone) todo.push(`${s.quizzesToday - s.quizzesDone} quiz set${s.quizzesToday - s.quizzesDone === 1 ? "" : "s"}`);
     if (s.snapsOpen.length) todo.push(`snap ${s.snapsOpen.join(" and ")}`);
-    out.push({ code: "evening", text: `🌙 ${s.firstName}, evening round: ${todo.join(" · ")}.${s.streak ? ` Streak ${s.streak}🔥 stays alive with the check-in.` : ""} ${s.appUrl}` });
+    out.push({ code: "evening", text: `🌙 ${s.firstName}, evening round: ${todo.join(" · ")}.${s.streak ? ` Streak ${s.streak}🔥 stays alive with the check-in.` : ""}${s.allowanceHint ? ` Allowance priority: ${s.allowanceHint}.` : ""} ${s.appUrl}` });
   }
 
   if (settings.lastcall && inWindow("lastcall") && !sent("lastcall") && !s.checkinDone) {

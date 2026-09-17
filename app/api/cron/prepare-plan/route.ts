@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordCronRun } from "@/lib/ops/log";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { prepareNextPlannedQuiz } from "@/lib/plan/prepare";
 import { coachReportStale, generateCoachReport } from "@/lib/coach/run";
@@ -9,6 +10,8 @@ import { checkDueSources } from "@/lib/sources/check";
 import { pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
+import { prepareWeekMaterial } from "@/lib/learning/resources";
+import { buildMonthlyRevisions } from "@/lib/revision/run";
 import { todayIn } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +46,16 @@ export async function GET(request: Request) {
       }
     }
   }
+  // This week's lessons, diagrams and videos, so the child never waits for the AI (a few topics per night).
+  for (const s of students ?? []) {
+    if (Date.now() - started >= TIME_BUDGET_MS) break;
+    try {
+      const r = await prepareWeekMaterial(s.id, { limit: 4, budgetMs: Math.max(0, TIME_BUDGET_MS - (Date.now() - started)) });
+      if (r.prepared || r.errors.length) (results[s.id] ??= []).push(`week material: ${r.prepared} ready, ${r.remaining} left${r.errors.length ? `, errors: ${r.errors.join("; ")}` : ""}`);
+    } catch (err) {
+      (results[s.id] ??= []).push(`week material error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
   // Allowance: close last week the morning after pay day and tell the parent.
   const { data: fams } = await admin.from("families").select("id, timezone, allowance_enabled, allowance_amount, allowance_pay_weekday, allowance_kpis").eq("allowance_enabled", true);
   for (const f of fams ?? []) {
@@ -56,7 +69,7 @@ export async function GET(request: Request) {
       }
     }
     if (lines.length) {
-      await notifyParents(f.id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`);
+      await notifyParents(f.id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`, { kind: "allowance", url: "/parent/allowance" });
       (results[f.id] ??= []).push(`allowance closed: ${lines.join("; ")}`);
     }
   }
@@ -99,6 +112,15 @@ export async function GET(request: Request) {
       results.checkpoints = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
+  // Monthly revision sheets and quizzes from the 25th, per subject with school files this month.
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await buildMonthlyRevisions(todayIn("Africa/Cairo"), { budgetMs: Math.max(0, TIME_BUDGET_MS - (Date.now() - started)) });
+      if (r.length) results.revision = r;
+    } catch (err) {
+      results.revision = [`error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
   // School files that failed to read for a temporary reason: try again.
   if (Date.now() - started < TIME_BUDGET_MS) {
     try {
@@ -116,5 +138,6 @@ export async function GET(request: Request) {
     results.snaps = [`prune error: ${err instanceof Error ? err.message : String(err)}`];
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));
+  await recordCronRun("prepare-plan", started, results);
   return NextResponse.json({ ok: true, seconds: Math.round((Date.now() - started) / 1000), results });
 }

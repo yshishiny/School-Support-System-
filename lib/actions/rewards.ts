@@ -48,6 +48,10 @@ export async function redeemRewardAction(_prev: { error?: string; ok?: string } 
 
   const available = await availablePoints(profile.id);
   if (available < reward.cost_points) return { error: `You need ${reward.cost_points - available} more points.` };
+  if ((reward.requires_full_weeks ?? 0) > 0) {
+    const streak = await fullWeekStreak(profile.id);
+    if (streak < reward.requires_full_weeks) return { error: `This one needs ${reward.requires_full_weeks} full-allowance week${reward.requires_full_weeks === 1 ? "" : "s"} in a row; you have ${streak}. ${reward.effort_note ?? ""}`.trim() };
+  }
 
   const { error } = await supabase
     .from("redemptions")
@@ -116,7 +120,25 @@ export async function enableRewardTemplateAction(formData: FormData): Promise<vo
   const supabase = await createClient();
   const { data: dup } = await supabase.from("rewards").select("id").eq("family_id", family.id).eq("title", t.title).maybeSingle();
   if (dup) return;
-  await supabase.from("rewards").insert({ family_id: family.id, title: t.title, description: t.description, kind: t.kind, cost_points: t.cost_points, cash_amount_egp: t.cash_amount_egp ?? null, emoji: t.emoji });
+  await supabase.from("rewards").insert({ family_id: family.id, title: t.title, description: t.description, kind: t.kind, cost_points: t.cost_points, cash_amount_egp: t.cash_amount_egp ?? null, emoji: t.emoji, requires_full_weeks: t.requires_full_weeks ?? 0, effort_note: t.effort_note ?? null });
   revalidatePath("/parent/rewards");
   revalidatePath("/rewards");
+}
+
+/** Consecutive closed weeks that paid the full allowance, newest first. */
+export async function fullWeekStreak(studentId: string): Promise<number> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("allowance_weeks").select("band").eq("student_id", studentId).order("week_start", { ascending: false }).limit(12);
+  let n = 0;
+  for (const w of data ?? []) { if (w.band === "full") n += 1; else break; }
+  return n;
+}
+
+/** The child picks the reward he is working toward; it shows on Rewards and the allowance meter. */
+export async function setTargetRewardAction(rewardId: string | null): Promise<void> {
+  const { profile } = await requireStudent();
+  const supabase = await createClient();
+  await supabase.from("profiles").update({ target_reward_id: rewardId }).eq("id", profile.id);
+  revalidatePath("/rewards");
+  revalidatePath("/today");
 }

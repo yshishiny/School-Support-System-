@@ -17,6 +17,8 @@ export interface Family {
   allowance_amount: number;
   allowance_pay_weekday: number;
   allowance_kpis: { code: string; weight?: number; enabled?: boolean }[] | null;
+  snap_ai_check?: boolean;
+  screen_limit_minutes?: number;
   practices_enabled: string[];
   custody_pattern: Record<string, string | null>; // weekday ("0".."6") -> parent id; empty = shared
 }
@@ -56,6 +58,9 @@ export interface Profile {
   avatar_image_id: string | null;
   banner_image_id: string | null;
   home_layout: "a" | "b" | "c";
+  is_admin?: boolean;
+  device?: { platform: string; standalone: boolean; screen: string; battery: number | null; charging: boolean | null; connection: string | null; updated_at: string } | null;
+  app_installed_at?: string | null;
   banner_fit: "cover" | "full";
   banner_zoom: number;
   banner_x: number;
@@ -65,6 +70,17 @@ export interface Profile {
   whatsapp: string | null;
   parent_label: string | null; // "Dad", "Mum"…
   character_id?: string | null; // V2: the child's virtual teacher
+  birth_date?: string | null;
+  stage?: "school" | "university" | "postgraduate" | "adult";
+  gender?: "boy" | "girl" | "other" | null;
+  school_name?: string | null;
+  phone?: string | null;
+  parent_notes?: string | null;
+  last_seen_at?: string | null;
+  last_path?: string | null;
+  live_pings?: boolean;
+  rater?: boolean; // older sibling who may rate manners and dish
+  target_reward_id?: string | null;
 }
 
 export interface Subject {
@@ -111,6 +127,8 @@ export interface Checkin {
   stuck_on: string | null;
   submitted_at: string;
   entered_late?: boolean; // filled in on a later day
+  manners_self?: number | null;
+  manners_note?: string | null;
 }
 
 export interface CheckinItem {
@@ -141,6 +159,8 @@ export interface Reward {
   cash_amount_egp: number | null;
   emoji: string;
   active: boolean;
+  requires_full_weeks?: number;
+  effort_note?: string | null;
 }
 
 export interface Redemption {

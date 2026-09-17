@@ -122,3 +122,11 @@ body {
 }
 .prose-lesson table { width: 100%; border-collapse: collapse; font-size: 0.85em; margin: 0.5rem 0; }
 .prose-lesson th, .prose-lesson td { border: 1px solid var(--color-line); padding: 0.25rem 0.5rem; text-align: left; }
+
+/* Phone containment: nothing may push the page wider than the screen; long words, links and labels wrap. */
+html, body { max-width: 100%; overflow-x: clip; }
+body { overflow-wrap: anywhere; }
+.card, .tile, .badge, .chip, main, section, article, table { min-width: 0; max-width: 100%; }
+.badge, .chip { white-space: normal; }
+pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+img, video, iframe, svg { max-width: 100%; }

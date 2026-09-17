@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, hourIn } from "@/lib/dates";
@@ -7,6 +8,8 @@ import { dueSnapTasks, taskDayState, windowOpen, type SnapLite } from "@/lib/sna
 import { loadSnapTasks } from "@/lib/snaps/server";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { weekFor } from "@/lib/allowance";
+import { isBirthday, ageOn } from "@/lib/people";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { computeStreak, levelFor } from "@/lib/points";
 import type { PrayerRow } from "@/components/PrayerPill";
 import { themeById } from "@/lib/themes";
@@ -16,6 +19,15 @@ import { INSTRUMENTS, dueInstruments, type CheckHistoryRow } from "@/lib/wellbei
 import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { eligibilityHint } from "@/lib/allowance";
 import { buildQueue } from "@/lib/today-queue";
+import { ensureFollowups } from "@/lib/followups/run";
+import { loadCompensations } from "@/lib/compensation/run";
+import { materialStages, nextStage } from "@/lib/materials/study";
+import { loadRevisions } from "@/lib/revision/run";
+import { MorningRoutine } from "@/components/MorningRoutine";
+import { buildMorning, isChampion, morningWindow } from "@/lib/morning";
+import { snapCounts } from "@/lib/snaps";
+import { schoolDay } from "@/lib/school-day";
+import { prettyDate } from "@/lib/dates";
 import { LayoutA } from "@/components/today/LayoutA";
 import { LayoutB } from "@/components/today/LayoutB";
 import { LayoutC } from "@/components/today/LayoutC";
@@ -54,6 +66,11 @@ export default async function TodayPage() {
     supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", today).order("created_at"),
   ]);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
+  // Morning routine: last night's sandwich and bag snaps count for this morning.
+  const [{ data: eveSnaps }, { data: morningRow }] = await Promise.all([
+    supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", shiftDate(today, -1)).in("task_code", ["sandwich", "bag"]),
+    supabase.from("morning_log").select("ready_at, champion_at").eq("student_id", profile.id).eq("day", today).maybeSingle(),
+  ]);
   const { start: weekStart, end: weekEnd } = weekFor(today, family.allowance_pay_weekday);
   const [{ data: weekLogs }, { data: offRows }] = await Promise.all([
     supabase.from("lesson_logs").select("log_date, subject_name, note, homework_given").eq("student_id", profile.id).gte("log_date", weekStart).lt("log_date", today),
@@ -90,6 +107,23 @@ export default async function TodayPage() {
   const checkpoint = cp ? { quizId: cp.quiz_id!, title: cp.quizzes?.title ?? (cp.kind === "weekly" ? "Weekly checkpoint" : `Spot check · ${cp.subject}`), questions: (cpCount ?? []).length, minutes: cp.time_limit_min, dueLabel: SHORT[weekdayOf(cp.due_by)] } : null;
   const checkinsMissed = Array.from({ length: 6 }, (_, k) => shiftDate(today, -1 - k)).filter((d) => d >= weekStart && !checkinDates.includes(d)).reverse().map((d) => ({ date: d, label: d === shiftDate(today, -1) ? "Yesterday" : SHORT[weekdayOf(d)] }));
   const due = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
+  const followupsOpen = (await ensureFollowups(profile.id, family.id, today, family.timezone, family.allowance_pay_weekday).catch(() => [])).filter((r) => !r.answer).length;
+  const compensationsOpen = (await loadCompensations(profile.id, shiftDate(today, -14)).catch(() => [])).filter((c) => !c.correct).length;
+  const [{ data: matRows }, { data: matQuizRows }, revisionRows] = await Promise.all([
+    supabase.from("materials").select("id, title, created_at").eq("student_id", profile.id).eq("status", "ready").gte("created_at", `${shiftDate(today, -21)}T00:00:00Z`),
+    supabase.from("quizzes").select("material_id, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null).gte("created_at", `${shiftDate(today, -21)}T00:00:00Z`),
+    loadRevisions([profile.id], 6).catch(() => []),
+  ]);
+  const matAttempts = ((matQuizRows ?? []) as { material_id: string; attempts: { submitted_at: string | null }[] }[]);
+  const materialsDue = ((matRows ?? []) as { id: string; title: string; created_at: string }[])
+    .map((m) => ({ m, st: nextStage(materialStages(m.created_at.slice(0, 10), matAttempts.filter((q) => q.material_id === m.id).flatMap((q) => q.attempts.filter((a) => a.submitted_at).map((a) => a.submitted_at!.slice(0, 10))), today)) }))
+    .filter((x) => x.st)
+    .sort((a, b) => a.st!.dueBy.localeCompare(b.st!.dueBy))
+    .map((x) => ({ id: x.m.id, title: x.m.title, stage: x.st!.label, dueBy: prettyDate(x.st!.dueBy), overdue: x.st!.state === "overdue" }));
+  const revisionQuizIds = revisionRows.filter((r) => r.status === "ready" && r.quiz_id).map((r) => r.quiz_id!);
+  const { data: revAttempts } = revisionQuizIds.length ? await supabase.from("attempts").select("quiz_id").in("quiz_id", revisionQuizIds).not("submitted_at", "is", null) : { data: [] as { quiz_id: string }[] };
+  const satIds = new Set((revAttempts ?? []).map((a) => a.quiz_id));
+  const revisionsOpen = revisionRows.filter((r) => r.status === "ready" && r.quiz_id && !satIds.has(r.quiz_id)).map((r) => ({ id: r.id, subject: r.subject }));
   const queue = buildQueue({
     hourLocal: hour,
     prayerOpen: openPrayer ? { prayer: openPrayer.prayer, label: PRAYER_LABEL[openPrayer.prayer], time: openPrayer.time } : null,
@@ -103,11 +137,20 @@ export default async function TodayPage() {
     reviewsDue: dueReviews ?? 0,
     learnerDone: !!profile.learner_profile,
     snapsDue,
+    followups: followupsOpen,
+    compensations: compensationsOpen,
+    materialsDue,
+    revisions: revisionsOpen,
     classLogMissing,
     checkinsMissed,
     checkpoint,
   });
 
+  const birthday = isBirthday(profile.birth_date, today);
+  if (birthday) {
+    // One gift per birthday: the unique (student, ref_type, ref_id) index makes repeats a no-op.
+    await createAdminClient().from("points_ledger").insert({ student_id: profile.id, delta: 50, reason: `Happy birthday ${today.slice(0, 4)} 🎂`, ref_type: `birthday-${today.slice(0, 4)}`, ref_id: profile.id }).then(() => null, () => null);
+  }
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);
   const streak = computeStreak(checkinDates, today) || computeStreak(checkinDates, shiftDate(today, -1));
   const theme = themeById(profile.theme);
@@ -126,7 +169,7 @@ export default async function TodayPage() {
     streak,
     mascot: stickers[1] ?? theme.emoji,
     stickers,
-    tagline: theme.tagline,
+    tagline: birthday ? `🎂 Happy birthday, ${profile.full_name.split(" ")[0]}! ${ageOn(profile.birth_date, today) ?? ""} today. +50 ★ from all of us.` : theme.tagline,
     queue,
     totalToday: queue.filter((q) => q.kind !== "done").length,
     prayerRows,
@@ -148,8 +191,28 @@ export default async function TodayPage() {
     classesToday: todayRows.length,
   };
 
+  const sdToday = schoolDay(today, (timetable ?? []) as { weekday: number; subject_name: string; start_time: string; end_time: string }[], (offRows ?? []) as { day: string; label: string | null }[]);
+  const firstLesson = sdToday.lessons[0]?.start_time?.slice(0, 5) ?? null;
+  const phase = morningWindow(hhmm, firstLesson);
+  const mineTasks = snapTasks.filter((t) => t.enabled && (t.student_id === null || t.student_id === profile.id));
+  const hasTask = (c: string) => mineTasks.some((t) => t.code === c);
+  const snapDone = (c: string) => [...((snapRows ?? []) as SnapLite[]), ...((eveSnaps ?? []) as SnapLite[])].some((s) => s.task_code === c && snapCounts(s));
+  const morningItems = buildMorning({ fajrLogged: !!logged.get("fajr") && logged.get("fajr")!.status !== "missed", bedDone: snapDone("bed"), sandwichDone: snapDone("sandwich"), bagDone: snapDone("bag"), ready: !!morningRow?.ready_at, hasBedTask: hasTask("bed"), hasSandwichTask: hasTask("sandwich"), hasBagTask: hasTask("bag") });
+  const showMorning = (phase === "morning" && !sdToday.off) || (phase === "night" && (hasTask("sandwich") || hasTask("bag")) && !schoolDay(shiftDate(today, 1), (timetable ?? []) as { weekday: number; subject_name: string; start_time: string; end_time: string }[], []).off);
+  const morningCard = showMorning ? <MorningRoutine items={morningItems} phase={phase === "night" ? "night" : "morning"} firstLesson={firstLesson} champion={!!morningRow?.champion_at || (phase === "morning" && isChampion(morningItems))} /> : null;
+
+  const snapBanner = snapsDue.length > 0 && (
+    <Link href="/snaps" className="card flex items-center gap-3 border-2 border-accent bg-accent/10 pop">
+      <span className="text-4xl sticker-still">📸</span>
+      <div className="flex-1 min-w-0">
+        <div className="font-bold">{snapsDue.length} snap{snapsDue.length === 1 ? "" : "s"} waiting now: {snapsDue.map((t) => `${t.emoji} ${t.label}`).join(" · ")}</div>
+        <div className="text-xs muted">Show your win before the time window closes. Counts for your allowance.</div>
+      </div>
+      <span className="btn-primary btn-sm shrink-0">Snap</span>
+    </Link>
+  );
   const layout = profile.home_layout ?? "b";
-  if (layout === "a") return <LayoutA d={d} />;
-  if (layout === "c") return <LayoutC d={d} />;
-  return <LayoutB d={d} />;
+  if (layout === "a") return <>{morningCard}{snapBanner}<LayoutA d={d} /></>;
+  if (layout === "c") return <>{morningCard}{snapBanner}<LayoutC d={d} /></>;
+  return <>{morningCard}{snapBanner}<LayoutB d={d} /></>;
 }

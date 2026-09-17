@@ -4,7 +4,7 @@
  */
 import { weekdayOf } from "./dates";
 
-export type SnapKind = "photo" | "homework" | "handwriting";
+export type SnapKind = "photo" | "homework" | "handwriting" | "bag" | "screentime";
 export type SnapVerdict = "looks_good" | "unclear" | "not_it" | "people" | "error";
 export type SnapStatus = "pending" | "approved" | "rejected";
 
@@ -52,6 +52,9 @@ export const SNAP_TEMPLATES: SnapTemplate[] = [
   { code: "dish", kind: "photo", label: "Dish cleared and space clean", emoji: "🍽️", prompt: "A cleared eating place: no used plate or cup left, table wiped, or the plate in the sink or dishwasher.", days: ALL_DAYS, window_start: null, window_end: null, weight: 10, hint: "After a meal, when no parent is home." },
   { code: "homework", kind: "homework", label: "Homework page", emoji: "📓", prompt: "A page of today's homework, written by hand, mostly filled in.", days: SCHOOL_DAYS, window_start: "14:00", window_end: "23:59", weight: 15, hint: "One page, readable. The AI checks it matches today's subjects." },
   { code: "handwriting", kind: "handwriting", label: "Handwriting sample", emoji: "✍️", prompt: "Four to six handwritten lines in English or Arabic, on lined paper, photographed straight on.", days: [5], window_start: null, window_end: null, weight: 5, hint: "Once a week. The coach gives feedback and a line to practise." },
+  { code: "sandwich", kind: "photo", label: "Sandwich ready for school", emoji: "🥪", prompt: "A prepared sandwich or lunch, wrapped or in a lunch box, ready to take to school.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The night before or in the morning. Part of the morning routine." },
+  { code: "bag", kind: "bag", label: "Bag packed for tomorrow", emoji: "🎒", prompt: "An open school bag with the books and notebooks for the next school day visible.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The AI reads the book labels it can see and compares with the next day's timetable." },
+  { code: "screentime", kind: "screentime", label: "Screen time screenshot", emoji: "⏱️", prompt: "A screenshot of today's Digital Wellbeing (Android) or Screen Time (iPhone) summary: total time and the top apps.", days: ALL_DAYS, window_start: "19:00", window_end: "23:59", weight: 10, hint: "Every evening. The AI reads the total; over the family limit it becomes a question, not a punishment." },
 ];
 
 export function templateByCode(code: string): SnapTemplate | undefined {

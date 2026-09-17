@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { requireParent } from "@/lib/auth";
+import { SideTabs } from "@/components/SideTabs";
+import { KID_COLORS } from "@/lib/kid-tabs";
 
 const STEPS: { emoji: string; title: string; body: string; href: string; cta: string }[] = [
   { emoji: "👦", title: "Kids and timetables", body: "Each child has a login. Their school timetable drives everything: which classes to ask about, which quizzes to prepare, which subjects count. Update it from a photo when the school changes it.", href: "/parent/children", cta: "Kids" },
@@ -14,32 +16,49 @@ const STEPS: { emoji: string; title: string; body: string; href: string; cta: st
 
 export default async function ParentGuidePage() {
   await requireParent();
+  const tabs = [
+    ...STEPS.map((s, i) => ({
+      id: `step-${i + 1}`,
+      label: `${i + 1}. ${s.title}`,
+      emoji: s.emoji,
+      color: KID_COLORS[i % KID_COLORS.length],
+      content: (
+        <section className="card flex items-start gap-3">
+          <span className="text-4xl sticker-still">{s.emoji}</span>
+          <div className="flex-1">
+            <div className="font-bold">{s.title}</div>
+            <p className="text-sm muted mt-0.5">{s.body}</p>
+          </div>
+          <Link href={s.href} className="btn-ghost btn-sm shrink-0">{s.cta} →</Link>
+        </section>
+      ),
+    })),
+    {
+      id: "first-week",
+      label: "A good first week",
+      emoji: "🚀",
+      color: "#22c55e",
+      content: (
+        <section className="card text-sm space-y-1">
+          <div className="font-bold">A good first week</div>
+          <ol className="list-decimal pl-5 space-y-1 muted">
+            <li>Each boy logs in, takes the tour (it opens by itself), picks a theme, fills "What I love" and "Tell your coach about you".</li>
+            <li>Tonight: check-in with class notes, prayers, today&apos;s planned quiz.</li>
+            <li>You: press Prepare on the Plan tab, add two rewards, connect Telegram if not yet.</li>
+            <li>After a week: run the coach on Progress and read the daily report every evening.</li>
+          </ol>
+        </section>
+      ),
+    },
+  ];
   return (
     <main className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="h1">How it works</h1>
         <Link href="/parent" className="btn-ghost btn-sm">← Home</Link>
       </div>
-      <p className="text-sm muted">Your side takes five minutes a week. The kids' side takes five minutes a day. Here is the loop.</p>
-      {STEPS.map((s, i) => (
-        <section key={s.title} className="card flex items-start gap-3">
-          <span className="text-4xl sticker-still">{s.emoji}</span>
-          <div className="flex-1">
-            <div className="font-bold">{i + 1}. {s.title}</div>
-            <p className="text-sm muted mt-0.5">{s.body}</p>
-          </div>
-          <Link href={s.href} className="btn-ghost btn-sm shrink-0">{s.cta}</Link>
-        </section>
-      ))}
-      <section className="card text-sm space-y-1">
-        <div className="font-bold">A good first week</div>
-        <ol className="list-decimal pl-5 space-y-1 muted">
-          <li>Each boy logs in, takes the tour (it opens by itself), picks a theme, fills "What I love" and "Tell your coach about you".</li>
-          <li>Tonight: check-in with class notes, prayers, today&apos;s planned quiz.</li>
-          <li>You: press Prepare on the Plan tab, add two rewards, connect Telegram if not yet.</li>
-          <li>After a week: run the coach on Progress and read the daily report every evening.</li>
-        </ol>
-      </section>
+      <p className="text-sm muted">Your side takes five minutes a week. The kids&apos; side takes five minutes a day. Here is the loop, one step per tab.</p>
+      <SideTabs storageKey="guide" tabs={tabs} />
     </main>
   );
 }
