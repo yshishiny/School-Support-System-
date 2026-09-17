@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { SideTabs } from "@/components/SideTabs";
+import { Tabs } from "@/components/Tabs";
 import type { HomeData, KidView } from "./types";
 
 function Head({ d }: { d: HomeData }) {
@@ -75,38 +76,38 @@ function ReportLine({ d }: { d: HomeData }) {
   );
 }
 
-/** A · Command centre: to-do left, kid cards in the middle, live and inbox right. */
+/** A · Command centre: to-do left, one child at a time in full-width tabs in the middle, live and inbox right. */
 export function ParentLayoutA({ d }: { d: HomeData }) {
   return (
     <main className="space-y-3">
       <Head d={d} />
       {d.alerts}
-      <div className="grid gap-3 lg:grid-cols-[13rem_1fr_15rem]">
+      <div className="grid gap-3 lg:grid-cols-[13rem_minmax(0,1fr)_15rem]">
         <NeedsList d={d} />
-        <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2 min-w-0">
-          {d.kids.map((k) => (
-            <details key={k.id} className="card !p-0 overflow-hidden" style={{ borderTop: `4px solid ${k.color}` }} open>
-              <summary className="cursor-pointer list-none p-3 space-y-2">
-                <div className="flex items-center gap-2">
-                  {k.avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={k.avatarUrl} alt="" className="h-9 w-9 rounded-full object-cover border-2" style={{ borderColor: k.color }} />
-                  ) : <span className="text-2xl">{k.emoji}</span>}
-                  <div className="flex-1 min-w-0">
-                    <div className="font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{k.name} <span className="muted font-normal text-xs">· Grade {k.grade}</span></div>
-                    <div className="text-[11px] muted truncate">{k.online ? "🟢 online" : k.presenceLabel ?? ""}{k.school.off ? ` · 🏖️ ${k.school.reason}` : ` · 🏫 ${k.school.line}`}</div>
+        <div className="min-w-0">
+          <Tabs
+            storageKey="home-a-kids"
+            underMenu
+            tabs={d.kids.map((k) => ({
+              id: k.id,
+              label: `${k.name}${k.online ? " 🟢" : k.checkedIn ? " ✓" : ""}`,
+              emoji: k.emoji,
+              badge: k.needsCount || null,
+              content: (
+                <div className="space-y-2">
+                  <div className="rounded-2xl border border-line bg-panel p-3 space-y-2" style={{ borderTop: `4px solid ${k.color}` }}>
+                    <div className="text-xs muted">{k.online ? "🟢 online" : k.presenceLabel ?? "not online"}{k.school.off ? ` · 🏖️ ${k.school.reason}` : ` · 🏫 ${k.school.line}`}</div>
+                    <KidStat k={k} />
+                    <AllowanceRow k={k} />
+                    {(k.classLog.missing || k.overdue.length > 0 || k.integrityCount > 0) && (
+                      <div className="text-xs text-warn">{k.classLog.missing ? `📖 missing ${k.classLog.missing}` : ""}{k.overdue.length ? ` · ⏰ ${k.overdue.length} overdue` : ""}{k.integrityCount ? ` · 🔎 ${k.integrityCount} to ask tonight` : ""}</div>
+                    )}
                   </div>
-                  <span className={`badge ${k.checkedIn ? "text-good" : "text-bad"}`}>{k.checkedIn ? "✓ in" : "no check-in"}</span>
+                  {k.card}
                 </div>
-                <KidStat k={k} />
-                <AllowanceRow k={k} />
-                {(k.classLog.missing || k.overdue.length > 0 || k.integrityCount > 0) && (
-                  <div className="text-[11px] text-warn">{k.classLog.missing ? `📖 missing ${k.classLog.missing}` : ""}{k.overdue.length ? ` · ⏰ ${k.overdue.length} overdue` : ""}{k.integrityCount ? ` · 🔎 ${k.integrityCount} to ask` : ""}</div>
-                )}
-              </summary>
-              <div className="px-3 pb-3 border-t border-line pt-2">{k.card}</div>
-            </details>
-          ))}
+              ),
+            }))}
+          />
         </div>
         <div className="space-y-3">
           {d.live}

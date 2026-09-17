@@ -2,6 +2,11 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.7.1 — Quieter menu, readable kids (17 September 2026)
+
+- **Parent menu redesigned**: one calm panel with grouped rows, a small coloured icon disc per item, and a colour bar plus soft fill on the current page. The phone strip is smaller pills.
+- **Command centre layout**: the two squeezed kid cards are replaced by one child at a time in full-width tabs, each with a short summary strip on top of the full card. The tab bar sits below the phone menu strip.
+
 ## 1.7.0 — Straight answers (17 September 2026)
 
 - **Follow-up questions to the child** on every integrity signal ("prayers marked on time after the fact", "the same Arabic note twice", "no class marked 10 times"…): asked up to three times on different days, each round phrased differently and asking for more detail; round three quotes his earlier answer and asks him to tell it again. Short or padded answers are refused; a real one earns 2 points.

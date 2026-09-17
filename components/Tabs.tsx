@@ -14,7 +14,7 @@ export interface TabDef {
  * Pill tabs that keep every panel mounted (server-rendered) and just show one. The chosen tab is remembered
  * per `storageKey` in sessionStorage and can be preset with ?tab=<id> in the URL.
  */
-export function Tabs({ tabs, storageKey, defaultId, size = "md" }: { tabs: TabDef[]; storageKey: string; defaultId?: string; size?: "md" | "sm" }) {
+export function Tabs({ tabs, storageKey, defaultId, size = "md", underMenu = false }: { tabs: TabDef[]; storageKey: string; defaultId?: string; size?: "md" | "sm"; underMenu?: boolean }) {
   const [active, setActive] = useState(defaultId ?? tabs[0]?.id);
   useEffect(() => {
     try {
@@ -35,7 +35,7 @@ export function Tabs({ tabs, storageKey, defaultId, size = "md" }: { tabs: TabDe
   }
   return (
     <div className="space-y-3">
-      <div className={`flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 ${size === "sm" ? "" : "sticky top-0 z-10 py-1 bg-bg/80 backdrop-blur rounded-2xl"}`} role="tablist">
+      <div className={`flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 ${size === "sm" ? "" : `sticky ${underMenu ? "top-12 sm:top-0" : "top-0"} z-10 py-1 bg-bg/80 backdrop-blur rounded-2xl`}`} role="tablist">
         {tabs.map((t) => {
           const on = t.id === active;
           return (

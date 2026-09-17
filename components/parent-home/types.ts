@@ -27,6 +27,7 @@ export interface KidView {
   balance: number;
   streak: number;
   integrityCount: number;
+  needsCount: number; // things on this child that need the parent (overdue, missing classes, integrity)
   card: ReactNode; // the full card used inside the kid tab (option B) and the middle column (option A)
 }
 

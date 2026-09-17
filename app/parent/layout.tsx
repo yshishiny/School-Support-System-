@@ -8,7 +8,7 @@ export default async function ParentLayout({ children }: { children: React.React
   const unread = await unreadCount(profile.id).catch(() => 0);
   return (
     <div className="mx-auto max-w-6xl px-4 pt-3 pb-10">
-      <div className="grid gap-4 sm:grid-cols-[11rem_1fr]">
+      <div className="grid gap-4 sm:grid-cols-[12rem_1fr]">
         <ParentMenu unread={unread} />
         <div className="min-w-0">{children}</div>
       </div>

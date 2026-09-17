@@ -287,6 +287,7 @@ export default async function ParentHome() {
       balance,
       streak,
       integrityCount: integrity[idx].length,
+      needsCount: (cov.days.length ? 1 : 0) + overdue.length + integrity[idx].length + (ck ? 0 : 1),
       card,
     };
   });
