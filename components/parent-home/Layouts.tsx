@@ -130,7 +130,7 @@ export function ParentLayoutB({ d }: { d: HomeData }) {
     <main className="space-y-3">
       <Head d={d} />
       {d.alerts}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 min-w-0">
         <Link href={d.needs[0]?.href ?? "/parent"} className="tile flex items-center gap-2"><span className="text-2xl">🧾</span><div><div className="font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{needsN || "0"}</div><div className="text-[11px] muted">need you</div></div></Link>
         <div className="tile flex items-center gap-2"><span className="text-2xl">{online.length ? "🟢" : "⚪"}</span><div><div className="font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{online.length ? `${online.length} online` : "nobody on"}</div><div className="text-[11px] muted truncate">{online.map((k) => `${k.name}${k.presenceLabel ? ` · ${k.presenceLabel}` : ""}`).join(", ") || "last seen in the tabs"}</div></div></div>
         <Link href="/parent/allowance" className="tile flex items-center gap-2"><span className="text-2xl">💵</span><div><div className="font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{d.allowanceEnabled ? d.kids.map((k) => k.allowance?.score ?? "—").join(" · ") : "off"}</div><div className="text-[11px] muted">allowance scores</div></div></Link>

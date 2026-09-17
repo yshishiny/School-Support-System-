@@ -1,5 +1,5 @@
 import { requireParent } from "@/lib/auth";
-import { ParentMenu } from "@/components/ParentMenu";
+import { ParentMenu, ParentPhoneBar } from "@/components/ParentMenu";
 import { unreadCount } from "@/lib/inbox";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -10,11 +10,12 @@ export default async function ParentLayout({ children }: { children: React.React
   const isAdmin = !!(profile as { is_admin?: boolean }).is_admin;
   const openErrors = isAdmin ? (await createAdminClient().from("app_errors").select("id", { count: "exact", head: true }).is("resolved_at", null)).count ?? 0 : 0;
   return (
-    <div className="mx-auto max-w-6xl px-4 pt-3 pb-10 overflow-x-clip">
-      <div className="grid gap-4 sm:grid-cols-[12rem_minmax(0,1fr)]">
+    <div className="mx-auto max-w-6xl px-4 pt-3 pb-24 sm:pb-10 overflow-x-clip">
+      <div className="grid gap-4 grid-cols-[minmax(0,1fr)] sm:grid-cols-[12rem_minmax(0,1fr)]">
         <ParentMenu unread={unread} isAdmin={isAdmin} openErrors={openErrors} />
         <div className="min-w-0">{children}</div>
       </div>
+      <ParentPhoneBar unread={unread} />
     </div>
   );
 }

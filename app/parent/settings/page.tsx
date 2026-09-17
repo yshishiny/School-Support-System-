@@ -8,6 +8,7 @@ import { MyParentCard, ParentsPanel, type InviteRow, type OverrideRow, type Pare
 import { PlacesForm, type PlaceRow } from "@/components/PlacesForm";
 import { PushToggle } from "@/components/PushToggle";
 import { Tabs } from "@/components/Tabs";
+import { PARENT_SECTIONS } from "@/components/ParentMenu";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
@@ -56,9 +57,16 @@ export default async function SettingsPage() {
   return (
     <main className="space-y-4">
       <h1 className="h1">More</h1>
-      <div className="grid grid-cols-2 gap-3">
-        <Link href="/parent/children" className="card text-center"><div className="text-3xl">🧒</div><div className="font-semibold mt-1">Kids & timetable</div></Link>
-        <Link href="/parent/reports" className="card text-center"><div className="text-3xl">📨</div><div className="font-semibold mt-1">Daily reports</div></Link>
+      <div className="grid grid-cols-3 gap-2 sm:hidden">
+        {PARENT_SECTIONS.filter((i) => !["/parent", "/parent/settings", "/parent/notifications"].includes(i.href)).map((i) => (
+          <Link key={i.href} href={i.href} className="tile !p-2.5 text-center min-w-0" style={{ borderColor: `${i.color}66`, background: `${i.color}14` }}>
+            <div className="text-2xl">{i.emoji}</div>
+            <div className="text-xs font-bold mt-0.5 truncate" style={{ fontFamily: "var(--font-display)" }}>{i.label}</div>
+          </Link>
+        ))}
+        {(profile as { is_admin?: boolean }).is_admin && (
+          <Link href="/parent/admin" className="tile !p-2.5 text-center min-w-0"><div className="text-2xl">🛠️</div><div className="text-xs font-bold mt-0.5">Admin</div></Link>
+        )}
       </div>
       <Tabs
         storageKey="more"

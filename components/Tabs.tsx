@@ -34,8 +34,8 @@ export function Tabs({ tabs, storageKey, defaultId, size = "md", underMenu = fal
     }
   }
   return (
-    <div className="space-y-3">
-      <div className={`flex gap-1.5 overflow-x-auto pb-1 -mx-1 px-1 ${size === "sm" ? "" : `sticky ${underMenu ? "top-12 sm:top-0" : "top-0"} z-10 py-1 bg-bg/80 backdrop-blur rounded-2xl`}`} role="tablist">
+    <div className="space-y-3 min-w-0 max-w-full">
+      <div className={`flex gap-1.5 overflow-x-auto pb-1 px-0.5 min-w-0 max-w-full ${size === "sm" ? "" : `sticky ${underMenu ? "top-0" : "top-0"} z-10 py-1 bg-bg/80 backdrop-blur rounded-2xl`}`} role="tablist">
         {tabs.map((t) => {
           const on = t.id === active;
           return (

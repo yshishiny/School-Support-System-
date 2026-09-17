@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.12.0 — A phone layout of its own for parents (17 September 2026)
+
+- **Root cause of the wide page found and fixed**: the scrolling menu strip sat in a grid column and forced that column to the strip's full width (about 930 px), so every card below stretched past the screen. Scrolling strips (menu, kid tabs, page tabs) can no longer size their column.
+- **Phones get a bottom bar** like the kids' app: Home, Inbox (with the unread badge), Kids, Allowance, More. The desktop side menu is hidden on phones; More shows a grid of every section.
+- Verified at 412 px: nothing wider than the screen, tiles two by two, live feed wraps, kid tabs scroll sideways.
+
 ## 1.11.2 — Fits the phone (17 September 2026)
 
 - The parent area (and the kids' area) can no longer grow wider than the screen: the page clips at the edge, long words and links wrap, badges and chips may break onto two lines, code blocks wrap, and the phone menu strip stays inside the padded column.

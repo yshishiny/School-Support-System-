@@ -22,8 +22,8 @@ export function SideTabs({ tabs, storageKey }: { tabs: SideTab[]; storageKey: st
     try { sessionStorage.setItem(`side:${storageKey}`, id); } catch { /* ignore */ }
   }
   return (
-    <div className="grid gap-3 sm:grid-cols-[11rem_1fr]">
-      <nav className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 -mx-1 px-1 sm:sticky sm:top-3 sm:self-start" role="tablist">
+    <div className="grid gap-3 grid-cols-[minmax(0,1fr)] sm:grid-cols-[11rem_minmax(0,1fr)]">
+      <nav className="flex sm:flex-col gap-2 overflow-x-auto sm:overflow-visible pb-1 sm:pb-0 px-0.5 sm:sticky sm:top-3 sm:self-start min-w-0 max-w-full" role="tablist">
         {tabs.map((t) => {
           const on = t.id === active;
           return (
@@ -37,7 +37,7 @@ export function SideTabs({ tabs, storageKey }: { tabs: SideTab[]; storageKey: st
           );
         })}
       </nav>
-      <div>
+      <div className="min-w-0">
         {tabs.map((t) => (
           <div key={t.id} role="tabpanel" hidden={t.id !== active} className={t.id === active ? "pop space-y-3" : undefined}>{t.content}</div>
         ))}
