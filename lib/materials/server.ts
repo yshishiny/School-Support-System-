@@ -26,6 +26,12 @@ export interface MaterialRow {
   pages: number | null;
   worksheet: { questions: { prompt: string; choices: string[]; correct_index: number; explanation: string; skill_tag: string; original_type: string }[]; skipped: number; note: string; model: string; prepared_at: string } | null;
   created_at: string;
+  is_week_summary?: boolean;
+  covers_week_start?: string | null;
+  covers_from?: string | null;
+  covers_to?: string | null;
+  date_note?: string | null;
+  subjects?: { subject: string; topics: string[] }[] | null;
 }
 
 /** Signed URLs for private files, keyed by material id. */

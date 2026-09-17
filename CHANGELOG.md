@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.11.1 — Weekly syllabus with a date check (17 September 2026)
+
+- **Upload asks "weekly syllabus / week summary? this week or last week"**. The reader extracts the dates printed in the file (D/M/YYYY) and one entry per subject; the app checks the dates against your choice, or against this and last week, and flags a typo instead of trusting it. The card shows the week it covers, what the file says, and a selector to correct it.
+- **Syllabus versus class log**: every subject the syllabus lists is compared with his log for that week (no class, nothing logged, notes that do not match). One signal names the subjects; three follow-up rounds send him through it subject by subject and then to fix the log.
+- At check-in, each class shows the syllabus line for that subject and week beside any subject file.
+- The syllabus photo from 17 September (dates typed as March at school) is set to this week.
+- Migration 20260917160311 (materials week-summary columns).
+
 ## 1.11.0 — Manners with the child first, and the school-file study loop (17 September 2026)
 
 - **Manners**: the child rates his own manners at check-in (1 to 5, with a note). New parent page Manners (Fairness group): his rating and note beside your ✓/✗, hints on what to look for (tone, greetings, helping, phone at the table, siblings, helpers and elders, honesty, repair), the week in one row, and the days you disagreed. When he says 4 or 5 and you mark ✗, it becomes an integrity signal and a three-round follow-up to him.

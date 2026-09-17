@@ -29,6 +29,10 @@ const MaterialSchema = z.object({
   topics: z.array(z.string()).describe("The specific topics or skills the file covers, in the file's language; at most 12, most important first"),
   digest: z.string().describe("A compact study version of the content (max ~1500 words): key definitions, rules, worked examples, and the kinds of questions asked. Faithful to the file; no invention. Written so practice questions can be generated from it."),
   items: z.array(LooseItemSchema).describe("Tasks for the student. Only when the file or the instructions actually ask for something. Never invent dates."),
+  is_week_summary: z.boolean().describe("true when the file is a weekly syllabus / weekly plan / week summary listing what each subject covers in one week"),
+  covers_from: z.string().nullable().describe("For a week summary: the first date the file itself states, as YYYY-MM-DD (read day/month order carefully: Egyptian schools write D/M/YYYY); null if none stated"),
+  covers_to: z.string().nullable().describe("For a week summary: the last date the file states, YYYY-MM-DD; null if none"),
+  subjects: z.array(z.object({ subject: z.string(), topics: z.array(z.string()) })).describe("For a week summary: one entry per subject with the topics listed for it, in the file's words. Empty for other files."),
 });
 export interface MaterialReading {
   title: string;
@@ -39,6 +43,10 @@ export interface MaterialReading {
   topics: string[];
   digest: string;
   items: ExtractedItem[];
+  is_week_summary: boolean;
+  covers_from: string | null;
+  covers_to: string | null;
+  subjects: { subject: string; topics: string[] }[];
 }
 
 const KINDS = ["worksheet", "notes", "study_guide", "announcement", "other"] as const;
@@ -63,6 +71,10 @@ export function normaliseReading(raw: z.infer<typeof MaterialSchema>): MaterialR
     topics: [...new Set((raw.topics ?? []).map((t) => t.trim()).filter(Boolean))].slice(0, 12),
     digest: raw.digest ?? "",
     items,
+    is_week_summary: !!raw.is_week_summary,
+    covers_from: raw.covers_from && /^\d{4}-\d{2}-\d{2}$/.test(raw.covers_from) ? raw.covers_from : null,
+    covers_to: raw.covers_to && /^\d{4}-\d{2}-\d{2}$/.test(raw.covers_to) ? raw.covers_to : null,
+    subjects: (raw.subjects ?? []).map((s) => ({ subject: (s.subject ?? "").trim(), topics: (s.topics ?? []).map((t) => t.trim()).filter(Boolean).slice(0, 12) })).filter((s) => s.subject).slice(0, 20),
   };
 }
 
@@ -73,6 +85,7 @@ Rules:
 - Describe what the file is and what the student should do with it. Use the parent's instructions when given; they override your guess.
 - The digest is for writing practice questions later: keep the actual content (formulas, definitions, facts, example problems, vocabulary), not commentary. Preserve Arabic in Arabic.
 - Items: homework, quiz, exam, project, event, or note. Resolve dates against today's date given by the user; the Egyptian school week is Sunday to Thursday. If no date is stated anywhere, due_date is null and confidence is "low".
+- Weekly syllabus / week plan files (one row per subject with what is covered that week): set is_week_summary true, copy the dates the file states (D/M/YYYY in Egypt: "1/3/2026" is 1 March), and fill subjects with one entry per subject. Do not judge whether the dates are right; the app checks that.
 - If the file is unreadable, say so in the summary and return no items.`;
 
 /** The file as the model takes it: a PDF document, an image, or the extracted text of an Office/CSV/text file. */

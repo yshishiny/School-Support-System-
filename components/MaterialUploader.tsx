@@ -17,6 +17,7 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
   const [studentId, setStudentId] = useState(fixedStudentId ?? students[0]?.id ?? "");
   const [subject, setSubject] = useState("");
   const [instructions, setInstructions] = useState("");
+  const [weekSummary, setWeekSummary] = useState<"" | "this" | "last">("");
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -38,7 +39,7 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
         const { error: upErr } = await supabase.storage.from("materials").upload(path, f, { contentType: mime, upsert: false });
         if (upErr) throw new Error(upErr.message);
         setBusy(`Reading ${f.name}… (up to a minute for a long PDF)`);
-        const r = await registerMaterialAction(studentId, path, { mime, size: f.size, name: f.name, subject, instructions });
+        const r = await registerMaterialAction(studentId, path, { mime, size: f.size, name: f.name, subject, instructions, weekSummary: weekSummary || null });
         if (r.error) throw new Error(r.error);
         out.push(r);
         setResults([...out]);
@@ -66,6 +67,13 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
         <datalist id="material-subjects">{subjects.map((s) => <option key={s} value={s} />)}</datalist>
       </div>
       <textarea className="input" rows={2} placeholder="Instructions from the teacher, e.g. “Solve pages 3–5 for Thursday” or “Study this for the quiz on Monday”" value={instructions} onChange={(e) => setInstructions(e.target.value)} maxLength={600} />
+      <div className="flex flex-wrap items-center gap-3 text-xs">
+        <span className="font-semibold">Weekly syllabus / week summary?</span>
+        {([["", "No, a normal file"], ["this", "Yes, this week"], ["last", "Yes, last week"]] as const).map(([v, label]) => (
+          <label key={v} className="flex items-center gap-1"><input type="radio" name="week_summary" checked={weekSummary === v} onChange={() => setWeekSummary(v)} />{label}</label>
+        ))}
+        <span className="muted">The dates printed in the file are checked against your choice; a typo at school is flagged, not trusted.</span>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <label className="btn-ghost cursor-pointer">
           {files.length ? `${files.length} file${files.length === 1 ? "" : "s"} chosen` : "Choose files (PDF, photo, Word, Excel…)"}

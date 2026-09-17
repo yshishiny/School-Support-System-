@@ -62,6 +62,12 @@ BANK.log_vs_school = {
   r3: (p) => `You said: “${short(p)}”. Go back to the check-in and fix the class log for that subject so it matches what really happened, then write here what you changed.`,
 };
 
+BANK.syllabus_vs_log = {
+  r1: "The school's weekly syllabus lists what each subject covered this week, and your class log disagrees on some subjects ({detail}). Go subject by subject: what did you actually take, and where does your log go wrong?",
+  r2: "Open Learn → Files, the weekly syllabus. For each subject you marked “no class” or left empty this week: did that class happen? If yes, what was taught?",
+  r3: (p) => `You said: “${short(p)}”. Fix the class log for those days now (Check-in → earlier days) so it matches the syllabus, and write here which days you changed.`,
+};
+
 BANK.manners_gap = {
   r1: "You rated your own manners well on {detail}, and a parent saw it differently. Tell what happened that day, from your side, with the details: who, what was said, what came next.",
   r2: "Same day ({detail}): if you were the other person, how would you describe it? What would you have wanted to hear from you?",
@@ -79,6 +85,7 @@ export function signalDetail(sig: IntegritySignal): string {
   const dates = sig.ask.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
   const paren = sig.ask.match(/\(([^)]+)\)/)?.[1];
   const subject = sig.label.match(/^The same (.+?) note/)?.[1] ?? sig.label.match(/ for (.+?) this week, but/)?.[1];
+  if (sig.code === "syllabus_vs_log") { const m = sig.ask.match(/subject by subject: (.+)\.$/); return m ? m[1].slice(0, 160) : "several subjects"; }
   if (sig.code === "manners_gap") { const ds = sig.label.match(/\d{4}-\d{2}-\d{2}/g) ?? []; return ds.length ? ds.join(", ") : "that day"; }
   const parts = [...new Set([...(subject ? [subject] : []), ...dates, ...(paren ? [paren] : [])])];
   return parts.length ? parts.join(", ") : "that day";

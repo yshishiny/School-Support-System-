@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { prettyDate } from "@/lib/dates";
+import { prettyDate, shiftDate } from "@/lib/dates";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
-import { deleteMaterialAction, updateMaterialAction } from "@/lib/actions/materials";
+import { deleteMaterialAction, setMaterialWeekAction, updateMaterialAction } from "@/lib/actions/materials";
+import { schoolWeekStart } from "@/lib/materials/week";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { MaterialItemsReview, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { Tabs } from "@/components/Tabs";
@@ -57,6 +58,28 @@ export default async function MaterialsPage() {
           const st = materialStages(m.created_at.slice(0, 10), done.map((a) => a.submitted_at!.slice(0, 10)), today);
           const scores = done.filter((a) => a.total).map((a) => `${a.score}/${a.total}`);
           return <div className="flex flex-wrap gap-1.5 text-[11px]">{st.map((s) => <span key={s.n} className={`chip ${s.state === "done" ? "text-good" : s.state === "overdue" ? "text-bad" : s.state === "due" ? "text-warn" : "muted"}`}>{s.state === "done" ? "✓" : s.state === "overdue" ? "⏰" : "·"} {s.label}{s.state !== "done" ? ` by ${prettyDate(s.dueBy)}` : ""}</span>)}{scores.length > 0 && <span className="chip">scores {scores.join(", ")}</span>}</div>;
+        })()}
+        {(m.is_week_summary || m.date_note) && (() => {
+          const thisWeek = schoolWeekStart(today);
+          const lastWeek = shiftDate(thisWeek, -7);
+          const current = m.covers_week_start === thisWeek ? "this" : m.covers_week_start === lastWeek ? "last" : m.covers_week_start ?? "";
+          return (
+            <div className={`rounded-xl p-2 text-xs space-y-1 ${m.date_note && /typo|neither|not this|No dates/.test(m.date_note) ? "border border-warn bg-warn/10" : "bg-panel-2"}`}>
+              <div>📅 <b>Week summary</b>{m.covers_week_start ? ` · covers the week of ${prettyDate(m.covers_week_start)}` : ""}{m.covers_from ? ` · file says ${prettyDate(m.covers_from)}${m.covers_to && m.covers_to !== m.covers_from ? ` → ${prettyDate(m.covers_to)}` : ""}` : ""}</div>
+              {m.date_note && <div>{m.date_note}</div>}
+              <form action={setMaterialWeekAction} className="flex flex-wrap items-center gap-1.5">
+                <input type="hidden" name="id" value={m.id} />
+                <select name="week" className="input !py-0.5 !px-1.5 text-xs" defaultValue={current}>
+                  <option value="this">This week ({prettyDate(thisWeek)})</option>
+                  <option value="last">Last week ({prettyDate(lastWeek)})</option>
+                  {current && current !== "this" && current !== "last" && <option value={current}>Week of {prettyDate(current)}</option>}
+                  <option value="">Not a week summary</option>
+                </select>
+                <button className="btn-ghost btn-sm">Save</button>
+              </form>
+              {(m.subjects?.length ?? 0) > 0 && <div className="muted">{m.subjects!.map((s) => `${s.subject}: ${s.topics.slice(0, 3).join(", ")}`).join(" · ").slice(0, 400)}</div>}
+            </div>
+          );
         })()}
         {m.summary && <p className="text-sm">{m.summary}</p>}
         {m.error && <p className="text-xs text-bad">{m.error}</p>}

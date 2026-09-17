@@ -10,7 +10,7 @@ export interface IntegrityInput {
   checkins: { checkin_date: string; submitted_at: string | null; hourLocal?: number }[];
   lessonLogs: { log_date: string; subject_name: string; note: string }[];
   snaps: { taken_on: string; status: string; ai_verdict: string | null }[];
-  materials?: { subject: string | null; title: string; topics: string[]; created_at: string; uploaded_by_student: boolean }[]; // school files shared this week
+  materials?: { subject: string | null; title: string; topics: string[]; created_at: string; uploaded_by_student: boolean; is_week_summary?: boolean; covers_week_start?: string | null; subjects?: { subject: string; topics: string[] }[] }[]; // school files shared this week
   timetableSubjects?: { weekday: number; subject_name: string }[]; // to know which days the subject had a class
   mannersSelf?: { date: string; self: number | null }[]; // the child's own rating at check-in
   parentTicks?: { tick_date: string; code: string; value: boolean }[]; // the parent's daily taps
@@ -81,8 +81,26 @@ export function integritySignals(i: IntegrityInput): IntegritySignal[] {
   if (noClassToday.length >= 3 || noClass.length >= 5) out.push({ code: "no_class_overuse", label: `“No class” marked ${noClassToday.length >= 3 ? `${noClassToday.length} times today` : `${noClass.length} times this week`}`, ask: `Ask which classes really did not happen ${noClassToday.length >= 3 ? "today" : "this week"} (${[...new Set((noClassToday.length >= 3 ? noClassToday : noClass).map((l) => l.subject_name))].join(", ")}) and what he did in that time.` });
 
   // 8. What the school shared vs what he logged: a file for a subject this week while his log says "no class" or nothing.
+  // 8b. A weekly syllabus for this week: every subject it lists vs his log for that week.
+  const thisWeekStart = new Date(Date.parse(i.today + "T00:00:00Z") - new Date(i.today + "T00:00:00Z").getUTCDay() * 86400000).toISOString().slice(0, 10);
+  for (const m of (i.materials ?? []).filter((m) => m.is_week_summary && m.covers_week_start === thisWeekStart && (m.subjects?.length ?? 0) > 0)) {
+    const problems: string[] = [];
+    for (const entry of m.subjects!) {
+      const logs = i.lessonLogs.filter((l) => l.log_date >= thisWeekStart && sameSubject(l.subject_name, entry.subject));
+      const onTimetable = !i.timetableSubjects || i.timetableSubjects.some((t) => sameSubject(t.subject_name, entry.subject));
+      if (!onTimetable) continue;
+      const noClass = logs.filter((l) => /^no class/i.test(l.note.trim())).length;
+      const topicWords = new Set(entry.topics.flatMap((t) => norm(t).split(" ")).filter((w) => w.length > 3));
+      const mentioned = logs.some((l) => norm(l.note).split(" ").some((w) => topicWords.has(w)));
+      if (noClass) problems.push(`${entry.subject}: “no class” ×${noClass}`);
+      else if (logs.length === 0) problems.push(`${entry.subject}: nothing logged`);
+      else if (!mentioned && entry.topics.length) problems.push(`${entry.subject}: notes do not match (${entry.topics.slice(0, 2).join(", ")})`);
+    }
+    if (problems.length) out.push({ code: "syllabus_vs_log", label: `The school's weekly syllabus disagrees with his log on ${problems.length} subject${problems.length === 1 ? "" : "s"}`, ask: `Go through the syllabus with him subject by subject: ${problems.slice(0, 6).join("; ")}.` });
+  }
+
   const seenSubj = new Set<string>();
-  for (const m of (i.materials ?? []).filter((m) => m.subject && m.created_at.slice(0, 10) >= weekAgo)) {
+  for (const m of (i.materials ?? []).filter((m) => m.subject && !m.is_week_summary && m.created_at.slice(0, 10) >= weekAgo)) {
     const subj = m.subject!;
     if (seenSubj.has(norm(subj))) continue;
     seenSubj.add(norm(subj));

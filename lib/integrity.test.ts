@@ -53,3 +53,20 @@ describe("school file vs class log", () => {
     expect(ok.find((x) => x.code === "log_vs_school")).toBeUndefined();
   });
 });
+
+describe("weekly syllabus vs class log", () => {
+  it("compares every subject the syllabus lists with that week's log", () => {
+    const out = integritySignals({
+      today: "2026-09-17", attempts: [], prayers: [], checkins: [], snaps: [],
+      timetableSubjects: [{ weekday: 0, subject_name: "Math (GPA)" }, { weekday: 1, subject_name: "English (GPA)" }, { weekday: 2, subject_name: "Physics" }],
+      lessonLogs: [{ log_date: "2026-09-14", subject_name: "Math (GPA)", note: "multi-step equations" }, { log_date: "2026-09-15", subject_name: "English (GPA)", note: "No class / absent" }],
+      materials: [{ subject: null, title: "Grade 10 Weekly Syllabus", topics: [], created_at: "2026-09-17T10:00:00Z", uploaded_by_student: false, is_week_summary: true, covers_week_start: "2026-09-13", subjects: [{ subject: "Math", topics: ["Solving multi-step equations"] }, { subject: "English", topics: ["Parts of speech"] }, { subject: "Physics", topics: ["Atomic structure"] }, { subject: "French", topics: ["Verbs"] }] }],
+    });
+    const sig = out.find((x) => x.code === "syllabus_vs_log");
+    expect(sig?.label).toMatch(/2 subjects/);
+    expect(sig?.ask).toMatch(/English: “no class” ×1/);
+    expect(sig?.ask).toMatch(/Physics: nothing logged/);
+    expect(sig?.ask).not.toMatch(/Math/);
+    expect(sig?.ask).not.toMatch(/French/);
+  });
+});
