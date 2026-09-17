@@ -2,21 +2,70 @@ import Anthropic from "@anthropic-ai/sdk";
 import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
-import { ExtractedItemSchema } from "./extract-items";
+import { ExtractedItemSchema, type ExtractedItem } from "./extract-items";
 
 export type MaterialInput = { media_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; data: string } | { media_type: "text/plain"; text: string; name?: string };
 
+/**
+ * The shape the model is asked for. Deliberately loose (plain strings where the app wants enums, no array caps):
+ * the small model sometimes returns 14 topics or "Worksheet" with a capital, and a strict schema threw the whole
+ * reading away. normalise() below turns it into the exact shape the app stores.
+ */
+const LooseItemSchema = z.object({
+  kind: z.string().describe("One of: homework, quiz, exam, project, event, note"),
+  title: z.string().describe("Short, specific title a student would recognise, e.g. 'Math p.45 ex 1-10'"),
+  subject: z.string().nullable().describe("Subject name if it can be inferred, else null"),
+  details: z.string().nullable().describe("Anything the student needs to know to do it"),
+  due_date: z.string().nullable().describe("YYYY-MM-DD when the work is due or the quiz/exam happens; null if unknown"),
+  source_excerpt: z.string().describe("The original text this came from, trimmed"),
+  confidence: z.string().describe("One of: high, medium, low"),
+});
 const MaterialSchema = z.object({
   title: z.string().describe("Short title a student would recognise, e.g. 'Unit 3 review: linear equations'"),
-  kind: z.enum(["worksheet", "notes", "study_guide", "announcement", "other"]),
+  kind: z.string().describe("One of: worksheet, notes, study_guide, announcement, other"),
   subject: z.string().nullable().describe("Subject if it can be inferred, else null"),
-  language: z.enum(["english", "arabic", "mixed"]),
+  language: z.string().describe("One of: english, arabic, mixed"),
   summary: z.string().describe("Two or three sentences for the parent: what this file is and what the student is expected to do with it"),
-  topics: z.array(z.string()).max(12).describe("The specific topics or skills the file covers, in the file's language"),
+  topics: z.array(z.string()).describe("The specific topics or skills the file covers, in the file's language; at most 12, most important first"),
   digest: z.string().describe("A compact study version of the content (max ~1500 words): key definitions, rules, worked examples, and the kinds of questions asked. Faithful to the file; no invention. Written so practice questions can be generated from it."),
-  items: z.array(ExtractedItemSchema).describe("Tasks for the student. Only when the file or the instructions actually ask for something. Never invent dates."),
+  items: z.array(LooseItemSchema).describe("Tasks for the student. Only when the file or the instructions actually ask for something. Never invent dates."),
 });
-export type MaterialReading = z.infer<typeof MaterialSchema>;
+export interface MaterialReading {
+  title: string;
+  kind: "worksheet" | "notes" | "study_guide" | "announcement" | "other";
+  subject: string | null;
+  language: "english" | "arabic" | "mixed";
+  summary: string;
+  topics: string[];
+  digest: string;
+  items: ExtractedItem[];
+}
+
+const KINDS = ["worksheet", "notes", "study_guide", "announcement", "other"] as const;
+const LANGS = ["english", "arabic", "mixed"] as const;
+const ITEM_KINDS = ["homework", "quiz", "exam", "project", "event", "note"] as const;
+const CONF = ["high", "medium", "low"] as const;
+const pick = <T extends string>(v: string, allowed: readonly T[], fallback: T): T => (allowed as readonly string[]).includes(v.trim().toLowerCase().replace(/[\s-]+/g, "_")) ? (v.trim().toLowerCase().replace(/[\s-]+/g, "_") as T) : fallback;
+
+/** Exact app shape from the loose model output: unknown enum values fall back, lists are capped, bad items dropped. */
+export function normaliseReading(raw: z.infer<typeof MaterialSchema>): MaterialReading {
+  const items: ExtractedItem[] = [];
+  for (const it of raw.items ?? []) {
+    const r = ExtractedItemSchema.safeParse({ ...it, kind: pick(it.kind ?? "", ITEM_KINDS, "note"), confidence: pick(it.confidence ?? "", CONF, "low"), due_date: it.due_date && /^\d{4}-\d{2}-\d{2}$/.test(it.due_date) ? it.due_date : null, source_excerpt: it.source_excerpt ?? "", subject: it.subject ?? null, details: it.details ?? null });
+    if (r.success) items.push(r.data);
+  }
+  return {
+    title: (raw.title ?? "").trim().slice(0, 120) || "School file",
+    kind: pick(raw.kind ?? "", KINDS, "other"),
+    subject: raw.subject?.trim() || null,
+    language: pick(raw.language ?? "", LANGS, "mixed"),
+    summary: (raw.summary ?? "").trim(),
+    topics: [...new Set((raw.topics ?? []).map((t) => t.trim()).filter(Boolean))].slice(0, 12),
+    digest: raw.digest ?? "",
+    items,
+  };
+}
+
 
 const SYSTEM = `You read a school file (PDF, photo, Word, PowerPoint, Excel, CSV or text) shared in a class WhatsApp group at an American-curriculum international school in Egypt. Files may be in English or Arabic (Ministry subjects: Arabic, Religion, Social Studies).
 
@@ -49,5 +98,5 @@ export async function readMaterial(doc: MaterialInput, ctx: { today: string; sub
   const message = await stream.finalMessage();
   if (message.stop_reason === "refusal") throw new Error("The model declined to read this file.");
   const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return MaterialSchema.parse(JSON.parse(text));
+  return normaliseReading(MaterialSchema.parse(JSON.parse(text)));
 }

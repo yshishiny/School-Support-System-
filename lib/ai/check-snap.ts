@@ -24,8 +24,8 @@ const HandwritingSchema = PhotoSchema.extend({
   letter_formation: z.number().int().min(1).max(5),
   size_consistency: z.number().int().min(1).max(5),
   line_alignment: z.number().int().min(1).max(5),
-  strengths: z.array(z.string()).max(3),
-  focus: z.array(z.string()).max(3).describe("The one to three things to work on, concrete (e.g. 'close the loops on a and d')"),
+  strengths: z.array(z.string()).describe("Up to three"),
+  focus: z.array(z.string()).describe("The one to three things to work on, concrete (e.g. 'close the loops on a and d')"),
   practice_line: z.string().describe("A single sentence to copy five times next session, in the sample's language, using the letters that need work"),
 });
 
@@ -66,7 +66,7 @@ export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label
   const message = await stream.finalMessage();
   if (message.stop_reason === "refusal") throw new Error("The model declined to look at this picture.");
   const parsed = JSON.parse(textOf(message));
-  if (task.kind === "handwriting") return { kind: "handwriting", result: HandwritingSchema.parse(parsed) };
+  if (task.kind === "handwriting") { const r = HandwritingSchema.parse(parsed); return { kind: "handwriting", result: { ...r, strengths: r.strengths.slice(0, 3), focus: r.focus.slice(0, 3) } }; }
   if (task.kind === "homework") return { kind: "homework", result: HomeworkSchema.parse(parsed) };
   return { kind: "photo", result: PhotoSchema.parse(parsed) };
 }

@@ -9,7 +9,7 @@ const Schema = z.object({
     title: z.string().describe("Short title of the diagram"),
     caption: z.string().describe("One or two sentences telling the student what to look at"),
     svg: z.string().describe("A complete, self-contained <svg> with viewBox 0 0 640 360, no scripts, no external images, readable text at 14-20px"),
-  })).min(1).max(3),
+  })).describe("Two or three figures"),
   video_query: z.string().describe("The best 3-6 word search phrase for a video lesson on this exact topic, in the lesson language"),
 });
 export type TopicVisuals = z.infer<typeof Schema>;
@@ -32,6 +32,6 @@ export async function drawTopicVisuals(spec: { subject: string; unit: string | n
     messages: [{ role: "user", content: [`Grade ${spec.grade ?? ""}`, `Subject: ${spec.subject}`, spec.unit ? `Unit: ${spec.unit}` : "", `Topic: ${spec.topic}`, spec.language === "ar" ? "Language: Arabic" : "Language: English", spec.lessonExcerpt ? `The lesson text starts:\n${spec.lessonExcerpt.slice(0, 1500)}` : ""].filter(Boolean).join("\n") }],
   });
   if (res.stop_reason === "refusal" || !res.parsed_output) throw new Error("The model declined to draw this topic.");
-  const visuals = res.parsed_output.visuals.map((v) => ({ title: v.title, caption: v.caption, svg: sanitizeSvg(v.svg) })).filter((v): v is { title: string; caption: string; svg: string } => !!v.svg);
+  const visuals = res.parsed_output.visuals.slice(0, 3).map((v) => ({ title: v.title, caption: v.caption, svg: sanitizeSvg(v.svg) })).filter((v): v is { title: string; caption: string; svg: string } => !!v.svg);
   return { visuals, videoQuery: res.parsed_output.video_query, model: res.model };
 }
