@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.9.0 — The school's file versus the class log (17 September 2026)
+
+- **New integrity signal "log vs school"**: when a school file for a subject is uploaded this week (by a parent or the child) and his class log for that subject says "no class", has nothing, or never mentions any of the file's topics, the parent sees it under "Worth asking tonight" with the file's topics and the dates he marked "no class".
+- **The child is asked, three times, differently**: what was taken in that subject (round 1), which of the file's topics he actually took and on which day, after opening the file (round 2), then to correct the class log and say what he changed (round 3).
+- **At check-in**, each class shows what the school shared for that subject this week. Tapping "No class" on such a subject shows a warning that the file and his log are seen side by side and will be double-checked.
+
 ## 1.8.2 — Reading no longer fails on a long topic list (17 September 2026)
 
 - The file reader asked the model for at most 12 topics and threw the whole reading away when it listed more (a literature guide did). Now any number is accepted and the first 12 kept; unknown values for kind, language or task type fall back instead of failing; a broken task is dropped, the rest kept.

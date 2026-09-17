@@ -3,6 +3,7 @@ import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, prettyDate } from "@/lib/dates";
 import { CheckinForm } from "@/components/CheckinForm";
+import { sameSubject } from "@/lib/integrity";
 import { AddAssignmentForm } from "@/components/AddAssignmentForm";
 import { buildLessonDays } from "@/lib/lessons";
 import { subjectEmoji } from "@/lib/plan";
@@ -33,6 +34,12 @@ export default async function CheckinPage({ searchParams }: { searchParams: Prom
   const doneDates = new Set((weekCheckins ?? []).map((c) => c.checkin_date as string));
   const missedDays = Array.from({ length: 6 }, (_, k) => shiftDate(realToday, -6 + k)).filter((d) => !doneDates.has(d));
   const lessonDays = buildLessonDays({ today, lookBackDays: filledLater ? 0 : undefined, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given: boolean | null; homework: string | null; homework_due: string | null }[], daysOff: (offRows ?? []).map((d) => d.day as string) });
+  const { data: sharedRows } = await supabase.from("materials").select("subject, title, topics").eq("student_id", profile.id).eq("status", "ready").gte("created_at", `${shiftDate(today, -6)}T00:00:00Z`);
+  const shared = ((sharedRows ?? []) as { subject: string | null; title: string; topics: string[] | null }[]).filter((m) => m.subject);
+  for (const day of lessonDays) for (const sub of day.subjects) {
+    const mine = shared.filter((m) => sameSubject(m.subject!, sub.subject)).map((m) => ({ title: m.title, topics: (m.topics ?? []).slice(0, 5) }));
+    if (mine.length) sub.schoolShared = mine;
+  }
   const todays = (checkins ?? null) as (Checkin & { checkin_items: CheckinItem[] }) | null;
   const existingItems: Record<string, ItemStatus> = {};
   todays?.checkin_items.forEach((i) => (existingItems[i.assignment_id] = i.status));

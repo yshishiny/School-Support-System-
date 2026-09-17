@@ -36,3 +36,20 @@ describe("integrity signals", () => {
     expect(integritySignals({ ...base, lessonLogs: logs.slice(0, 2) })).toEqual([]);
   });
 });
+
+describe("school file vs class log", () => {
+  const base = { today: "2026-09-18", attempts: [], prayers: [], checkins: [], snaps: [], timetableSubjects: [{ weekday: 0, subject_name: "English (GPA)" }, { weekday: 2, subject_name: "English (GPA)" }] };
+  const file = { subject: "English (GPA)", title: "Grade 10 Quarter 1 Literature", topics: ["Of Mice and Men", "Foreshadowing", "Character arc"], created_at: "2026-09-18T10:00:00Z", uploaded_by_student: false };
+  it("flags a file for a subject he marked 'no class'", () => {
+    const out = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "No class" }], materials: [file] });
+    const sig = out.find((x) => x.code === "log_vs_school");
+    expect(sig?.label).toMatch(/1 of his English \(GPA\) classes marked/);
+    expect(sig?.ask).toMatch(/Of Mice and Men/);
+  });
+  it("flags notes that never mention the file's topics, and stays quiet when they do", () => {
+    const off = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "grammar drills" }], materials: [file] });
+    expect(off.find((x) => x.code === "log_vs_school")?.label).toMatch(/do not mention/);
+    const ok = integritySignals({ ...base, lessonLogs: [{ log_date: "2026-09-15", subject_name: "English (GPA)", note: "Of Mice and Men chapter 2, foreshadowing" }], materials: [file] });
+    expect(ok.find((x) => x.code === "log_vs_school")).toBeUndefined();
+  });
+});

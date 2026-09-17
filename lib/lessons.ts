@@ -22,6 +22,7 @@ export interface LessonSubjectInput {
   existingHomework: string | null;
   existingHomeworkDue: string | null;
   defaultHomeworkDue: string; // next time this subject is on the timetable
+  schoolShared?: { title: string; topics: string[] }[]; // files the school shared for this subject this week
 }
 
 export interface LessonDay {

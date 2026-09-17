@@ -56,6 +56,12 @@ const BANK: Record<string, Bank> = {
   },
 };
 
+BANK.log_vs_school = {
+  r1: "The school shared a file for {detail} this week, but your class log says otherwise (no class, or nothing about it). What was actually taken in that subject this week? Name the lesson and one thing the teacher explained.",
+  r2: "Open the school's file for {detail} on Learn → Files and look at it. Which of its topics did you actually take in class, and on which day? Which ones have not been taught yet?",
+  r3: (p) => `You said: “${short(p)}”. Go back to the check-in and fix the class log for that subject so it matches what really happened, then write here what you changed.`,
+};
+
 const GENERIC: Bank = {
   r1: "Your coach noticed: {label}. Tell what happened in your own words, with the details (when, where, who).",
   r2: "About “{label}”: walk through it step by step, from the start.",
@@ -66,7 +72,7 @@ const GENERIC: Bank = {
 export function signalDetail(sig: IntegritySignal): string {
   const dates = sig.ask.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
   const paren = sig.ask.match(/\(([^)]+)\)/)?.[1];
-  const subject = sig.label.match(/^The same (.+?) note/)?.[1];
+  const subject = sig.label.match(/^The same (.+?) note/)?.[1] ?? sig.label.match(/ for (.+?) this week, but/)?.[1];
   const parts = [...new Set([...(subject ? [subject] : []), ...dates, ...(paren ? [paren] : [])])];
   return parts.length ? parts.join(", ") : "that day";
 }

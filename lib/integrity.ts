@@ -10,6 +10,8 @@ export interface IntegrityInput {
   checkins: { checkin_date: string; submitted_at: string | null; hourLocal?: number }[];
   lessonLogs: { log_date: string; subject_name: string; note: string }[];
   snaps: { taken_on: string; status: string; ai_verdict: string | null }[];
+  materials?: { subject: string | null; title: string; topics: string[]; created_at: string; uploaded_by_student: boolean }[]; // school files shared this week
+  timetableSubjects?: { weekday: number; subject_name: string }[]; // to know which days the subject had a class
 }
 
 export interface IntegritySignal {
@@ -19,6 +21,13 @@ export interface IntegritySignal {
 }
 
 const cap = (p: string) => p[0].toUpperCase() + p.slice(1);
+const norm = (x: string) => x.toLowerCase().replace(/\(.*?\)/g, "").replace(/[^a-z\u0600-\u06ff ]/g, " ").trim();
+/** "English (GPA)" and "English Literature" are the same subject for the file-vs-log check. */
+export function sameSubject(a: string, b: string): boolean {
+  const x = norm(a);
+  const y = norm(b);
+  return !!x && !!y && (x === y || x.includes(y) || y.includes(x) || x.split(" ").some((w) => w.length > 3 && y.split(" ").includes(w)));
+}
 
 export function integritySignals(i: IntegrityInput): IntegritySignal[] {
   const out: IntegritySignal[] = [];
@@ -68,6 +77,21 @@ export function integritySignals(i: IntegrityInput): IntegritySignal[] {
   const noClass = i.lessonLogs.filter((l) => l.log_date >= weekAgo && /^no class/i.test(l.note.trim()));
   const noClassToday = noClass.filter((l) => l.log_date === i.today);
   if (noClassToday.length >= 3 || noClass.length >= 5) out.push({ code: "no_class_overuse", label: `“No class” marked ${noClassToday.length >= 3 ? `${noClassToday.length} times today` : `${noClass.length} times this week`}`, ask: `Ask which classes really did not happen ${noClassToday.length >= 3 ? "today" : "this week"} (${[...new Set((noClassToday.length >= 3 ? noClassToday : noClass).map((l) => l.subject_name))].join(", ")}) and what he did in that time.` });
+
+  // 8. What the school shared vs what he logged: a file for a subject this week while his log says "no class" or nothing.
+  const seenSubj = new Set<string>();
+  for (const m of (i.materials ?? []).filter((m) => m.subject && m.created_at.slice(0, 10) >= weekAgo)) {
+    const subj = m.subject!;
+    if (seenSubj.has(norm(subj))) continue;
+    seenSubj.add(norm(subj));
+    const logs = i.lessonLogs.filter((l) => l.log_date >= weekAgo && sameSubject(l.subject_name, subj));
+    const noClass = logs.filter((l) => /^no class/i.test(l.note.trim()));
+    const days = (i.timetableSubjects ?? []).filter((t) => sameSubject(t.subject_name, subj)).length;
+    const topicWords = new Set(m.topics.flatMap((t) => norm(t).split(" ")).filter((w) => w.length > 3));
+    const mentioned = logs.some((l) => norm(l.note).split(" ").some((w) => topicWords.has(w)));
+    const gap = noClass.length > 0 ? `${noClass.length} of his ${subj} classes marked “no class”` : logs.length === 0 && (days > 0 || !i.timetableSubjects) ? `no ${subj} class logged this week` : !mentioned && m.topics.length > 0 && logs.length > 0 ? `his ${subj} notes do not mention any of it` : null;
+    if (gap) out.push({ code: "log_vs_school", label: `School shared “${m.title}” for ${subj} this week, but ${gap}`, ask: `Ask what was taken in ${subj} this week. The school's file covers: ${m.topics.slice(0, 5).join(", ") || m.title}. ${noClass.length ? `He marked “no class” on ${noClass.map((l) => l.log_date).join(", ")}.` : ""}`.trim() });
+  }
 
   // 7. Snaps sent back more than once.
   const rejected = i.snaps.filter((s) => s.status === "rejected" && s.taken_on >= weekAgo);

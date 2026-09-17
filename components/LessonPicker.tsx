@@ -75,6 +75,13 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
         </div>
       )}
 
+      {input.schoolShared && input.schoolShared.length > 0 && (
+        <div className={`text-xs rounded-xl p-2 ${note === "No class / absent" ? "border border-warn bg-warn/10" : "bg-panel-2"}`}>
+          🏫 The school shared this week: {input.schoolShared.map((m) => `${m.title}${m.topics.length ? ` (${m.topics.join(", ")})` : ""}`).join("; ")}.
+          {note === "No class / absent" ? <b> You marked “no class”. If the class happened, pick the lesson instead. Your parents see the file and your log side by side, and your coach will ask about it.</b> : " Pick the lesson that matches, or say what really happened."}
+        </div>
+      )}
+
       {note && note !== "No class / absent" && (
         <div className="space-y-1.5">
           <div className="flex items-center gap-2 text-xs">
