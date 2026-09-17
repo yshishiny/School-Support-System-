@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { settleCheckpoint } from "@/lib/checkpoint/build";
+import { pingParents } from "@/lib/notify";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -259,6 +260,10 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
     }
   }
   if (quizMeta?.checkpoint_id) await settleCheckpoint(quizMeta.checkpoint_id, attemptId).catch((err) => console.error("[checkpoint] settle failed", err));
+  if (attempt.kind !== "review") {
+    const { data: qz } = await admin.from("quizzes").select("title").eq("id", attempt.quiz_id).maybeSingle();
+    void pingParents(family.id, `${profile.full_name.split(" ")[0]} · ${quizMeta?.checkpoint_id ? "checkpoint" : "quiz"} done`, `${qz?.title ?? "Quiz"}: ${score}/${total}${flag ? ` · ⚠️ ${flag}` : ""}`, quizMeta?.checkpoint_id ? "/parent/progress" : "/parent");
+  }
   ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
 }

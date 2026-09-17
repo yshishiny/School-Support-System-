@@ -18,7 +18,7 @@ export default async function SettingsPage() {
   const [{ data: places }, { data: kids }, { data: parents }, { data: invites }, { data: overrides }] = await Promise.all([
     supabase.from("places").select("*").eq("family_id", family.id).order("kind"),
     supabase.from("profiles").select("id, full_name").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
-    supabase.from("profiles").select("id, full_name, parent_label, telegram_chat_id, whatsapp, created_at").eq("family_id", family.id).eq("role", "parent").order("created_at"),
+    supabase.from("profiles").select("id, full_name, parent_label, telegram_chat_id, whatsapp, created_at, live_pings").eq("family_id", family.id).eq("role", "parent").order("created_at"),
     supabase.from("family_invites").select("id, label, token, expires_at, used_at").eq("family_id", family.id).order("created_at", { ascending: false }).limit(10),
     supabase.from("custody_overrides").select("id, day, parent_id, note").eq("family_id", family.id).gte("day", today).order("day").limit(30),
   ]);

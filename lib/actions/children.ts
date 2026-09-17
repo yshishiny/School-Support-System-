@@ -13,15 +13,17 @@ export async function createChildAction(_prev: { error?: string; ok?: string } |
   const fullName = String(formData.get("full_name") ?? "").trim();
   const username = String(formData.get("username") ?? "").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
   const password = String(formData.get("password") ?? "");
-  const grade = Number(formData.get("grade") ?? 0);
+  const stage = (["school", "university", "postgraduate", "adult"].includes(String(formData.get("stage"))) ? String(formData.get("stage")) : "school") as "school" | "university" | "postgraduate" | "adult";
+  const grade = stage === "school" ? Number(formData.get("grade") ?? 0) : 0;
+  const birthDate = String(formData.get("birth_date") ?? "").trim();
   const emoji = String(formData.get("avatar_emoji") ?? "🎓").trim() || "🎓";
   const subjects = String(formData.get("subjects") ?? "")
     .split(/[,\n]/)
     .map((s) => s.trim())
     .filter(Boolean);
 
-  if (!fullName || !username || password.length < 6 || !(grade >= 1 && grade <= 12)) {
-    return { error: "Name, username, a password of 6+ characters and a grade (1-12) are required." };
+  if (!fullName || !username || password.length < 6 || (stage === "school" && !(grade >= 1 && grade <= 12))) {
+    return { error: "Name, username, a password of 6+ characters and, for school, a grade (1-12) are required." };
   }
 
   const admin = createAdminClient();
@@ -29,14 +31,15 @@ export async function createChildAction(_prev: { error?: string; ok?: string } |
     email: `${username}@${CHILD_DOMAIN}`,
     password,
     email_confirm: true,
-    user_metadata: { role: "student", full_name: fullName, family_id: family.id, grade, avatar_emoji: emoji },
+    user_metadata: { role: "student", full_name: fullName, family_id: family.id, grade: grade || null, avatar_emoji: emoji },
   });
   if (error || !data.user) return { error: error?.message ?? "Could not create the account." };
+  await admin.from("profiles").update({ stage, birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null }).eq("id", data.user.id);
 
   if (subjects.length) {
     await admin.from("subjects").insert(subjects.map((name) => ({ student_id: data.user!.id, name })));
   }
-  const copied = await copyTimetableTemplate(data.user.id, grade);
+  const copied = grade ? await copyTimetableTemplate(data.user.id, grade) : 0;
   revalidatePath("/parent/children");
   return { ok: `${fullName} can now log in with username "${username}".${copied ? ` School timetable for grade ${grade} loaded (${copied} periods).` : ""}` };
 }
@@ -177,4 +180,38 @@ export async function setDayOffAction(formData: FormData): Promise<void> {
     await supabase.from("school_days_off").upsert({ family_id: family.id, day, label }, { onConflict: "family_id,day" });
   }
   ["/parent", "/parent/children", "/today"].forEach((p) => revalidatePath(p));
+}
+
+/** The child's personal page: name, birthday, stage, school, notes for the coach, and an optional new password. */
+export async function updateChildProfileAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { family } = await requireParent();
+  const studentId = String(formData.get("student_id") ?? "");
+  const admin = createAdminClient();
+  const { data: target } = await admin.from("profiles").select("id, family_id, role").eq("id", studentId).maybeSingle();
+  if (!target || target.family_id !== family.id || target.role !== "student") return { error: "Child not found." };
+  const stage = (["school", "university", "postgraduate", "adult"].includes(String(formData.get("stage"))) ? String(formData.get("stage")) : "school") as "school" | "university" | "postgraduate" | "adult";
+  const gradeRaw = Number(formData.get("grade") ?? 0);
+  const birth = String(formData.get("birth_date") ?? "").trim();
+  const gender = String(formData.get("gender") ?? "");
+  const patch = {
+    full_name: String(formData.get("full_name") ?? "").trim().slice(0, 80) || undefined,
+    stage,
+    grade: stage === "school" && gradeRaw >= 1 && gradeRaw <= 12 ? gradeRaw : stage === "school" ? undefined : null,
+    birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birth) ? birth : null,
+    gender: ["boy", "girl", "other"].includes(gender) ? gender : null,
+    school_name: String(formData.get("school_name") ?? "").trim().slice(0, 120) || null,
+    phone: String(formData.get("phone") ?? "").trim().slice(0, 30) || null,
+    avatar_emoji: String(formData.get("avatar_emoji") ?? "").trim().slice(0, 8) || undefined,
+    parent_notes: String(formData.get("parent_notes") ?? "").trim().slice(0, 1500) || null,
+  };
+  const { error } = await admin.from("profiles").update(patch).eq("id", studentId);
+  if (error) return { error: error.message };
+  const pw = String(formData.get("new_password") ?? "");
+  if (pw) {
+    if (pw.length < 6) return { error: "Saved, but the new password needs 6+ characters." };
+    const { error: pwErr } = await admin.auth.admin.updateUserById(studentId, { password: pw });
+    if (pwErr) return { error: `Saved, but the password was not changed: ${pwErr.message}` };
+  }
+  ["/parent", "/parent/children", "/parent/progress", "/today", "/me", "/coach"].forEach((p) => revalidatePath(p));
+  return { ok: pw ? "Saved, password changed." : "Saved." };
 }

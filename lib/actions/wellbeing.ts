@@ -7,6 +7,7 @@ import { INSTRUMENTS, scoreInstrument, type Instrument } from "@/lib/wellbeing";
 import { classifyRisk, coachChat, type ChatTurn } from "@/lib/ai/coach-chat";
 import { HELPLINES, parentAlertText, type RiskCategory, type RiskLevel } from "@/lib/safety";
 import { notifyParents } from "@/lib/notify";
+import { learnerLine, stageTone } from "@/lib/people";
 import { learnerPromptLine } from "@/lib/learner";
 import { themeById } from "@/lib/themes";
 import { todayIn } from "@/lib/dates";
@@ -89,9 +90,13 @@ export async function coachChatAction(message: string): Promise<ChatReply> {
   const history: ChatTurn[] = [...(past ?? []).reverse().map((m) => ({ role: m.role as "user" | "assistant", content: m.content })), { role: "user", content: text }];
   await admin.from("coach_messages").insert({ student_id: profile.id, role: "user", content: text });
   try {
+    const today = todayIn(family.timezone);
     const out = await coachChat({
       studentName: profile.full_name.split(" ")[0],
       grade: profile.grade,
+      learnerLine: learnerLine(profile, today),
+      stageTone: stageTone(profile.stage),
+      parentNotes: profile.parent_notes ?? null,
       themeName: themeById(profile.theme).name,
       learner: learnerPromptLine(profile.learner_profile),
       guidance: profile.professional_guidance,

@@ -15,8 +15,16 @@ export function AddChildForm() {
           <input name="full_name" className="input" required />
         </div>
         <div>
-          <label className="label">Grade</label>
-          <input name="grade" type="number" min={1} max={12} className="input" required />
+          <label className="label">Stage</label>
+          <select name="stage" className="input" defaultValue="school"><option value="school">🎒 School</option><option value="university">🎓 University</option><option value="postgraduate">📚 Postgraduate</option><option value="adult">💼 Adult learner</option></select>
+        </div>
+        <div>
+          <label className="label">Grade (school only)</label>
+          <input name="grade" type="number" min={1} max={12} className="input" />
+        </div>
+        <div>
+          <label className="label">Date of birth</label>
+          <input name="birth_date" type="date" className="input" />
         </div>
         <div>
           <label className="label">Avatar emoji</label>

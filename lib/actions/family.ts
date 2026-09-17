@@ -16,7 +16,7 @@ export async function updateParentProfileAction(_prev: { error?: string; ok?: st
   const label = String(formData.get("parent_label") ?? "").trim().slice(0, 24) || null;
   const whatsapp = String(formData.get("whatsapp") ?? "").replace(/[^\d]/g, "") || null;
   const fullName = String(formData.get("full_name") ?? "").trim().slice(0, 80) || profile.full_name;
-  const { error } = await supabase.from("profiles").update({ parent_label: label, whatsapp, full_name: fullName }).eq("id", profile.id);
+  const { error } = await supabase.from("profiles").update({ parent_label: label, whatsapp, full_name: fullName, live_pings: formData.get("live_pings") === "on" }).eq("id", profile.id);
   if (error) return { error: error.message };
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: "Saved." };

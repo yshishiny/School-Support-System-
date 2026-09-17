@@ -33,6 +33,7 @@ export interface ReportChild {
   school?: { off: boolean; reason: string | null; lessons: number } | null;
   classLog?: { due: number; done: number; missing: string | null } | null; // this allowance week
   checkpoint?: { line: string; kind: string; notLearned: string[] } | { pending: string } | null;
+  birthday?: { today: boolean; inDays: number | null; age: number | null } | null;
   snaps?: { label: string; state: "approved" | "good" | "sent" | "rejected" | "missing" }[]; // show-your-win tasks due today
   handwriting?: { score: number; before: number | null; focus: string[] } | null; // latest sample this week
 }
@@ -56,6 +57,8 @@ export function buildDailyReport(date: string, children: ReportChild[], parentAc
   for (const c of children) {
     lines.push("");
     lines.push(`*${c.name}*${c.grade ? ` (Grade ${c.grade})` : ""}`);
+    if (c.birthday?.today) lines.push(`🎂 Birthday today${c.birthday.age !== null ? `: ${c.birthday.age} years` : ""}!`);
+    else if (c.birthday?.inDays !== null && c.birthday?.inDays !== undefined && c.birthday.inDays <= 7) lines.push(`🎂 Birthday in ${c.birthday.inDays} day${c.birthday.inDays === 1 ? "" : "s"}.`);
     if (c.school) lines.push(c.school.off ? `🏖️ No school today${c.school.reason && c.school.reason !== "Weekend" ? ` (${c.school.reason})` : ""}.` : `🏫 School day, ${c.school.lessons} lesson${c.school.lessons === 1 ? "" : "s"}.`);
     if (!c.checkin) {
       lines.push("⚠️ No check-in today.");

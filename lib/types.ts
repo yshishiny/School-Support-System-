@@ -64,6 +64,15 @@ export interface Profile {
   telegram_chat_id: string | null;
   whatsapp: string | null;
   parent_label: string | null; // "Dad", "Mum"…
+  birth_date?: string | null;
+  stage?: "school" | "university" | "postgraduate" | "adult";
+  gender?: "boy" | "girl" | "other" | null;
+  school_name?: string | null;
+  phone?: string | null;
+  parent_notes?: string | null;
+  last_seen_at?: string | null;
+  last_path?: string | null;
+  live_pings?: boolean;
 }
 
 export interface Subject {

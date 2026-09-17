@@ -1,6 +1,7 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server";
 import { logAccess } from "@/lib/access/log";
+import { touchPresence } from "@/lib/access/presence";
 
 const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron"];
 
@@ -43,6 +44,13 @@ export async function updateSession(request: NextRequest, event?: NextFetchEvent
       const write = logAccess(user.id, "visit", (n) => request.headers.get(n), path);
       if (event) event.waitUntil(write); else await write;
       response.cookies.set("al", day, { path: "/", maxAge: 60 * 60 * 26, sameSite: "lax", httpOnly: true });
+    }
+    // Presence for the parent's live panel: at most once per two minutes per device.
+    const bucket = String(Math.floor(Date.now() / 120000));
+    if (request.cookies.get("ps")?.value !== bucket) {
+      const touch = touchPresence(user.id, path);
+      if (event) event.waitUntil(touch); else await touch;
+      response.cookies.set("ps", bucket, { path: "/", maxAge: 120, sameSite: "lax", httpOnly: true });
     }
   }
   return response;

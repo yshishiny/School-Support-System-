@@ -7,6 +7,8 @@ import { dueSnapTasks, taskDayState, windowOpen, type SnapLite } from "@/lib/sna
 import { loadSnapTasks } from "@/lib/snaps/server";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { weekFor } from "@/lib/allowance";
+import { isBirthday, ageOn } from "@/lib/people";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { computeStreak, levelFor } from "@/lib/points";
 import type { PrayerRow } from "@/components/PrayerPill";
 import { themeById } from "@/lib/themes";
@@ -108,6 +110,11 @@ export default async function TodayPage() {
     checkpoint,
   });
 
+  const birthday = isBirthday(profile.birth_date, today);
+  if (birthday) {
+    // One gift per birthday: the unique (student, ref_type, ref_id) index makes repeats a no-op.
+    await createAdminClient().from("points_ledger").insert({ student_id: profile.id, delta: 50, reason: `Happy birthday ${today.slice(0, 4)} 🎂`, ref_type: `birthday-${today.slice(0, 4)}`, ref_id: profile.id }).then(() => null, () => null);
+  }
   const balance = (ledger ?? []).reduce((s, r) => s + r.delta, 0);
   const streak = computeStreak(checkinDates, today) || computeStreak(checkinDates, shiftDate(today, -1));
   const theme = themeById(profile.theme);
@@ -126,7 +133,7 @@ export default async function TodayPage() {
     streak,
     mascot: stickers[1] ?? theme.emoji,
     stickers,
-    tagline: theme.tagline,
+    tagline: birthday ? `🎂 Happy birthday, ${profile.full_name.split(" ")[0]}! ${ageOn(profile.birth_date, today) ?? ""} today. +50 ★ from all of us.` : theme.tagline,
     queue,
     totalToday: queue.filter((q) => q.kind !== "done").length,
     prayerRows,

@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { learnerLine, stageTone } from "@/lib/people";
 import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -37,7 +38,9 @@ export async function runCoach(stats: CoachStats): Promise<CoachOutput & { model
   const client = new Anthropic();
   const s = stats.student;
   const lines = [
-    `Student: ${s.full_name}, grade ${s.grade}, theme "${stats.themeName}", interests: ${s.interests ?? "not given"}, favourite subjects: ${s.favourite_subjects?.join(", ") || "not given"}, target exam: ${s.target_exam ?? "none"}.`,
+    `Student: ${learnerLine(s, stats.today)}${s.school_name ? ` at ${s.school_name}` : ""}, theme "${stats.themeName}", interests: ${s.interests ?? "not given"}, favourite subjects: ${s.favourite_subjects?.join(", ") || "not given"}, target exam: ${s.target_exam ?? "none"}.`,
+    stageTone(s.stage) || null,
+    s.parent_notes ? `Parent's notes about the student (private, use with care): ${s.parent_notes}` : null,
     `Period: ${stats.periodStart} to ${stats.today}. Check-ins ${stats.checkins}/14, streak ${stats.streak}, minutes studied at home ${stats.minutesStudied}, prayers on time ${stats.prayersOnTimeRate === null ? "not logged" : stats.prayersOnTimeRate + "%"}.`,
     `Subjects:`,
     ...stats.subjects.map(

@@ -6,7 +6,7 @@ import { WEEKDAYS, parentName, type CustodyPattern, type ParentLite } from "@/li
 import { prettyDate } from "@/lib/dates";
 import { Notice, SubmitButton } from "./ui";
 
-export interface ParentRow extends ParentLite { telegram_chat_id: string | null; whatsapp: string | null; created_at: string }
+export interface ParentRow extends ParentLite { telegram_chat_id: string | null; whatsapp: string | null; created_at: string; live_pings?: boolean }
 export interface InviteRow { id: string; label: string | null; token: string; expires_at: string; used_at: string | null }
 export interface OverrideRow { id: string; day: string; parent_id: string | null; note: string | null }
 
@@ -24,6 +24,7 @@ export function MyParentCard({ me }: { me: ParentRow }) {
         <label className="label">Your WhatsApp number (country code, digits only)</label>
         <input name="whatsapp" className="input" inputMode="numeric" placeholder="2010xxxxxxxx" defaultValue={me.whatsapp ?? ""} />
       </div>
+      <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="live_pings" defaultChecked={me.live_pings !== false} /> Instant pings on this phone when a kid checks in or finishes a quiz</label>
       <Notice error={state?.error} ok={state?.ok} />
       <SubmitButton pendingText="Saving…">Save</SubmitButton>
     </form>

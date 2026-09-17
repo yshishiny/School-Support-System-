@@ -14,6 +14,10 @@ import { signHeroUrls } from "@/lib/hero";
 import { lessonsLine, schoolDay, type DayOff } from "@/lib/school-day";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { computeIntegrity } from "@/lib/integrity/run";
+import { liveFeedAction } from "@/lib/actions/live";
+import { LiveFeed } from "@/components/LiveFeed";
+import { presence } from "@/lib/activity";
+import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
@@ -84,6 +88,7 @@ export default async function ParentHome() {
   const allowanceStatus = family.allowance_enabled ? await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family).catch(() => null))) : students.map(() => null);
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
+  const live = await liveFeedAction().catch(() => null);
   const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
   const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
@@ -135,6 +140,8 @@ export default async function ParentHome() {
         </section>
       ))}
 
+      {live && <LiveFeed initial={live} tz={family.timezone} />}
+
       {/* Needs you */}
       {needs.length > 0 && (
         <div className="flex flex-wrap gap-1.5">
@@ -178,7 +185,8 @@ export default async function ParentHome() {
               </Link>
               <div className="flex-1 min-w-0">
                 <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
-                <div className="text-xs muted">{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
+                <div className="text-xs muted">{(() => { const pr = presence(s.last_seen_at, s.last_path); return pr.label ? <span className={pr.online ? "text-good" : ""}>{pr.online ? "🟢 " : ""}{pr.label} · </span> : null; })()}{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
+                {(() => { const d = daysToBirthday(s.birth_date, today); return d !== null && d <= 7 ? <div className="text-xs text-warn">🎂 {d === 0 ? `Birthday today, turns ${ageOn(s.birth_date, today)}!` : `Birthday in ${d} day${d === 1 ? "" : "s"}`}</div> : null; })()}
               </div>
               <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
             </div>

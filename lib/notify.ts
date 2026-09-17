@@ -44,3 +44,10 @@ export async function notifyParents(familyId: string, textFor: string | ((p: Par
   if (channels.length === 0) return { channel: "none", ok: false, error: "No delivery channel configured: connect Telegram under More", delivered: 0, parents: parents.length };
   return { channel: channels.join("+"), ok: false, error: results.map((r, i) => `${parents[i].full_name.split(" ")[0]}: ${r.error}`).join(" | "), delivered: 0, parents: parents.length };
 }
+
+/** Instant browser ping to the parents who want them: "Youssef finished Fractions 7/8". Push only, never Telegram. */
+export async function pingParents(familyId: string, title: string, body: string, url = "/parent"): Promise<void> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("profiles").select("id, live_pings").eq("family_id", familyId).eq("role", "parent");
+  await Promise.all((data ?? []).filter((p) => p.live_pings !== false).map((p) => sendPush(p.id, { title, body, url, tag: "live" }).catch(() => null)));
+}
