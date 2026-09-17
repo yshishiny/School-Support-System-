@@ -68,8 +68,9 @@ and a "teach it again" button. The daily report gets one line. Nothing from the 
 - **Code:** `main` stays 1.x production. `v2` is the beta tree. Features branch from `v2` as `v2/<feature>` and merge back.
   Hotfixes land on `main` and are merged into `v2` weekly.
 - **Beta site:** a second Vercel project (free) whose production branch is `v2`, at its own URL (e.g. study-beta.vercel.app).
-- **Beta database:** a second Supabase project (free tier) so V2 migrations never touch the family's live data. Seed it with
-  a copy of the curriculum, timetables and the boys' accounts. Beta AI key can be the same, with `AI_TIER=saver`.
+- **Beta database (decision, 17 Sep):** the free plan allows two active Supabase projects and both are in use, so the beta
+  shares the live database for now. Rule: V2 migrations are additive only (new tables, nullable columns), never a change to
+  an existing table or policy. The beta deployment runs with `CRON_DISABLED=1` so nothing is sent twice.
 - **Promotion:** when a feature is stable in beta, it merges to `main` as 1.x, or the whole tree ships as 2.0.
 
 ## 9. Cost

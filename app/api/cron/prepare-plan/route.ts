@@ -22,6 +22,8 @@ export async function GET(request: Request) {
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
+  // The beta site shares the live database: its crons stay off (CRON_DISABLED=1) so nothing runs twice.
+  if (process.env.CRON_DISABLED === "1") return NextResponse.json({ ok: true, skipped: "crons disabled on this deployment" });
   const started = Date.now();
   const admin = createAdminClient();
   const { data: students } = await admin.from("profiles").select("id, full_name, family_id").eq("role", "student");
