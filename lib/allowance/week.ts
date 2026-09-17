@@ -38,6 +38,14 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
   ]);
   const { data: cpRow } = await admin.from("checkpoints").select("status").eq("student_id", studentId).eq("kind", "weekly").eq("week_start", start).order("created_at", { ascending: false }).limit(1).maybeSingle();
   const checkpoint = { status: (cpRow?.status as "ready" | "done" | "expired" | "failed" | undefined) ?? "none" } as const;
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const [{ data: hwRows }, { data: sheetRow }] = await Promise.all([
+    admin.from("assignments").select("due_date, status, completed_at, kind").eq("student_id", studentId).in("kind", ["homework", "project"]).gte("due_date", start).lte("due_date", lastDay),
+    admin.from("grade_sheets").select("id").eq("student_id", studentId).eq("month", monthStart).maybeSingle(),
+  ]);
+  const hw = (hwRows ?? []) as { due_date: string; status: string; completed_at: string | null; kind: string }[];
+  const homework = { due: hw.length, doneOnTime: hw.filter((a) => a.status === "done" && (!a.completed_at || a.completed_at.slice(0, 10) <= a.due_date)).length, open: hw.filter((a) => a.status === "open").length };
+  const gradesSheet = { uploaded: !!sheetRow, dayOfMonth: Number(today.slice(8, 10)) };
   const coverage = classLogCoverage(start, lastDay, ttRows ?? [], (logRows ?? []) as ClassLogRow[], (offRows ?? []).map((d) => d.day as string));
   const classLog = { due: coverage.due, done: coverage.done, missingLine: coverage.days.length ? missingLine(coverage.days) : null };
   const snapDays: Record<string, string[]> = {};
@@ -69,6 +77,8 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     snapDays,
     classLog,
     checkpoint,
+    homework,
+    gradesSheet,
   });
   return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }

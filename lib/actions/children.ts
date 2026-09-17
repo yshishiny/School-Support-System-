@@ -203,6 +203,7 @@ export async function updateChildProfileAction(_prev: { error?: string; ok?: str
     phone: String(formData.get("phone") ?? "").trim().slice(0, 30) || null,
     avatar_emoji: String(formData.get("avatar_emoji") ?? "").trim().slice(0, 8) || undefined,
     parent_notes: String(formData.get("parent_notes") ?? "").trim().slice(0, 1500) || null,
+    rater: formData.get("rater") === "on",
   };
   const { error } = await admin.from("profiles").update(patch).eq("id", studentId);
   if (error) return { error: error.message };

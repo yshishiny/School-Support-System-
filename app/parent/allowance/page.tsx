@@ -52,6 +52,7 @@ export default async function AllowancePage() {
               return (
                 <li key={w.id} className="py-2 flex items-center gap-2">
                   <span className="flex-1">{s?.avatar_emoji} {s?.full_name.split(" ")[0]} · {prettyDate(w.week_start)} → {prettyDate(w.week_end)} · score {w.score} · <b>{w.amount} EGP</b></span>
+                  {w.claimed_at && !w.paid_at && <span className="badge text-warn">claimed</span>}
                   {w.paid_at ? <span className="badge text-good">paid</span> : (
                     <form action={markAllowancePaidAction.bind(null, w.id)}><button className="btn-ghost btn-sm">Mark paid</button></form>
                   )}

@@ -27,6 +27,7 @@ export function ChildProfileForm({ s, age, username }: { s: Profile; age: number
         <div><label className="label">Avatar emoji</label><input name="avatar_emoji" className="input" defaultValue={s.avatar_emoji} /></div>
         <div><label className="label">Login username</label><input className="input" value={username ?? ""} readOnly /></div>
         <div className="col-span-2"><label className="label">Notes for the coach (strengths, health, what upsets him, what motivates him)</label><textarea name="parent_notes" className="input" rows={3} defaultValue={s.parent_notes ?? ""} maxLength={1500} /></div>
+        <label className="col-span-2 flex items-center gap-2 text-sm"><input type="checkbox" name="rater" defaultChecked={!!s.rater} /> Older sibling: may rate the others&apos; manners and dish (one tap a day, shown to you)</label>
         <div className="col-span-2"><label className="label">New password (leave empty to keep)</label><input name="new_password" type="text" className="input" minLength={6} placeholder="6+ characters" /></div>
       </div>
       <Notice error={state?.error} ok={state?.ok} />

@@ -298,3 +298,16 @@ export async function setTargetExamAction(formData: FormData) {
   revalidatePath("/learn");
   revalidatePath("/today");
 }
+
+/** The child says a quiz topic has not been taught yet: the planner skips it until the class log says otherwise. */
+export async function flagTopicNotTakenAction(topicId: string): Promise<void> {
+  const { profile } = await requireStudent();
+  const admin = createAdminClient();
+  await admin.from("topic_flags").upsert({ student_id: profile.id, topic_id: topicId, kind: "not_taken" }, { onConflict: "student_id,topic_id,kind" });
+  // Today's planned quiz on that topic is retired, so tomorrow's top-up picks something he has taken.
+  const { data: q } = await admin.from("quizzes").select("id, attempts(submitted_at)").eq("student_id", profile.id).eq("topic_id", topicId).not("scheduled_for", "is", null).gte("scheduled_for", new Date().toISOString().slice(0, 10));
+  for (const row of (q ?? []) as { id: string; attempts: { submitted_at: string | null }[] }[]) {
+    if (!row.attempts.some((a) => a.submitted_at)) await admin.from("quizzes").update({ scheduled_for: null, plan_slot: null }).eq("id", row.id);
+  }
+  ["/today", "/learn", "/parent/plan"].forEach((p) => revalidatePath(p));
+}

@@ -23,6 +23,7 @@ export interface NudgeState {
   missedClasses: number; // earlier days this week
   weekClosesLabel: string; // "Thursday"
   appUrl: string;
+  allowanceHint?: string | null; // the most valuable missing basic, from the allowance meter
 }
 
 export interface Nudge { code: NudgeCode; text: string }
@@ -48,7 +49,7 @@ export function dueNudges(s: NudgeState, settings: NudgeSettings, alreadySent: s
     if (s.classesToLog) todo.push(`${s.classesToLog} class${s.classesToLog === 1 ? "" : "es"} to log`);
     if (s.quizzesToday > s.quizzesDone) todo.push(`${s.quizzesToday - s.quizzesDone} quiz set${s.quizzesToday - s.quizzesDone === 1 ? "" : "s"}`);
     if (s.snapsOpen.length) todo.push(`snap ${s.snapsOpen.join(" and ")}`);
-    out.push({ code: "evening", text: `🌙 ${s.firstName}, evening round: ${todo.join(" · ")}.${s.streak ? ` Streak ${s.streak}🔥 stays alive with the check-in.` : ""} ${s.appUrl}` });
+    out.push({ code: "evening", text: `🌙 ${s.firstName}, evening round: ${todo.join(" · ")}.${s.streak ? ` Streak ${s.streak}🔥 stays alive with the check-in.` : ""}${s.allowanceHint ? ` Allowance priority: ${s.allowanceHint}.` : ""} ${s.appUrl}` });
   }
 
   if (settings.lastcall && inWindow("lastcall") && !sent("lastcall") && !s.checkinDone) {

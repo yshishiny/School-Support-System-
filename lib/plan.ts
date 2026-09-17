@@ -55,6 +55,7 @@ export interface PlanInput {
   existing: ExistingPlanned[];
   covered?: Set<string>; // topic ids the student logged as taken at school recently
   priority?: Set<string>; // foundation topics the coach named: scheduled before anything else
+  notTaken?: Set<string>; // topics the child flagged as not yet taught (until the class log says otherwise)
   levels?: Record<string, Level>; // per-subject difficulty from the coach's last analysis
   favourites?: string[]; // subjects the student likes: preferred when several are taught the same day
   days?: number;
@@ -123,6 +124,8 @@ export function planSlots(input: PlanInput): { wanted: PlanSlot[]; missing: Plan
   const arabicAvailable = ARABIC_SUBJECTS.filter((a) => available.includes(a));
   const favs = input.favourites ?? [];
   const covered = input.covered ?? new Set<string>();
+  const notTaken = input.notTaken ?? new Set<string>();
+  input = { ...input, topics: input.topics.filter((t) => !notTaken.has(t.id)) };
 
   const chooseSubject = (candidates: string[], used: string[]): string | null => {
     if (candidates.length === 0) return null;

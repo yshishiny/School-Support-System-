@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { secondsPerQuestion } from "@/lib/exams";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { QuizRunner } from "@/components/QuizRunner";
+import { NotTakenButton } from "@/components/NotTakenButton";
 import { ensureAttempt } from "@/lib/actions/learning";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Quiz, QuizQuestion } from "@/lib/types";
@@ -59,8 +60,10 @@ export default async function QuizPage({ params }: { params: Promise<{ id: strin
     deadlineMs = new Date(att!.started_at).getTime() + (q.time_limit_min ?? 20) * 60000;
   }
 
+  const { data: topicRow } = q.topic_id ? await supabase.from("topics").select("id, name").eq("id", q.topic_id).maybeSingle() : { data: null };
   return (
     <main className="space-y-3" dir={q.language === "ar" ? "rtl" : undefined} lang={q.language === "ar" ? "ar" : undefined}>
+      {topicRow && !q.checkpoint_id && <NotTakenButton topicId={topicRow.id} topicName={topicRow.name} />}
       <QuizRunner
         attemptId={attemptId}
         quizId={id}

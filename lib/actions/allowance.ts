@@ -1,7 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireParent, requireStudent } from "@/lib/auth";
+import { requireParent, requireSession, requireStudent } from "@/lib/auth";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { pingParents } from "@/lib/notify";
 import { createClient } from "@/lib/supabase/server";
 import { DEFAULT_KPIS, PRACTICES, practiceByCode } from "@/lib/allowance";
 import { shiftDate, todayIn } from "@/lib/dates";
@@ -27,8 +29,15 @@ export async function saveAllowanceSettingsAction(formData: FormData): Promise<v
 
 /** Parent's daily tap: ✓ or ✗ for a parent-judged KPI. Tapping the same value again clears it. */
 export async function tickKpiAction(studentId: string, code: string, value: boolean, date?: string): Promise<void> {
-  const { family, profile } = await requireParent();
-  const supabase = await createClient();
+  // A parent, or an older sibling the parent marked as a rater (never for himself).
+  const session = await requireSession();
+  const { family, profile } = session;
+  if (profile.role !== "parent" && !((profile as { rater?: boolean }).rater && studentId !== profile.id)) return;
+  const supabase = profile.role === "parent" ? await createClient() : createAdminClient();
+  if (profile.role !== "parent") {
+    const { data: sib } = await supabase.from("profiles").select("id").eq("id", studentId).eq("family_id", family.id).eq("role", "student").maybeSingle();
+    if (!sib) return;
+  }
   const day = date ?? todayIn(family.timezone);
   const { data: existing } = await supabase.from("kpi_ticks").select("id, value").eq("student_id", studentId).eq("tick_date", day).eq("code", code).maybeSingle();
   if (existing && existing.value === value) await supabase.from("kpi_ticks").delete().eq("id", existing.id);
@@ -79,4 +88,19 @@ export async function claimEarnBackAction(id: string): Promise<void> {
   const supabase = await createClient();
   await supabase.from("consequences").update({ student_claimed_at: new Date().toISOString() }).eq("id", id).eq("student_id", profile.id);
   PATHS.forEach((p) => revalidatePath(p));
+}
+
+/** The child claims a closed week: the parent gets a ping and marks it paid. */
+export async function claimAllowanceAction(weekId: string): Promise<{ error?: string; ok?: string }> {
+  const { profile, family } = await requireStudent();
+  const admin = createAdminClient();
+  const { data: w } = await admin.from("allowance_weeks").select("id, amount, week_start, week_end, claimed_at, paid_at").eq("id", weekId).eq("student_id", profile.id).maybeSingle();
+  if (!w) return { error: "Week not found." };
+  if (w.amount <= 0) return { error: "Nothing to claim for that week." };
+  if (w.paid_at) return { ok: "Already paid." };
+  if (w.claimed_at) return { ok: "Already claimed; waiting for a parent." };
+  await admin.from("allowance_weeks").update({ claimed_at: new Date().toISOString() }).eq("id", weekId);
+  void pingParents(family.id, `${profile.full_name.split(" ")[0]} claims ${w.amount} EGP`, `Allowance week ${w.week_start} → ${w.week_end}. Mark it paid on the Allowance page.`, "/parent/allowance");
+  ["/rewards", "/today", "/parent", "/parent/allowance"].forEach((p) => revalidatePath(p));
+  return { ok: `Claimed ${w.amount} EGP. Your parent has been told.` };
 }

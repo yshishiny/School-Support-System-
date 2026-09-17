@@ -73,6 +73,8 @@ export interface Profile {
   last_seen_at?: string | null;
   last_path?: string | null;
   live_pings?: boolean;
+  rater?: boolean; // older sibling who may rate manners and dish
+  target_reward_id?: string | null;
 }
 
 export interface Subject {
@@ -149,6 +151,8 @@ export interface Reward {
   cash_amount_egp: number | null;
   emoji: string;
   active: boolean;
+  requires_full_weeks?: number;
+  effort_note?: string | null;
 }
 
 export interface Redemption {

@@ -8,6 +8,10 @@ import { InterestsForm } from "@/components/InterestsForm";
 import Link from "next/link";
 import { learnerTags, type LearnerProfile } from "@/lib/learner";
 import { RemindersCard } from "@/components/RemindersCard";
+import { GradeSheetUploader } from "@/components/GradeSheetUploader";
+import { KpiTicks } from "@/components/KpiTicks";
+import { mergeKpis } from "@/lib/allowance";
+import { todayIn } from "@/lib/dates";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 import { DEFAULT_NUDGES, type NudgeSettings } from "@/lib/nudges";
 import { HeroUploader } from "@/components/HeroUploader";
@@ -19,6 +23,13 @@ import type { Checkin } from "@/lib/types";
 export default async function MePage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
+  const today = todayIn(family.timezone);
+  const monthStart = `${today.slice(0, 7)}-01`;
+  const [{ data: sheets }, { data: siblings }, { data: sibTicks }] = await Promise.all([
+    supabase.from("grade_sheets").select("month, status, average, previous_average, appraisal").eq("student_id", profile.id).order("month", { ascending: false }).limit(3),
+    (profile as { rater?: boolean }).rater ? supabase.from("profiles").select("id, full_name, avatar_emoji").eq("family_id", family.id).eq("role", "student").neq("id", profile.id) : Promise.resolve({ data: [] as { id: string; full_name: string; avatar_emoji: string }[] }),
+    (profile as { rater?: boolean }).rater ? supabase.from("kpi_ticks").select("student_id, code, value").eq("family_id", family.id).eq("tick_date", today) : Promise.resolve({ data: [] as { student_id: string; code: string; value: boolean }[] }),
+  ]);
   const [{ data: checkins }, { data: topics }, { data: heroRows }] = await Promise.all([
     supabase.from("checkins").select("*").eq("student_id", profile.id).order("checkin_date", { ascending: false }).limit(14),
     supabase.from("topics").select("subject").eq("track", "school").eq("grade", profile.grade ?? 0),
@@ -93,6 +104,30 @@ export default async function MePage() {
       </section>
 
       <PointsGuide />
+
+      <section className="card space-y-2">
+        <h2 className="h2">📊 Grades sheet</h2>
+        <p className="text-xs muted">Once a month, a photo of the school&apos;s grades sheet. The coach reads it, writes your appraisal, and it counts toward the allowance from the 21st.</p>
+        {(sheets ?? []).map((g) => (
+          <div key={g.month} className="tile !p-2 text-sm">
+            <div className="font-semibold">{g.month.slice(0, 7)}{g.average !== null ? ` · average ${g.average}%` : ""}{g.previous_average !== null && g.average !== null ? ` (${Number(g.average) >= Number(g.previous_average) ? "▲" : "▼"} from ${g.previous_average}%)` : ""}{g.status !== "ready" ? ` · ${g.status}` : ""}</div>
+            {g.appraisal && <p className="text-xs muted mt-1">{g.appraisal}</p>}
+          </div>
+        ))}
+        {!(sheets ?? []).some((g) => g.month === monthStart) && <GradeSheetUploader familyId={family.id} studentId={profile.id} month={today.slice(0, 7)} />}
+      </section>
+
+      {(siblings ?? []).length > 0 && (
+        <section className="card space-y-2">
+          <h2 className="h2">🤝 Rate your siblings today</h2>
+          <p className="text-xs muted">You are trusted with this. Only a ✗ counts against them, and your parents see who tapped.</p>
+          {(siblings ?? []).map((sib) => {
+            const ticks: Record<string, boolean> = {};
+            (sibTicks ?? []).filter((t) => t.student_id === sib.id).forEach((t) => (ticks[t.code] = t.value));
+            return <div key={sib.id} className="space-y-1"><div className="text-sm font-semibold">{sib.avatar_emoji} {sib.full_name.split(" ")[0]}</div><KpiTicks studentId={sib.id} kpis={mergeKpis(family.allowance_kpis)} ticks={ticks} /></div>;
+          })}
+        </section>
+      )}
 
       <RemindersCard settings={{ ...DEFAULT_NUDGES, ...(((profile as { nudges?: Partial<NudgeSettings> }).nudges) ?? {}) }} />
 

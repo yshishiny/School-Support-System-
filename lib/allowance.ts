@@ -23,6 +23,8 @@ export const DEFAULT_KPIS: KpiDef[] = [
   { code: "checkins", label: "Check-in done 5 of 7 days", emoji: "✅", source: "app", weight: 15, enabled: true, hint: "Counted automatically." },
   { code: "classlog", label: "Every class logged: what he took, homework yes/no", emoji: "📖", source: "app", weight: 15, enabled: true, hint: "Per the timetable. A missed day can be filled in until the week closes; after that it counts against him." },
   { code: "checkpoint", label: "Weekly checkpoint attempted", emoji: "🎯", source: "app", weight: 10, enabled: true, hint: "The timed test on what he logged this week. Attempting it is the KPI; the score positions him." },
+  { code: "homework", label: "Homework done by its due date", emoji: "📝", source: "app", weight: 10, enabled: true, hint: "Homework and projects due this week, marked done in the check-in on time." },
+  { code: "grades", label: "Monthly grades sheet uploaded", emoji: "📊", source: "app", weight: 5, enabled: true, hint: "A photo of the school's grades sheet each month, from the 21st onward. The AI writes an appraisal." },
   { code: "quizzes", label: "Attempted 60% of the week's planned quizzes", emoji: "📅", source: "app", weight: 15, enabled: true, hint: "Attempts, never scores." },
   { code: "phone", label: "Phone parked by the agreed hour", emoji: "📵", source: "parent", weight: 10, enabled: true, hint: "One tap a day." },
   { code: "wellbeing", label: "Did the coach check-in when it was due", emoji: "💓", source: "app", weight: 5, enabled: true, hint: "Weekly pulse or monthly check." },
@@ -78,6 +80,8 @@ export interface WeekInput {
   snapDays?: Record<string, string[]>; // "snap:<code>" -> dates with a counting snap
   classLog?: { due: number; done: number; missingLine: string | null }; // timetable classes in the week so far
   checkpoint?: { status: "none" | "ready" | "done" | "expired" | "failed" };
+  homework?: { due: number; doneOnTime: number; open: number }; // due in the week up to today
+  gradesSheet?: { uploaded: boolean; dayOfMonth: number };
 }
 
 export interface KpiResult {
@@ -157,6 +161,18 @@ export function scoreWeek(i: WeekInput): WeekResult {
       maxFraction = 1; // catch-up is allowed until the week closes
       detail = c.due === 0 ? "no classes yet this week" : `${c.done} of ${c.due} classes logged`;
       if (fraction < 1) hintByCode.set(k.code, `Fill in ${c.due - c.done} class${c.due - c.done === 1 ? "" : "es"} in the check-in${c.missingLine ? ` (${c.missingLine})` : ""}`);
+    } else if (k.code === "homework") {
+      const h = i.homework ?? { due: 0, doneOnTime: 0, open: 0 };
+      fraction = h.due === 0 ? 1 : h.doneOnTime / h.due;
+      maxFraction = 1;
+      detail = h.due === 0 ? "nothing due yet" : `${h.doneOnTime} of ${h.due} done on time${h.open ? ` · ${h.open} still open` : ""}`;
+      if (h.open) hintByCode.set(k.code, `Finish ${h.open} open homework${h.open === 1 ? "" : "s"} and mark ${h.open === 1 ? "it" : "them"} done in the check-in`);
+    } else if (k.code === "grades") {
+      const g = i.gradesSheet ?? { uploaded: false, dayOfMonth: 1 };
+      fraction = g.uploaded || g.dayOfMonth < 21 ? 1 : 0;
+      maxFraction = 1;
+      detail = g.uploaded ? "this month's sheet is in" : g.dayOfMonth < 21 ? "due from the 21st" : "not uploaded yet this month";
+      if (fraction < 1) hintByCode.set(k.code, "Upload a photo of this month's grades sheet (Me → Grades)");
     } else if (k.code === "checkpoint") {
       const st = i.checkpoint?.status ?? "none";
       fraction = st === "expired" ? 0 : 1; // benefit of the doubt until it is due

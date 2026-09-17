@@ -1,6 +1,8 @@
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { RedeemButton } from "@/components/RedeemButton";
+import { AllowanceClaims, TargetButton, type ClosedWeek } from "@/components/AllowanceClaims";
+import { fullWeekStreak } from "@/lib/actions/rewards";
 import { PointsGuide } from "@/components/PointsGuide";
 import { AllowanceMeter } from "@/components/AllowanceMeter";
 import { allowanceWeekStatus } from "@/lib/allowance/week";
@@ -20,6 +22,11 @@ export default async function RewardsPage() {
   const held = reds.filter((r) => r.status === "pending").reduce((s, r) => s + r.points_spent, 0);
   const available = balance - held;
   const allowance = family.allowance_enabled ? await allowanceWeekStatus(profile.id, family).catch(() => null) : null;
+  const [{ data: closedWeeks }, streakFull] = await Promise.all([
+    supabase.from("allowance_weeks").select("id, week_start, week_end, score, band, amount, claimed_at, paid_at").eq("student_id", profile.id).order("week_start", { ascending: false }).limit(6),
+    fullWeekStreak(profile.id),
+  ]);
+  const target = ((rewards ?? []) as Reward[]).find((r) => r.id === (profile as { target_reward_id?: string | null }).target_reward_id) ?? null;
 
   return (
     <main className="space-y-4">
@@ -35,6 +42,14 @@ export default async function RewardsPage() {
         </div>
       </header>
 
+      {target && (
+        <section className="card !py-3 border-accent/60 space-y-1">
+          <div className="text-sm font-semibold">🎯 Target: {target.emoji} {target.title}</div>
+          <div className="h-2 rounded-full bg-panel-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${Math.min(100, Math.round((available / target.cost_points) * 100))}%` }} /></div>
+          <div className="text-xs muted">{available}/{target.cost_points} ⭐{(target.requires_full_weeks ?? 0) > 0 ? ` · full-allowance weeks in a row: ${streakFull}/${target.requires_full_weeks}` : ""}{target.effort_note ? ` · ${target.effort_note}` : ""}</div>
+        </section>
+      )}
+      <AllowanceClaims weeks={(closedWeeks ?? []) as ClosedWeek[]} />
       <PointsGuide compact />
 
       <section className="grid grid-cols-2 gap-3">
@@ -44,9 +59,10 @@ export default async function RewardsPage() {
             <div className="font-bold leading-tight">{r.title}</div>
             {r.description && <div className="text-xs muted">{r.description}</div>}
             {r.kind === "cash" && r.cash_amount_egp && <div className="text-xs text-good">{Number(r.cash_amount_egp)} EGP</div>}
-            <div className="mt-auto pt-1">
-              <div className="text-sm font-semibold mb-2">{r.cost_points} ⭐</div>
-              <RedeemButton rewardId={r.id} disabled={available < r.cost_points} />
+            {(r.requires_full_weeks ?? 0) > 0 && <div className="text-xs text-warn">Extra effort: {r.requires_full_weeks} full week{r.requires_full_weeks === 1 ? "" : "s"} in a row ({streakFull} so far){r.effort_note ? ` · ${r.effort_note}` : ""}</div>}
+            <div className="mt-auto pt-1 space-y-1">
+              <div className="flex items-center justify-between"><span className="text-sm font-semibold">{r.cost_points} ⭐</span><TargetButton rewardId={r.id} isTarget={target?.id === r.id} /></div>
+              <RedeemButton rewardId={r.id} disabled={available < r.cost_points || streakFull < (r.requires_full_weeks ?? 0)} />
             </div>
           </div>
         ))}

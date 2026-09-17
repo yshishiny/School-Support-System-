@@ -7,7 +7,9 @@ export interface RewardTemplate {
   kind: "cash" | "privilege" | "item";
   cost_points: number;
   cash_amount_egp?: number;
-  group: "free" | "screen" | "football" | "long" | "values";
+  group: "free" | "screen" | "football" | "long" | "values" | "friends";
+  requires_full_weeks?: number;
+  effort_note?: string;
 }
 
 export const REWARD_TEMPLATES: RewardTemplate[] = [
@@ -24,6 +26,8 @@ export const REWARD_TEMPLATES: RewardTemplate[] = [
   { key: "boots", emoji: "👟", title: "New boots or kit item", description: "One item from the wish list.", kind: "item", cost_points: 2000, group: "football" },
   { key: "savings_match", emoji: "🏦", title: "Savings match (100 EGP)", description: "For every 100 EGP he saves toward a goal, Dad adds 100.", kind: "cash", cost_points: 500, cash_amount_egp: 100, group: "long" },
   { key: "book", emoji: "📚", title: "A book of his choice", description: "Any book, any language.", kind: "item", cost_points: 300, group: "long" },
+  { key: "friend_weekend", emoji: "🏕️", title: "Weekend with a friend (+250 EGP)", description: "A weekend out or a sleepover with a friend, with 250 EGP extra spending money on top of the allowance.", kind: "cash", cost_points: 1200, cash_amount_egp: 250, group: "friends", requires_full_weeks: 3, effort_note: "Three full-allowance weeks in a row, the checkpoint attempted each of those weeks, and this month's grades sheet uploaded." },
+  { key: "friend_over", emoji: "🎲", title: "Friend over for the afternoon", description: "A friend comes over after school, snacks on us.", kind: "privilege", cost_points: 250, group: "friends", requires_full_weeks: 1, effort_note: "One full-allowance week." },
   { key: "sadaqah", emoji: "🤲", title: "Sadaqah in his name (100 EGP)", description: "He chooses the cause; Dad gives it in his name.", kind: "cash", cost_points: 250, cash_amount_egp: 100, group: "values" },
 ];
 
@@ -33,4 +37,5 @@ export const TEMPLATE_GROUPS: Record<RewardTemplate["group"], string> = {
   football: "Football",
   long: "Longer horizon",
   values: "Values",
+  friends: "Friends (extra effort)",
 };

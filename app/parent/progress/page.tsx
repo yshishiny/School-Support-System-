@@ -13,6 +13,7 @@ import type { CoachReport } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { wellbeingStatus, straightTalkLabels, type CheckHistoryRow } from "@/lib/wellbeing";
 import { CheckpointPanel, type CheckpointRow } from "@/components/CheckpointPanel";
+import { GradeSheetUploader } from "@/components/GradeSheetUploader";
 import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
 export default async function ProgressPage() {
@@ -34,6 +35,8 @@ export default async function ProgressPage() {
   const { data: straightRows } = ids.length ? await admin.from("wellbeing_checks").select("student_id, taken_on, answers").in("student_id", ids).eq("instrument", "straight").order("taken_on", { ascending: false }).limit(20) : { data: [] };
   const { data: cpRows } = ids.length ? await admin.from("checkpoints").select("id, student_id, kind, subject, status, due_by, week_start, result, error, created_at").in("student_id", ids).order("created_at", { ascending: false }).limit(30) : { data: [] };
   const { data: subjRows } = ids.length ? await admin.from("lesson_logs").select("student_id, subject_name").in("student_id", ids).gte("log_date", shiftDate(today, -6)) : { data: [] };
+  const { data: gradeRows } = ids.length ? await admin.from("grade_sheets").select("student_id, month, status, average, previous_average, appraisal, items").in("student_id", ids).order("month", { ascending: false }).limit(24) : { data: [] };
+  const gradesFor = (id: string) => ((gradeRows ?? []) as { student_id: string; month: string; status: string; average: number | null; previous_average: number | null; appraisal: string | null; items: { subject: string; grade: string; percent: number | null }[] | null }[]).filter((g) => g.student_id === id).slice(0, 3);
   const checkpointsFor = (id: string) => ((cpRows ?? []) as (CheckpointRow & { student_id: string })[]).filter((r) => r.student_id === id);
   const subjectsFor = (id: string) => [...new Set((subjRows ?? []).filter((r) => r.student_id === id).map((r) => r.subject_name as string))].sort();
   const straightFor = (id: string) => ((straightRows ?? []) as { student_id: string; taken_on: string; answers: Record<string, string> }[]).filter((r) => r.student_id === id).slice(0, 4);
@@ -83,6 +86,18 @@ export default async function ProgressPage() {
                 </div>
               );
             })()}
+
+            <div className="rounded-xl border border-line p-3 text-sm space-y-2">
+              <div className="flex items-center gap-2"><span className="text-2xl">📊</span><div className="flex-1"><div className="font-semibold">Monthly grades sheet <span className="muted font-normal">· appraisal</span></div><div className="muted text-xs">He uploads a photo each month from Me → Grades; you can too. The AI transcribes and compares with last month.</div></div></div>
+              {gradesFor(s.id).length === 0 ? <p className="text-xs muted">No sheet yet.</p> : gradesFor(s.id).map((g) => (
+                <div key={g.month} className="text-xs space-y-0.5">
+                  <div className="font-semibold">{g.month.slice(0, 7)}{g.average !== null ? ` · average ${g.average}%` : ""}{g.previous_average !== null && g.average !== null ? ` (${Number(g.average) >= Number(g.previous_average) ? "▲" : "▼"} from ${g.previous_average}%)` : ""}{g.status !== "ready" ? ` · ${g.status}` : ""}</div>
+                  {g.items && g.items.length > 0 && <div className="muted">{g.items.map((i) => `${i.subject} ${i.grade}`).join(" · ")}</div>}
+                  {g.appraisal && <p className="muted">{g.appraisal}</p>}
+                </div>
+              ))}
+              <GradeSheetUploader familyId={family.id} studentId={s.id} month={today.slice(0, 7)} />
+            </div>
 
             <CheckpointPanel studentId={s.id} firstName={s.full_name.split(" ")[0]} rows={checkpointsFor(s.id)} subjects={subjectsFor(s.id)} />
 
