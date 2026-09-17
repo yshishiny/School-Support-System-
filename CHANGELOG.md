@@ -2,6 +2,13 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.7.0 — Straight answers (17 September 2026)
+
+- **Follow-up questions to the child** on every integrity signal ("prayers marked on time after the fact", "the same Arabic note twice", "no class marked 10 times"…): asked up to three times on different days, each round phrased differently and asking for more detail; round three quotes his earlier answer and asks him to tell it again. Short or padded answers are refused; a real one earns 2 points.
+- On the kid side: a "questions from your coach" item on Today and a Straight answers page (Coach → follow-up) with this week's answers.
+- On the parent side: the answers appear under "Worth asking tonight" on the kid card, round by round, so a story that drifts is visible.
+- Migration 20260917145743 (integrity_followups).
+
 ## 1.6.0 — Allowance on its own, three parent homes (17 September 2026)
 
 - **Kids → Allowance tab** (💵, separate from Rewards): this week's amount and band, "why this amount right now" in plain words, "how to get the full allowance" as a to-do sorted by points at stake with a button to the right place for each, what can only be protected (a parent's ✗), what is lost, "if you stop now / if you do all of it", and "can I do extra?" (catch-ups until pay day, earn-back on consequences, extra-effort rewards and the full-week streak). Past weeks and claims moved here.

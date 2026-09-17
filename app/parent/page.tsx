@@ -20,6 +20,7 @@ import { kidColor } from "@/lib/kid-tabs";
 import { presence } from "@/lib/activity";
 import { unreadCount } from "@/lib/inbox";
 import { loadSnapTasks } from "@/lib/snaps/server";
+import { loadFollowups } from "@/lib/followups/run";
 import { taskDayState, type SnapLite } from "@/lib/snaps";
 import { formatInTimeZone } from "date-fns-tz";
 import { ParentLayoutA, ParentLayoutB, ParentLayoutC } from "@/components/parent-home/Layouts";
@@ -97,6 +98,7 @@ export default async function ParentHome() {
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const live = await liveFeedAction().catch(() => null);
   const unread = await unreadCount(profile.id).catch(() => 0);
+  const followups = await loadFollowups(ids, shiftDate(today, -13)).catch(() => []);
   const [snapTasks, { data: todaySnapRows }] = await Promise.all([
     loadSnapTasks(family.id).catch(() => []),
     supabase.from("snaps").select("student_id, task_code, taken_on, status, ai_verdict").eq("family_id", family.id).eq("taken_on", today),
@@ -189,6 +191,21 @@ export default async function ParentHome() {
               {integrity[idx].map((x) => <li key={x.code}><b>{x.label}.</b> <span className="muted">{x.ask}</span></li>)}
             </ul>
             <p className="muted mt-1">Signals, not verdicts. Ask with curiosity; the honest answer is the goal.</p>
+            {(() => {
+              const mineF = followups.filter((f) => f.student_id === s.id);
+              if (!mineF.length) return null;
+              return (
+                <div className="mt-2 space-y-1 border-t border-line pt-2">
+                  <div className="font-semibold">🗣️ What he told his coach (asked up to 3 times, differently)</div>
+                  {mineF.map((f) => (
+                    <div key={f.id} className={f.answer ? "" : "muted"}>
+                      <span className="muted">{f.asked_on.slice(5)} · r{f.round} · {f.signal_code.replace(/_/g, " ")}:</span> {f.answer ? `“${f.answer}”` : "not answered yet"}
+                    </div>
+                  ))}
+                  <p className="muted">Compare the rounds: an honest story stays the same and gains detail; a made-up one drifts.</p>
+                </div>
+              );
+            })()}
           </details>
         )}
         {cov.due > 0 && (

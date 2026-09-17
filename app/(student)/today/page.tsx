@@ -19,6 +19,7 @@ import { INSTRUMENTS, dueInstruments, type CheckHistoryRow } from "@/lib/wellbei
 import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { eligibilityHint } from "@/lib/allowance";
 import { buildQueue } from "@/lib/today-queue";
+import { ensureFollowups } from "@/lib/followups/run";
 import { LayoutA } from "@/components/today/LayoutA";
 import { LayoutB } from "@/components/today/LayoutB";
 import { LayoutC } from "@/components/today/LayoutC";
@@ -93,6 +94,7 @@ export default async function TodayPage() {
   const checkpoint = cp ? { quizId: cp.quiz_id!, title: cp.quizzes?.title ?? (cp.kind === "weekly" ? "Weekly checkpoint" : `Spot check · ${cp.subject}`), questions: (cpCount ?? []).length, minutes: cp.time_limit_min, dueLabel: SHORT[weekdayOf(cp.due_by)] } : null;
   const checkinsMissed = Array.from({ length: 6 }, (_, k) => shiftDate(today, -1 - k)).filter((d) => d >= weekStart && !checkinDates.includes(d)).reverse().map((d) => ({ date: d, label: d === shiftDate(today, -1) ? "Yesterday" : SHORT[weekdayOf(d)] }));
   const due = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
+  const followupsOpen = (await ensureFollowups(profile.id, family.id, today, family.timezone, family.allowance_pay_weekday).catch(() => [])).filter((r) => !r.answer).length;
   const queue = buildQueue({
     hourLocal: hour,
     prayerOpen: openPrayer ? { prayer: openPrayer.prayer, label: PRAYER_LABEL[openPrayer.prayer], time: openPrayer.time } : null,
@@ -106,6 +108,7 @@ export default async function TodayPage() {
     reviewsDue: dueReviews ?? 0,
     learnerDone: !!profile.learner_profile,
     snapsDue,
+    followups: followupsOpen,
     classLogMissing,
     checkinsMissed,
     checkpoint,
