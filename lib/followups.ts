@@ -62,6 +62,12 @@ BANK.log_vs_school = {
   r3: (p) => `You said: “${short(p)}”. Go back to the check-in and fix the class log for that subject so it matches what really happened, then write here what you changed.`,
 };
 
+BANK.manners_gap = {
+  r1: "You rated your own manners well on {detail}, and a parent saw it differently. Tell what happened that day, from your side, with the details: who, what was said, what came next.",
+  r2: "Same day ({detail}): if you were the other person, how would you describe it? What would you have wanted to hear from you?",
+  r3: (p) => `You said: “${short(p)}”. Is there anything to repair, an apology or a fix, and have you done it? Say what.`,
+};
+
 const GENERIC: Bank = {
   r1: "Your coach noticed: {label}. Tell what happened in your own words, with the details (when, where, who).",
   r2: "About “{label}”: walk through it step by step, from the start.",
@@ -73,6 +79,7 @@ export function signalDetail(sig: IntegritySignal): string {
   const dates = sig.ask.match(/\d{4}-\d{2}-\d{2}/g) ?? [];
   const paren = sig.ask.match(/\(([^)]+)\)/)?.[1];
   const subject = sig.label.match(/^The same (.+?) note/)?.[1] ?? sig.label.match(/ for (.+?) this week, but/)?.[1];
+  if (sig.code === "manners_gap") { const ds = sig.label.match(/\d{4}-\d{2}-\d{2}/g) ?? []; return ds.length ? ds.join(", ") : "that day"; }
   const parts = [...new Set([...(subject ? [subject] : []), ...dates, ...(paren ? [paren] : [])])];
   return parts.length ? parts.join(", ") : "that day";
 }

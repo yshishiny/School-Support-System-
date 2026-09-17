@@ -5,6 +5,7 @@ import { shiftDate, todayIn } from "@/lib/dates";
 import { snapCounts, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { compensatedRefs } from "@/lib/compensation";
+import { materialsKpi, materialStages, nextStage } from "@/lib/materials/study";
 import type { Family } from "@/lib/types";
 
 export interface WeekStatus extends WeekResult {
@@ -47,6 +48,15 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
   const hw = (hwRows ?? []) as { due_date: string; status: string; completed_at: string | null; kind: string }[];
   const homework = { due: hw.length, doneOnTime: hw.filter((a) => a.status === "done" && (!a.completed_at || a.completed_at.slice(0, 10) <= a.due_date)).length, open: hw.filter((a) => a.status === "open").length };
   const gradesSheet = { uploaded: !!sheetRow, dayOfMonth: Number(today.slice(8, 10)) };
+  const [{ data: matRows }, { data: matQuizRows }] = await Promise.all([
+    admin.from("materials").select("id, title, created_at").eq("student_id", studentId).eq("status", "ready").gte("created_at", `${shiftDate(start, -14)}T00:00:00Z`),
+    admin.from("quizzes").select("material_id, attempts(submitted_at)").eq("student_id", studentId).not("material_id", "is", null).gte("created_at", `${shiftDate(start, -14)}T00:00:00Z`),
+  ]);
+  const matList = ((matRows ?? []) as { id: string; title: string; created_at: string }[]).map((m) => ({ id: m.id, title: m.title, uploadedOn: m.created_at.slice(0, 10) }));
+  const matAttempts = ((matQuizRows ?? []) as { material_id: string; attempts: { submitted_at: string | null }[] }[]).flatMap((q) => q.attempts.filter((a) => a.submitted_at).map((a) => ({ materialId: q.material_id, date: a.submitted_at!.slice(0, 10) })));
+  const mk = materialsKpi(matList, matAttempts, start, lastDay);
+  const nextMat = matList.map((m) => ({ m, st: nextStage(materialStages(m.uploadedOn, matAttempts.filter((a) => a.materialId === m.id).map((a) => a.date), today)) })).filter((x) => x.st).sort((a, b) => a.st!.dueBy.localeCompare(b.st!.dueBy))[0];
+  const materialsInput = { due: mk.due, done: mk.done, next: nextMat ? nextMat.m.title : null };
   const coverage = classLogCoverage(start, lastDay, ttRows ?? [], (logRows ?? []) as ClassLogRow[], (offRows ?? []).map((d) => d.day as string));
   const classLog = { due: coverage.due, done: coverage.done, missingLine: coverage.days.length ? missingLine(coverage.days) : null };
   const snapDays: Record<string, string[]> = {};
@@ -87,6 +97,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     checkpoint,
     homework,
     gradesSheet,
+    materials: materialsInput,
   });
   return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }

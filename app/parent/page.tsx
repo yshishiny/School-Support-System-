@@ -220,7 +220,7 @@ export default async function ParentHome() {
 
         {family.allowance_enabled && (myTurn ? (
           <div className="space-y-1">
-            <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗</div>
+            <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗{ck?.manners_self ? ` · manners: he says ${ck.manners_self}/5${ck.manners_note ? ` (“${ck.manners_note}”)` : ""}` : ""}</div>
             <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
           </div>
         ) : (

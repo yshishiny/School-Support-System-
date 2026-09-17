@@ -11,6 +11,7 @@ import { pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
+import { buildMonthlyRevisions } from "@/lib/revision/run";
 import { todayIn } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -107,6 +108,15 @@ export async function GET(request: Request) {
       if (r.length) results.checkpoints = r;
     } catch (err) {
       results.checkpoints = [`error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
+  // Monthly revision sheets and quizzes from the 25th, per subject with school files this month.
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await buildMonthlyRevisions(todayIn("Africa/Cairo"), { budgetMs: Math.max(0, TIME_BUDGET_MS - (Date.now() - started)) });
+      if (r.length) results.revision = r;
+    } catch (err) {
+      results.revision = [`error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
   // School files that failed to read for a temporary reason: try again.

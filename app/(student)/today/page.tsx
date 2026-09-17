@@ -21,6 +21,9 @@ import { eligibilityHint } from "@/lib/allowance";
 import { buildQueue } from "@/lib/today-queue";
 import { ensureFollowups } from "@/lib/followups/run";
 import { loadCompensations } from "@/lib/compensation/run";
+import { materialStages, nextStage } from "@/lib/materials/study";
+import { loadRevisions } from "@/lib/revision/run";
+import { prettyDate } from "@/lib/dates";
 import { LayoutA } from "@/components/today/LayoutA";
 import { LayoutB } from "@/components/today/LayoutB";
 import { LayoutC } from "@/components/today/LayoutC";
@@ -97,6 +100,21 @@ export default async function TodayPage() {
   const due = dueInstruments(today, (wellbeing ?? []) as CheckHistoryRow[]);
   const followupsOpen = (await ensureFollowups(profile.id, family.id, today, family.timezone, family.allowance_pay_weekday).catch(() => [])).filter((r) => !r.answer).length;
   const compensationsOpen = (await loadCompensations(profile.id, shiftDate(today, -14)).catch(() => [])).filter((c) => !c.correct).length;
+  const [{ data: matRows }, { data: matQuizRows }, revisionRows] = await Promise.all([
+    supabase.from("materials").select("id, title, created_at").eq("student_id", profile.id).eq("status", "ready").gte("created_at", `${shiftDate(today, -21)}T00:00:00Z`),
+    supabase.from("quizzes").select("material_id, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null).gte("created_at", `${shiftDate(today, -21)}T00:00:00Z`),
+    loadRevisions([profile.id], 6).catch(() => []),
+  ]);
+  const matAttempts = ((matQuizRows ?? []) as { material_id: string; attempts: { submitted_at: string | null }[] }[]);
+  const materialsDue = ((matRows ?? []) as { id: string; title: string; created_at: string }[])
+    .map((m) => ({ m, st: nextStage(materialStages(m.created_at.slice(0, 10), matAttempts.filter((q) => q.material_id === m.id).flatMap((q) => q.attempts.filter((a) => a.submitted_at).map((a) => a.submitted_at!.slice(0, 10))), today)) }))
+    .filter((x) => x.st)
+    .sort((a, b) => a.st!.dueBy.localeCompare(b.st!.dueBy))
+    .map((x) => ({ id: x.m.id, title: x.m.title, stage: x.st!.label, dueBy: prettyDate(x.st!.dueBy), overdue: x.st!.state === "overdue" }));
+  const revisionQuizIds = revisionRows.filter((r) => r.status === "ready" && r.quiz_id).map((r) => r.quiz_id!);
+  const { data: revAttempts } = revisionQuizIds.length ? await supabase.from("attempts").select("quiz_id").in("quiz_id", revisionQuizIds).not("submitted_at", "is", null) : { data: [] as { quiz_id: string }[] };
+  const satIds = new Set((revAttempts ?? []).map((a) => a.quiz_id));
+  const revisionsOpen = revisionRows.filter((r) => r.status === "ready" && r.quiz_id && !satIds.has(r.quiz_id)).map((r) => ({ id: r.id, subject: r.subject }));
   const queue = buildQueue({
     hourLocal: hour,
     prayerOpen: openPrayer ? { prayer: openPrayer.prayer, label: PRAYER_LABEL[openPrayer.prayer], time: openPrayer.time } : null,
@@ -112,6 +130,8 @@ export default async function TodayPage() {
     snapsDue,
     followups: followupsOpen,
     compensations: compensationsOpen,
+    materialsDue,
+    revisions: revisionsOpen,
     classLogMissing,
     checkinsMissed,
     checkpoint,

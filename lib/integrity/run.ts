@@ -8,7 +8,7 @@ export async function computeIntegrity(studentId: string, today: string, tz: str
   const admin = createAdminClient();
   const weekAgo = shiftDate(today, -6);
   const weekAgoIso = new Date(weekAgo + "T00:00:00Z").toISOString();
-  const [{ data: attempts }, { data: prayers }, { data: checkins }, { data: logs }, { data: snaps }, { data: materials }, { data: tt }] = await Promise.all([
+  const [{ data: attempts }, { data: prayers }, { data: checkins }, { data: logs }, { data: snaps }, { data: materials }, { data: tt }, { data: mannersRows }, { data: tickRows }] = await Promise.all([
     admin.from("attempts").select("submitted_at, seconds, total, tab_switches, kind, quizzes(title)").eq("student_id", studentId).gte("started_at", weekAgoIso),
     admin.from("prayer_logs").select("log_date, logged_at, status, entered_late, claim, prayer").eq("student_id", studentId).gte("log_date", weekAgo),
     admin.from("checkins").select("checkin_date, submitted_at").eq("student_id", studentId).gte("checkin_date", weekAgo),
@@ -16,6 +16,8 @@ export async function computeIntegrity(studentId: string, today: string, tz: str
     admin.from("snaps").select("taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", weekAgo),
     admin.from("materials").select("subject, title, topics, created_at, uploaded_by, student_id").eq("student_id", studentId).eq("status", "ready").gte("created_at", weekAgoIso),
     admin.from("timetable_entries").select("weekday, subject_name").eq("student_id", studentId),
+    admin.from("checkins").select("checkin_date, manners_self").eq("student_id", studentId).gte("checkin_date", weekAgo),
+    admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", weekAgo),
   ]);
   type A = { submitted_at: string | null; seconds: number | null; total: number | null; tab_switches: number; kind: string; quizzes: { title: string } | null };
   return integritySignals({
@@ -27,5 +29,7 @@ export async function computeIntegrity(studentId: string, today: string, tz: str
     snaps: (snaps ?? []) as { taken_on: string; status: string; ai_verdict: string | null }[],
     materials: ((materials ?? []) as { subject: string | null; title: string; topics: string[] | null; created_at: string; uploaded_by: string | null; student_id: string }[]).map((m) => ({ subject: m.subject, title: m.title, topics: m.topics ?? [], created_at: m.created_at, uploaded_by_student: m.uploaded_by === m.student_id })),
     timetableSubjects: (tt ?? []) as { weekday: number; subject_name: string }[],
+    mannersSelf: ((mannersRows ?? []) as { checkin_date: string; manners_self: number | null }[]).map((c) => ({ date: c.checkin_date, self: c.manners_self })),
+    parentTicks: (tickRows ?? []) as { tick_date: string; code: string; value: boolean }[],
   });
 }

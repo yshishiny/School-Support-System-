@@ -10,6 +10,8 @@ import { recordPositionAction } from "@/lib/actions/location";
 import { LessonPicker } from "./LessonPicker";
 import { lessonFieldKey, type LessonDay } from "@/lib/lessons";
 
+import { MANNERS_SCALE } from "@/lib/manners";
+
 const MOODS = [
   { v: 1, e: "😞" },
   { v: 2, e: "😕" },
@@ -127,6 +129,19 @@ export function CheckinForm({
           {day.date !== today && <p className="text-xs text-warn">Missed days must be filled in before the week closes: after that they count against the allowance.</p>}
         </div>
       ))}
+
+      <div>
+        <label className="label">Your manners today, honestly (your parents rate it too; the two are compared)</label>
+        <div className="grid grid-cols-5 gap-1.5">
+          {MANNERS_SCALE.map((m) => (
+            <label key={m.v} className="min-w-0">
+              <input type="radio" name="manners_self" value={m.v} className="peer sr-only" defaultChecked={existing?.manners_self === m.v} />
+              <span className="block text-center rounded-xl border border-line py-1.5 peer-checked:border-accent peer-checked:bg-accent/20 cursor-pointer"><span className="text-2xl block">{m.e}</span><span className="text-[10px] muted block leading-tight px-0.5">{m.label.split(":")[0].split(",")[0]}</span></span>
+            </label>
+          ))}
+        </div>
+        <input name="manners_note" className="input mt-1.5" placeholder="Anything to say about it? (a slip, an apology, something you did well)" defaultValue={existing?.manners_note ?? ""} maxLength={200} />
+      </div>
 
       <div>
         <label className="label">How was today?</label>

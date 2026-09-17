@@ -12,6 +12,8 @@ export interface IntegrityInput {
   snaps: { taken_on: string; status: string; ai_verdict: string | null }[];
   materials?: { subject: string | null; title: string; topics: string[]; created_at: string; uploaded_by_student: boolean }[]; // school files shared this week
   timetableSubjects?: { weekday: number; subject_name: string }[]; // to know which days the subject had a class
+  mannersSelf?: { date: string; self: number | null }[]; // the child's own rating at check-in
+  parentTicks?: { tick_date: string; code: string; value: boolean }[]; // the parent's daily taps
 }
 
 export interface IntegritySignal {
@@ -92,6 +94,10 @@ export function integritySignals(i: IntegrityInput): IntegritySignal[] {
     const gap = noClass.length > 0 ? `${noClass.length} of his ${subj} classes marked “no class”` : logs.length === 0 && (days > 0 || !i.timetableSubjects) ? `no ${subj} class logged this week` : !mentioned && m.topics.length > 0 && logs.length > 0 ? `his ${subj} notes do not mention any of it` : null;
     if (gap) out.push({ code: "log_vs_school", label: `School shared “${m.title}” for ${subj} this week, but ${gap}`, ask: `Ask what was taken in ${subj} this week. The school's file covers: ${m.topics.slice(0, 5).join(", ") || m.title}. ${noClass.length ? `He marked “no class” on ${noClass.map((l) => l.log_date).join(", ")}.` : ""}`.trim() });
   }
+
+  // 9. Manners: he rated himself 4-5 on a day a parent marked ✗.
+  const gaps = (i.mannersSelf ?? []).filter((m) => m.date >= weekAgo && (m.self ?? 0) >= 4 && (i.parentTicks ?? []).some((t) => t.tick_date === m.date && t.code === "manners" && t.value === false));
+  if (gaps.length) out.push({ code: "manners_gap", label: `Rated his own manners ${gaps.length === 1 ? "well" : `well on ${gaps.length} days`} when a parent marked ✗ (${gaps.map((g) => g.date).join(", ")})`, ask: `Ask him, without the ✗ in view, what happened on ${gaps[gaps.length - 1].date} that a parent saw differently, and who he thinks was affected.` });
 
   // 7. Snaps sent back more than once.
   const rejected = i.snaps.filter((s) => s.status === "rejected" && s.taken_on >= weekAgo);

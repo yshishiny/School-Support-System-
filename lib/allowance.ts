@@ -26,6 +26,7 @@ export const DEFAULT_KPIS: KpiDef[] = [
   { code: "homework", label: "Homework done by its due date", emoji: "📝", source: "app", weight: 10, enabled: true, hint: "Homework and projects due this week, marked done in the check-in on time." },
   { code: "grades", label: "Monthly grades sheet uploaded", emoji: "📊", source: "app", weight: 5, enabled: true, hint: "A photo of the school's grades sheet each month, from the 21st onward. The AI writes an appraisal." },
   { code: "quizzes", label: "Attempted 60% of the week's planned quizzes", emoji: "📅", source: "app", weight: 15, enabled: true, hint: "Attempts, never scores." },
+  { code: "materials", label: "School files practised on time", emoji: "📎", source: "app", weight: 5, enabled: true, hint: "Each file the school shares: a first set within 3 days, a second by day 7, a third by day 14." },
   { code: "phone", label: "Phone parked by the agreed hour", emoji: "📵", source: "parent", weight: 10, enabled: true, hint: "One tap a day." },
   { code: "wellbeing", label: "Did the coach check-in when it was due", emoji: "💓", source: "app", weight: 5, enabled: true, hint: "Weekly pulse or monthly check." },
 ];
@@ -82,6 +83,7 @@ export interface WeekInput {
   checkpoint?: { status: "none" | "ready" | "done" | "expired" | "failed" };
   homework?: { due: number; doneOnTime: number; open: number }; // due in the week up to today
   gradesSheet?: { uploaded: boolean; dayOfMonth: number };
+  materials?: { due: number; done: number; next: string | null }; // school-file practice deadlines in the week so far
 }
 
 export interface KpiResult {
@@ -173,6 +175,12 @@ export function scoreWeek(i: WeekInput): WeekResult {
       maxFraction = 1;
       detail = g.uploaded ? "this month's sheet is in" : g.dayOfMonth < 21 ? "due from the 21st" : "not uploaded yet this month";
       if (fraction < 1) hintByCode.set(k.code, "Upload a photo of this month's grades sheet (Me → Grades)");
+    } else if (k.code === "materials") {
+      const m = i.materials ?? { due: 0, done: 0, next: null };
+      fraction = m.due === 0 ? 1 : m.done / m.due;
+      maxFraction = 1;
+      detail = m.due === 0 ? "no file deadline yet this week" : `${m.done} of ${m.due} set${m.due === 1 ? "" : "s"} on time`;
+      if (m.next) hintByCode.set(k.code, `Do a practice set on “${m.next}” (Learn → Files)`);
     } else if (k.code === "checkpoint") {
       const st = i.checkpoint?.status ?? "none";
       fraction = st === "expired" ? 0 : 1; // benefit of the doubt until it is due
@@ -260,6 +268,7 @@ export const KPI_ROUTE: Record<string, { href: string; cta: string }> = {
   checkins: { href: "/allowance#late-checkins", cta: "Fill in" },
   classlog: { href: "/checkin", cta: "Fill in classes" },
   quizzes: { href: "/learn?tab=me", cta: "Do a quiz" },
+  materials: { href: "/learn?tab=files", cta: "Practise the file" },
   checkpoint: { href: "/today", cta: "Open checkpoint" },
   homework: { href: "/checkin", cta: "Mark homework" },
   grades: { href: "/me", cta: "Upload sheet" },

@@ -1,3 +1,5 @@
+import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { DeployWatcher } from "@/components/DeployWatcher";
@@ -25,6 +27,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className="antialiased">
         {children}
         <DeployWatcher />
+        <SpeedInsights />
+        <Analytics />
       </body>
     </html>
   );

@@ -13,6 +13,7 @@ const ITEMS: { href: string; label: string; emoji: string; color: string; group:
   { href: "/parent/materials", label: "School files", emoji: "📎", color: "#fb5607", group: "Learning" },
   { href: "/parent/import", label: "Import", emoji: "💬", color: "#06d6a0", group: "Learning" },
   { href: "/parent/allowance", label: "Allowance", emoji: "💵", color: "#e0a800", group: "Fairness" },
+  { href: "/parent/manners", label: "Manners", emoji: "🤝", color: "#f77f00", group: "Fairness" },
   { href: "/parent/snaps", label: "Snaps", emoji: "📸", color: "#ef476f", group: "Fairness" },
   { href: "/parent/rewards", label: "Rewards", emoji: "🎁", color: "#118ab2", group: "Fairness" },
   { href: "/parent/reports", label: "Reports", emoji: "📨", color: "#0e7c86", group: "Family" },

@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.11.0 — Manners with the child first, and the school-file study loop (17 September 2026)
+
+- **Manners**: the child rates his own manners at check-in (1 to 5, with a note). New parent page Manners (Fairness group): his rating and note beside your ✓/✗, hints on what to look for (tone, greetings, helping, phone at the table, siblings, helpers and elders, honesty, repair), the week in one row, and the days you disagreed. When he says 4 or 5 and you mark ✗, it becomes an integrity signal and a three-round follow-up to him.
+- **What happens to every school file**: three practice sets on a spaced schedule (within 3 days, by day 7, by day 14), shown as chips on his Learn → Files and yours, pushed onto his Today, and counted as a new allowance basic "School files practised on time" (weight 5).
+- **Monthly revision** from the 25th: per subject with files that month, one revision sheet (must-know list, worked examples, traps, self-test) and one 12-question quiz built only from the month's files. Kids open them from Learn → Files and Today; parents see them under School files → Revision, with a "build now" button.
+- **Vercel Speed Insights and Analytics** added.
+- Migration 20260917155153 (checkins.manners_self/manners_note, revision_sheets).
+
 ## 1.10.0 — Admin page and error log (17 September 2026)
 
 - **Every caught failure is recorded** (file reading, snap check, lessons and diagrams, compensation, message delivery, grades reading, nightly jobs, browser crashes) with area, message, stack and who was affected. The administrator gets one inbox note per area per hour.

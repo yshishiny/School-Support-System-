@@ -123,6 +123,8 @@ export interface Checkin {
   stuck_on: string | null;
   submitted_at: string;
   entered_late?: boolean; // filled in on a later day
+  manners_self?: number | null;
+  manners_note?: string | null;
 }
 
 export interface CheckinItem {

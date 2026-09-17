@@ -8,6 +8,8 @@ import { PracticeButton, PrepareWeekButton } from "@/components/LearnButtons";
 import { weekTopicsFor } from "@/lib/learning/resources";
 import { weekdayOf } from "@/lib/dates";
 import { fileEmoji } from "@/lib/materials/files";
+import { materialStages, nextStage } from "@/lib/materials/study";
+import { loadRevisions } from "@/lib/revision/run";
 import { Tabs } from "@/components/Tabs";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
@@ -39,12 +41,14 @@ export default async function LearnPage() {
     supabase.from("subjects").select("name").eq("student_id", profile.id),
   ]);
   const week = await weekTopicsFor(profile.id, profile.grade, family.timezone);
+  const revisions = await loadRevisions([profile.id], 12).catch(() => []);
   const weekMissing = week.filter((w) => !w.hasLesson || !w.hasResources).length;
   const materials = (materialRows ?? []) as MaterialRow[];
   const materialUrls = await signMaterialUrls(materials.map((m) => ({ id: m.id, path: m.path })));
   type MQ = { material_id: string | null; title: string; attempts: { submitted_at: string | null }[] };
   const mq = (materialQuizzes ?? []) as MQ[];
   const setsFor = (id: string) => mq.filter((q) => q.material_id === id && !q.title.startsWith("Worksheet:")).length;
+  const attemptDatesFor = (id: string) => mq.filter((q) => q.material_id === id).flatMap((q) => q.attempts.filter((a) => a.submitted_at).map((a) => a.submitted_at!.slice(0, 10)));
   const worksheetDone = (id: string) => mq.filter((q) => q.material_id === id && q.title.startsWith("Worksheet:") && q.attempts.some((a) => a.submitted_at)).length;
   const all = (topics ?? []) as Topic[];
   const school = all.filter((t) => t.track === "school");
@@ -207,6 +211,21 @@ export default async function LearnPage() {
 
   const filesTab = (
     <div className="space-y-3">
+      {revisions.length > 0 && (
+        <section className="card space-y-2 border-accent/50">
+          <h2 className="h2">📚 Monthly revision</h2>
+          <p className="text-xs muted">One sheet and one quiz per subject, built from everything the school shared this month. Read, then sit the quiz.</p>
+          <ul className="divide-y divide-line text-sm">
+            {revisions.map((r) => (
+              <li key={r.id} className="py-2 flex items-center gap-2">
+                <span className="text-xl">{subjectEmoji(r.subject)}</span>
+                <span className="flex-1"><b>{r.subject}</b> <span className="muted text-xs">· {r.month.slice(0, 7)}{r.status !== "ready" ? ` · ${r.status}` : ""}</span></span>
+                {r.status === "ready" && <Link href={`/learn/revision/${r.id}`} className="btn-primary btn-sm">Open</Link>}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {materials.map((m) => (
         <section key={m.id} className="card space-y-2">
           <div className="flex items-start gap-2">
@@ -217,6 +236,16 @@ export default async function LearnPage() {
             </div>
             {materialUrls.get(m.id) && <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">Open</a>}
           </div>
+          {m.status === "ready" && (() => {
+            const st = materialStages(m.created_at.slice(0, 10), attemptDatesFor(m.id), today);
+            const nx = nextStage(st);
+            return (
+              <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                {st.map((s) => <span key={s.n} className={`chip ${s.state === "done" ? "text-good" : s.state === "overdue" ? "text-bad" : s.state === "due" ? "text-warn" : "muted"}`}>{s.state === "done" ? "✓" : s.state === "overdue" ? "⏰" : "·"} {s.label}{s.state !== "done" ? ` by ${prettyDate(s.dueBy)}` : ""}</span>)}
+                {nx && <span className="muted">→ {nx.state === "overdue" ? "late:" : "next:"} {nx.label.toLowerCase()} · counts for the allowance</span>}
+              </div>
+            );
+          })()}
           {m.instructions && <p className="text-sm"><b>Teacher says:</b> {m.instructions}</p>}
           {m.summary && <p className="text-xs muted">{m.summary}</p>}
           {m.status === "ready" && m.worksheet?.questions?.length ? <DoWorksheetButton materialId={m.id} questions={m.worksheet.questions.length} attempts={worksheetDone(m.id)} /> : null}
