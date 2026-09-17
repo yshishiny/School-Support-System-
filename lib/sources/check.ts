@@ -47,7 +47,7 @@ export async function checkSource(source: { id: string; family_id: string; label
     const extraction = await extractItemsFromMessages(`[${today}] Page: ${source.label} (${source.url})\n${text}`, today, ["This is a school website or announcements page, not a chat: extract dated announcements, events, exams, holidays, supply lists and deadlines that are still ahead; skip navigation text, old news and boilerplate."]);
     await admin.from("source_findings").insert({ source_id: source.id, family_id: source.family_id, summary: extraction.summary, items: extraction.items });
     await admin.from("sources").update({ last_checked_at: now, last_hash: hash, last_error: null }).eq("id", source.id);
-    await notifyParents(source.family_id, `🏫 *${source.label}* has news.\n${extraction.summary}\n${extraction.items.length} item${extraction.items.length === 1 ? "" : "s"} waiting for your approval under Import.`);
+    await notifyParents(source.family_id, `🏫 *${source.label}* has news.\n${extraction.summary}\n${extraction.items.length} item${extraction.items.length === 1 ? "" : "s"} waiting for your approval under Import.`, { kind: "news", url: "/parent/import" });
     return { changed: true, items: extraction.items.length };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -22,7 +22,7 @@ async function raiseAlert(opts: { familyId: string; studentId: string; studentNa
   const { data: recent } = await admin.from("safety_alerts").select("id").eq("student_id", opts.studentId).eq("level", opts.level).gte("created_at", since).limit(1);
   if (recent && recent.length) return;
   // Safety alerts always go to every parent, whatever the custody day.
-  const send = await notifyParents(opts.familyId, parentAlertText(opts.studentName, opts.level, opts.category));
+  const send = await notifyParents(opts.familyId, parentAlertText(opts.studentName, opts.level, opts.category), { kind: "alert", url: "/parent" });
   await admin.from("safety_alerts").insert({ family_id: opts.familyId, student_id: opts.studentId, level: opts.level, category: opts.category, summary: opts.summary, notified: send.ok });
   revalidatePath("/parent");
   revalidatePath("/parent/progress");

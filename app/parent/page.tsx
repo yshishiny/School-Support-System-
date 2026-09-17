@@ -19,6 +19,7 @@ import { LiveFeed } from "@/components/LiveFeed";
 import { SideTabs } from "@/components/SideTabs";
 import { kidColor } from "@/lib/kid-tabs";
 import { presence } from "@/lib/activity";
+import { unreadCount } from "@/lib/inbox";
 import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
@@ -91,6 +92,7 @@ export default async function ParentHome() {
   const plans = await Promise.all(students.map((s) => loadPlan(s.id).catch(() => null)));
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const live = await liveFeedAction().catch(() => null);
+  const unread = await unreadCount(profile.id).catch(() => 0);
   const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
   const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
@@ -127,6 +129,14 @@ export default async function ParentHome() {
           ))}
         </nav>
       </header>
+
+      {unread > 0 && (
+        <Link href="/parent/notifications" className="card !py-2.5 flex items-center gap-3 border-accent/60">
+          <span className="text-2xl">🔔</span>
+          <div className="flex-1 text-sm"><b>{unread} new</b> in your inbox: reports, alerts, allowance, school news and live pings.</div>
+          <span className="btn-ghost btn-sm">Open</span>
+        </Link>
+      )}
 
       {/* Alerts */}
       {openAlerts.map((a) => (

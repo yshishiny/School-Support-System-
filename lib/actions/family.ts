@@ -94,3 +94,14 @@ export async function familyToday(): Promise<string> {
   const { family } = await requireParent();
   return todayIn(family.timezone);
 }
+
+/** Inbox: mark one or every notification read. */
+export async function markNotificationsReadAction(id: string | null): Promise<void> {
+  const { profile } = await requireParent();
+  const supabase = await createClient();
+  let q = supabase.from("parent_notifications").update({ read_at: new Date().toISOString() }).eq("parent_id", profile.id).is("read_at", null);
+  if (id) q = q.eq("id", id);
+  await q;
+  revalidatePath("/parent/notifications");
+  revalidatePath("/parent");
+}

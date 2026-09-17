@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.5.0 — Parent inbox (17 September 2026)
+
+- **Inbox** in the parent menu (🔔, with an unread badge) and a "N new" strip on Home: a copy of every daily report, safety alert, allowance week, school-news note and live ping, with New / All / per-kind tabs, "Read" per item and "Mark all read".
+- The inbox fills even when Telegram or browser notifications are not connected, so nothing is lost.
+- Migration 20260917144403 (parent_notifications).
+
 ## 1.4.0 — Snaps front and centre, this week's lessons ready before you open them (17 September 2026)
 
 - **Snaps is its own tab** in the kids' bottom bar, with a week meter (done/due per task), "N to snap now", and a bright banner at the top of Today whenever a snap window is open. A saved picture or screenshot can be sent as well as a fresh camera shot.

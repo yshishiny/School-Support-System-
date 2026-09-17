@@ -65,7 +65,7 @@ export async function GET(request: Request) {
       }
     }
     if (lines.length) {
-      await notifyParents(f.id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`);
+      await notifyParents(f.id, `💵 *Allowance this week*\n${lines.join("\n")}\nDetails and “mark paid” are on the Allowance page.`, { kind: "allowance", url: "/parent/allowance" });
       (results[f.id] ??= []).push(`allowance closed: ${lines.join("; ")}`);
     }
   }

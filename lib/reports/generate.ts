@@ -162,7 +162,7 @@ export async function generateAndSendReport(familyId: string, opts: { force?: bo
   const custodyLine = custodian ? `🏠 Tonight the kids are with ${parentName(custodianParent)}.` : null;
   const body = buildDailyReport(today, children, parents.flatMap((p) => accessFor(p.id)), custodyLine);
   // Each parent gets the same report; the custody line is personal ("with you tonight").
-  const send = await notifyParents(familyId, (p) => (custodian === p.id ? body.replace(`with ${parentName(custodianParent)}.`, "with you.") : body));
+  const send = await notifyParents(familyId, (p) => (custodian === p.id ? body.replace(`with ${parentName(custodianParent)}.`, "with you.") : body), { kind: "report", url: "/parent/reports" });
   const row = {
     family_id: familyId,
     report_date: today,
