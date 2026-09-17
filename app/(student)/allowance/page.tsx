@@ -8,6 +8,11 @@ import { AllowanceClaims, type ClosedWeek } from "@/components/AllowanceClaims";
 import { ConsequenceCard } from "@/components/ConsequenceCard";
 import { fullWeekStreak } from "@/lib/actions/rewards";
 import type { Consequence, Reward } from "@/lib/types";
+import { shiftDate, weekdayOf } from "@/lib/dates";
+import { PRAYERS, type PrayerName } from "@/lib/prayers";
+import { loadCompensations } from "@/lib/compensation/run";
+import { CompensationCard } from "@/components/CompensationCard";
+import { PastPrayersFill, type PastDay } from "@/components/PastPrayersFill";
 
 /** The child's allowance page: how much this week, why, how to get the full amount, and what extra he can do. */
 export default async function AllowancePage() {
@@ -29,6 +34,21 @@ export default async function AllowancePage() {
     supabase.from("rewards").select("*").eq("family_id", family.id).eq("active", true).gt("requires_full_weeks", 0).order("cost_points"),
     fullWeekStreak(profile.id),
   ]);
+  const [{ data: prayerRows }, { data: checkinRows }, compensations] = await Promise.all([
+    supabase.from("prayer_logs").select("log_date, prayer").eq("student_id", profile.id).gte("log_date", status.start).lt("log_date", today),
+    supabase.from("checkins").select("checkin_date").eq("student_id", profile.id).gte("checkin_date", status.start).lt("checkin_date", today),
+    loadCompensations(profile.id, shiftDate(today, -14)),
+  ]);
+  const DAY = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const pastDays: PastDay[] = [];
+  for (let d = status.start; d < today; d = shiftDate(d, 1)) {
+    const logged = new Set((prayerRows ?? []).filter((p) => p.log_date === d).map((p) => p.prayer as PrayerName));
+    const missing = PRAYERS.filter((p) => !logged.has(p));
+    if (missing.length) pastDays.push({ date: d, label: `${DAY[weekdayOf(d)]} ${prettyDate(d)}`, missing });
+  }
+  const checkinMissed: string[] = [];
+  for (let d = status.start; d < today; d = shiftDate(d, 1)) if (!(checkinRows ?? []).some((c) => c.checkin_date === d)) checkinMissed.push(d);
+  const toBalance = compensations.filter((c) => !c.correct);
   const plan = allowancePlan(status);
   const now = bandFor(status.score);
   const best = bandFor(status.maxScore);
@@ -114,11 +134,39 @@ export default async function AllowancePage() {
         </div>
       </section>
 
+      {/* 3b. Late entries to balance */}
+      {toBalance.length > 0 && (
+        <div id="balance" className="space-y-2">
+          <h2 className="h2">📿 Balance your late entries ({toBalance.length})</h2>
+          <p className="text-xs muted">Each entry you filled in later counts once you read two ayahs and answer one question right. Read them slowly; the question is on what you just read.</p>
+          {toBalance.map((c) => <CompensationCard key={c.id} c={c} />)}
+        </div>
+      )}
+
+      {/* 3c. Past prayers not logged */}
+      {pastDays.length > 0 && (
+        <section id="late-prayers" className="card space-y-2">
+          <h2 className="h2">🕌 Prayers you did not log on earlier days</h2>
+          <p className="text-xs muted">Say honestly what happened. On time or late counts once balanced with two ayahs; “missed” costs nothing extra and is worth points for honesty.</p>
+          <PastPrayersFill days={pastDays} />
+        </section>
+      )}
+
+      {checkinMissed.length > 0 && (
+        <section id="late-checkins" className="card space-y-1.5">
+          <h2 className="h2">✅ Check-ins you missed this week</h2>
+          <div className="flex flex-wrap gap-1.5">
+            {checkinMissed.map((d) => <Link key={d} href={`/checkin?date=${d}`} className="btn-ghost btn-sm">{DAY[weekdayOf(d)].slice(0, 3)} {prettyDate(d)} →</Link>)}
+          </div>
+          <p className="text-xs muted">A check-in filled in later counts once balanced with two ayahs and one right answer.</p>
+        </section>
+      )}
+
       {/* 4. Extra */}
       <section className="card space-y-2">
         <h2 className="h2">💪 Can I do extra?</h2>
         <ul className="text-sm space-y-2">
-          <li className="flex gap-2"><span>🔁</span><span><b>Catch-ups count until pay day.</b> A missed class log, a missed check-in, yesterday&apos;s prayers and a skipped planned quiz can all still be filled in from Today or the Check-in, and they bring the points back in full.</span></li>
+          <li className="flex gap-2"><span>🔁</span><span><b>Catch-ups count until pay day.</b> A missed class log, a missed check-in, earlier prayers and a skipped planned quiz can all still be filled in, right here or from the Check-in. A late entry is balanced by reading two ayahs and answering one question right; then it counts in full.</span></li>
           {open.length > 0 && <li className="flex gap-2"><span>🪞</span><span><b>Earn-back.</b> Each consequence below has a task; do it and press &quot;I did it&quot;, a parent confirms.</span></li>}
           <li className="flex gap-2"><span>⭐</span><span><b>Extra quizzes and lessons earn points</b>, not extra allowance: the allowance is for the basics, and a clean week already pays all of it. Points go to Rewards.</span></li>
           {extras.length > 0 ? (

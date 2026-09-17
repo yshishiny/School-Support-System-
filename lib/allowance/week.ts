@@ -4,6 +4,7 @@ import { dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { snapCounts, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
+import { compensatedRefs } from "@/lib/compensation";
 import type { Family } from "@/lib/types";
 
 export interface WeekStatus extends WeekResult {
@@ -24,8 +25,8 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
   const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks);
   const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }, { data: snapRows }] = await Promise.all([
     admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", start).lte("tick_date", end),
-    admin.from("prayer_logs").select("log_date").eq("student_id", studentId).gte("log_date", start).lte("log_date", end),
-    admin.from("checkins").select("checkin_date").eq("student_id", studentId).gte("checkin_date", start).lte("checkin_date", end),
+    admin.from("prayer_logs").select("log_date, prayer, status, entered_late").eq("student_id", studentId).gte("log_date", start).lte("log_date", end),
+    admin.from("checkins").select("checkin_date, entered_late").eq("student_id", studentId).gte("checkin_date", start).lte("checkin_date", end),
     admin.from("quizzes").select("scheduled_for, attempts(submitted_at)").eq("student_id", studentId).not("scheduled_for", "is", null).gte("scheduled_for", start).lte("scheduled_for", today < end ? today : end),
     admin.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", studentId).gte("taken_on", shiftDate(start, -60)).order("taken_on", { ascending: false }),
     admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
@@ -54,8 +55,15 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     const key = `snap:${sn.task_code}`;
     if (!snapDays[key]?.includes(sn.taken_on)) (snapDays[key] ??= []).push(sn.taken_on);
   }
+  // Late entries count only once balanced (two ayahs read, one question right).
+  const { data: compRows } = await admin.from("late_compensations").select("ref, correct").eq("student_id", studentId).gte("created_at", `${shiftDate(start, -7)}T00:00:00Z`);
+  const balanced = compensatedRefs((compRows ?? []) as { ref: string; correct: boolean | null }[]);
   const prayerDays: Record<string, number> = {};
-  for (const p of prayers ?? []) prayerDays[p.log_date as string] = (prayerDays[p.log_date as string] ?? 0) + 1;
+  for (const p of (prayers ?? []) as { log_date: string; prayer: string; status: string; entered_late: boolean }[]) {
+    if (p.entered_late && !balanced.has(`prayer:${p.log_date}:${p.prayer}`)) continue;
+    prayerDays[p.log_date] = (prayerDays[p.log_date] ?? 0) + 1;
+  }
+  const checkinDates = ((checkins ?? []) as { checkin_date: string; entered_late: boolean }[]).filter((c) => !c.entered_late || balanced.has(`checkin:${c.checkin_date}`)).map((c) => c.checkin_date);
   const plannedRows = (planned ?? []) as { scheduled_for: string; attempts: { submitted_at: string | null }[] }[];
   const history = (wb ?? []) as CheckHistoryRow[];
   // Something was due in this week if, at the start of the week, an instrument was due (using history before the week) …
@@ -69,7 +77,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     today,
     ticks: (ticks ?? []) as { tick_date: string; code: string; value: boolean }[],
     prayerDays,
-    checkinDates: (checkins ?? []).map((c) => c.checkin_date as string),
+    checkinDates,
     plannedTotal: plannedRows.length,
     plannedAttempted: plannedRows.filter((q) => q.attempts.some((a) => a.submitted_at)).length,
     wellbeingDue,

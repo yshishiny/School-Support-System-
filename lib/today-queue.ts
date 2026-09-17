@@ -4,7 +4,7 @@
  */
 import type { PrayerName } from "./prayers";
 
-export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "classlog" | "checkpoint" | "followup" | "done";
+export type QueueKind = "prayer" | "quiz" | "check" | "checkin" | "recall" | "review" | "catchup" | "learner" | "snap" | "classlog" | "checkpoint" | "followup" | "compensation" | "done";
 
 export interface QueueItem {
   key: string;
@@ -31,6 +31,7 @@ export interface QueueInput {
   learnerDone: boolean;
   snapsDue?: { id: string; label: string; emoji: string }[]; // snap tasks open now and not yet sent today
   followups?: number; // open coach questions on integrity signals
+  compensations?: number; // late entries waiting for two ayahs and a question
   classLogMissing?: { count: number; line: string; deadline: string } | null; // previous days' classes still not logged this week
   checkinsMissed?: { date: string; label: string }[]; // earlier days this week without a check-in
   checkpoint?: { quizId: string; title: string; questions: number; minutes: number; dueLabel: string } | null; // ready, not attempted
@@ -65,6 +66,7 @@ export function buildQueue(i: QueueInput): QueueItem[] {
   if (evening && !i.checkinDone) q.push(checkin);
   for (const m of (i.checkinsMissed ?? []).slice(0, 2)) q.push({ key: `checkin-${m.date}`, kind: "checkin", title: `${m.label}'s check-in`, subtitle: "You missed it: fill it in before the week closes", href: `/checkin?date=${m.date}`, cta: "Fill in", chips: ["+5", "streak kept"] });
   q.push(...quizzes);
+  if (i.compensations) q.push({ key: "compensation", kind: "compensation", title: `${i.compensations} late entr${i.compensations === 1 ? "y" : "ies"} to balance`, subtitle: "Read two ayahs and answer one question right; then it counts", href: "/allowance#balance", cta: "Balance", chips: ["+1 each", "keeps the allowance"] });
   if (i.followups) q.push({ key: "followup", kind: "followup", title: `${i.followups} question${i.followups === 1 ? "" : "s"} from your coach`, subtitle: "Something the app noticed: tell the story with the details", href: "/coach/followup", cta: "Answer", chips: ["+2 each", "honest wins"] });
   if (i.dueCheck) q.push({ key: `check-${i.dueCheck.id}`, kind: "check", title: i.dueCheck.title, subtitle: `${i.dueCheck.minutes} min · private`, href: `/coach/check/${i.dueCheck.id}`, cta: "Go", chips: ["+5"] });
   if (!evening && !i.checkinDone) q.push(checkin);

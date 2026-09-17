@@ -8,6 +8,7 @@ import { computeAwards, computeStreak, POINTS } from "@/lib/points";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { parseLessonFieldKey } from "@/lib/lessons";
 import { pingParents } from "@/lib/notify";
+import { openCompensation } from "@/lib/compensation/run";
 import type { Assignment, ItemStatus } from "@/lib/types";
 
 export interface CheckinResult {
@@ -162,6 +163,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     if (!insertError) earned += award.delta;
   }
 
+  if (enteredLate) await openCompensation(profile.id, family.id, "checkin", `checkin:${checkinDate}`, `Check-in for ${checkinDate}, filled in later`);
   void pingParents(family.id, `${profile.full_name.split(" ")[0]} checked in`, `${minutes} min studied · ${lessonNotes.length} class${lessonNotes.length === 1 ? "" : "es"} logged · +${earned} points${enteredLate ? " · filled in later" : ""}`);
   ["/today", "/checkin", "/calendar", "/parent", "/parent/assignments"].forEach((p) => revalidatePath(p));
   return { earned, streak };

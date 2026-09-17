@@ -256,8 +256,8 @@ export function eligibilityHint(r: WeekResult, allowance: number): { tone: "good
 
 /** Where in the app a basic is fixed, so the child's allowance page can send him straight there. */
 export const KPI_ROUTE: Record<string, { href: string; cta: string }> = {
-  prayers: { href: "/today", cta: "Log prayers" },
-  checkins: { href: "/checkin", cta: "Check in" },
+  prayers: { href: "/allowance#late-prayers", cta: "Fill in prayers" },
+  checkins: { href: "/allowance#late-checkins", cta: "Fill in" },
   classlog: { href: "/checkin", cta: "Fill in classes" },
   quizzes: { href: "/learn?tab=me", cta: "Do a quiz" },
   checkpoint: { href: "/today", cta: "Open checkpoint" },

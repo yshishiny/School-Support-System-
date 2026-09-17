@@ -2,6 +2,13 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.8.0 — Late entries, balanced (17 September 2026)
+
+- **Prayers not logged on earlier days** can be filled in from the Allowance page for the whole allowance week (not only yesterday): on time, late, or missed, said honestly.
+- **Every late entry is balanced**: a past prayer or a check-in filled in later opens a small task: read two ayahs (from the child's own memorisation list, otherwise from a rotation of short surahs) and answer one question on what he just read (complete the ayah, or which surah). Only then does the entry count for the allowance. Right answer earns 1 point; a wrong one means read again and try once more.
+- The Allowance page now sends him straight to each thing that is left: prayers to fill in, missed check-ins by day, entries to balance, and the rest of the plan with a button per line. Today shows "late entries to balance" in the queue.
+- Migration 20260917151733 (late_compensations).
+
 ## 1.7.1 — Quieter menu, readable kids (17 September 2026)
 
 - **Parent menu redesigned**: one calm panel with grouped rows, a small coloured icon disc per item, and a colour bar plus soft fill on the current page. The phone strip is smaller pills.
