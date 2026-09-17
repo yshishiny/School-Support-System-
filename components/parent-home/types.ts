@@ -1,0 +1,45 @@
+import type { ReactNode } from "react";
+
+export interface NeedItem { href: string; label: string; n: number; emoji: string }
+export interface KidView {
+  id: string;
+  name: string;
+  grade: number | null;
+  color: string;
+  emoji: string;
+  avatarUrl: string | null;
+  online: boolean;
+  presenceLabel: string | null;
+  checkedIn: boolean;
+  checkinLate: boolean;
+  checkinTime: string | null;
+  prayers: { prayer: string; status: string | null }[];
+  prayersOnTime: number;
+  quizzesDone: number;
+  quizzesTotal: number;
+  allowance: { amount: number; score: number; allowance: number } | null;
+  classLog: { done: number; due: number; missing: string | null };
+  school: { off: boolean; reason: string | null; line: string };
+  ticks: Record<string, boolean>;
+  snapsToday: { code: string; label: string; emoji: string; state: "due" | "sent" | "good" | "approved" | "rejected" | "closed" | "none" }[];
+  overdue: string[];
+  tests: string[];
+  balance: number;
+  streak: number;
+  integrityCount: number;
+  card: ReactNode; // the full card used inside the kid tab (option B) and the middle column (option A)
+}
+
+export interface HomeData {
+  today: string;
+  dateLine: string;
+  firstName: string;
+  unread: number;
+  needs: NeedItem[];
+  alerts: ReactNode;
+  live: ReactNode;
+  kids: KidView[];
+  reportLine: string;
+  allowanceEnabled: boolean;
+  kpiToday: { label: string; emoji: string; code: string }[]; // parent-judged basics for the strip
+}

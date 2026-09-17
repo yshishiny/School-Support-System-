@@ -253,3 +253,74 @@ export function eligibilityHint(r: WeekResult, allowance: number): { tone: "good
   if (best.band === "none") return { tone: "bad", text: `This week's allowance is gone. Next week starts fresh; a clean week pays the full ${allowance}.` };
   return { tone: "warn", text: `Heading for ${nowEgp} EGP. The best you can still reach this week is ${bestEgp} EGP (${best.label.toLowerCase()}).` };
 }
+
+/** Where in the app a basic is fixed, so the child's allowance page can send him straight there. */
+export const KPI_ROUTE: Record<string, { href: string; cta: string }> = {
+  prayers: { href: "/today", cta: "Log prayers" },
+  checkins: { href: "/checkin", cta: "Check in" },
+  classlog: { href: "/checkin", cta: "Fill in classes" },
+  quizzes: { href: "/learn?tab=me", cta: "Do a quiz" },
+  checkpoint: { href: "/today", cta: "Open checkpoint" },
+  homework: { href: "/checkin", cta: "Mark homework" },
+  grades: { href: "/me", cta: "Upload sheet" },
+  wellbeing: { href: "/coach", cta: "Coach check-in" },
+};
+export function kpiRoute(code: string): { href: string; cta: string } | null {
+  if (code.startsWith("snap:")) return { href: "/snaps", cta: "Snap it" };
+  return KPI_ROUTE[code] ?? null;
+}
+
+export interface PlanItem {
+  code: string;
+  emoji: string;
+  label: string;
+  detail: string;
+  atStake: number;     // points still missing on this basic (weight - earned)
+  recoverable: boolean; // can the missing part still be earned this week
+  how: string;          // what to do, in the child's words
+  href: string | null;
+  cta: string | null;
+}
+
+/**
+ * The child's plan for the rest of the week: every basic that is not full, most valuable first, with what to do and
+ * whether it can still be recovered. Parent-judged basics can only be protected (no more ✗), never caught up.
+ */
+export function allowancePlan(r: WeekResult): { todo: PlanItem[]; protect: PlanItem[]; lost: PlanItem[] } {
+  const items: PlanItem[] = r.results
+    .filter((k) => k.fraction < 0.999)
+    .map((k) => {
+      const atStake = Math.round((k.weight - k.earned) * 10) / 10;
+      const route = kpiRoute(k.code);
+      const parentJudged = ["dish", "manners", "phone"].includes(k.code);
+      const hint = r.hints.find((h) => h.toLowerCase().includes(k.label.toLowerCase().slice(0, 12)) || (k.code === "prayers" && /prayer/i.test(h)) || (k.code === "checkins" && /check-in/i.test(h) && !/coach/i.test(h)) || (k.code === "classlog" && /class/i.test(h)) || (k.code === "quizzes" && /quiz/i.test(h) && !/checkpoint/i.test(h)) || (k.code === "checkpoint" && /checkpoint/i.test(h)) || (k.code === "homework" && /homework/i.test(h)) || (k.code === "grades" && /grades/i.test(h)) || (k.code === "wellbeing" && /coach/i.test(h)) || (k.code.startsWith("snap:") && /snap/i.test(h) && h.toLowerCase().includes(k.label.replace(/^Snap: /, "").toLowerCase().slice(0, 6))));
+      let recoverable = true;
+      let how = hint ?? "";
+      if (parentJudged) {
+        recoverable = false;
+        how = `A ✗ from a parent stays. Keep the rest of the week clean so no more points go.`;
+      } else if (k.code === "checkpoint" && /not attempted before the week closed/.test(k.detail)) {
+        recoverable = false;
+        how = "The checkpoint closed with the week.";
+      } else if (!how) {
+        how = k.code === "prayers" ? "Log 4 prayers a day; yesterday's can still be reported." : k.code === "checkins" ? "Check in tonight; a missed day can be filled in from Today." : "Catch up before pay day.";
+      }
+      return { code: k.code, emoji: k.emoji, label: k.label, detail: k.detail, atStake, recoverable, how, href: route?.href ?? null, cta: route?.cta ?? null };
+    })
+    .filter((p) => p.atStake > 0)
+    .sort((a, b) => b.atStake - a.atStake);
+  return { todo: items.filter((p) => p.recoverable), protect: items.filter((p) => !p.recoverable && ["dish", "manners", "phone"].includes(p.code)), lost: items.filter((p) => !p.recoverable && !["dish", "manners", "phone"].includes(p.code)) };
+}
+
+/** The child's "why this amount" in plain words. */
+export function whyThisAmount(r: WeekResult, allowance: number): string {
+  const now = bandFor(r.score);
+  const best = bandFor(r.maxScore);
+  const nowEgp = Math.round(allowance * now.share);
+  const bestEgp = Math.round(allowance * best.share);
+  const daysLeft = r.totalDays - r.elapsedDays;
+  const head = `Your score is ${r.score} out of 100 after ${r.elapsedDays} day${r.elapsedDays === 1 ? "" : "s"}. ${now.min ? `${now.min}+ pays ${now.label.toLowerCase()}` : "Under 50 pays nothing"}, so right now that is ${nowEgp} EGP.`;
+  if (now.band === "full") return `${head} Keep every basic ✓ for the ${daysLeft} day${daysLeft === 1 ? "" : "s"} left and the full ${allowance} EGP is yours.`;
+  if (best.band === now.band) return `${head} What is missing cannot be recovered this week, so ${nowEgp} EGP is where this week ends unless you lose more. Next week starts fresh at 100.`;
+  return `${head} If you do everything below by pay day you reach ${r.maxScore}, which is ${best.label.toLowerCase()}: ${bestEgp} EGP.`;
+}

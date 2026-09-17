@@ -16,6 +16,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
           { href: "/learn", label: "Learn", emoji: "🧠" },
           { href: "/coach", label: "Coach", emoji: "🦸" },
           { href: "/calendar", label: "Planner", emoji: "🗓️" },
+          { href: "/allowance", label: "Allowance", emoji: "💵" },
           { href: "/rewards", label: "Rewards", emoji: "🎁" },
           { href: "/me", label: "Me", emoji: "🧑‍🚀" },
         ]}

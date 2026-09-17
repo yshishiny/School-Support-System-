@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.6.0 — Allowance on its own, three parent homes (17 September 2026)
+
+- **Kids → Allowance tab** (💵, separate from Rewards): this week's amount and band, "why this amount right now" in plain words, "how to get the full allowance" as a to-do sorted by points at stake with a button to the right place for each, what can only be protected (a parent's ✗), what is lost, "if you stop now / if you do all of it", and "can I do extra?" (catch-ups until pay day, earn-back on consequences, extra-effort rewards and the full-week streak). Past weeks and claims moved here.
+- **Kids → Rewards** is short again: Shop, My requests and Points tabs, with the target and an allowance link on top.
+- **Three parent home layouts**, chosen under More → You: A command centre (to-do, kid cards, live feed and inbox in three columns), B kid-first (four numbers, then the coloured kid tabs), C the day as a timeline (Fajr to check-in, both boys side by side). The header's row of shortcut icons is replaced by the inbox bell.
+
 ## 1.5.0 — Parent inbox (17 September 2026)
 
 - **Inbox** in the parent menu (🔔, with an unread badge) and a "N new" strip on Home: a copy of every daily report, safety alert, allowance week, school-news note and live ping, with New / All / per-kind tabs, "Read" per item and "Mark all read".

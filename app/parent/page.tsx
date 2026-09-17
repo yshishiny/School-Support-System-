@@ -16,10 +16,14 @@ import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log
 import { computeIntegrity } from "@/lib/integrity/run";
 import { liveFeedAction } from "@/lib/actions/live";
 import { LiveFeed } from "@/components/LiveFeed";
-import { SideTabs } from "@/components/SideTabs";
 import { kidColor } from "@/lib/kid-tabs";
 import { presence } from "@/lib/activity";
 import { unreadCount } from "@/lib/inbox";
+import { loadSnapTasks } from "@/lib/snaps/server";
+import { taskDayState, type SnapLite } from "@/lib/snaps";
+import { formatInTimeZone } from "date-fns-tz";
+import { ParentLayoutA, ParentLayoutB, ParentLayoutC } from "@/components/parent-home/Layouts";
+import type { HomeData, KidView } from "@/components/parent-home/types";
 import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
@@ -93,6 +97,11 @@ export default async function ParentHome() {
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const live = await liveFeedAction().catch(() => null);
   const unread = await unreadCount(profile.id).catch(() => 0);
+  const [snapTasks, { data: todaySnapRows }] = await Promise.all([
+    loadSnapTasks(family.id).catch(() => []),
+    supabase.from("snaps").select("student_id, task_code, taken_on, status, ai_verdict").eq("family_id", family.id).eq("taken_on", today),
+  ]);
+  const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
   const planMissing = plans.reduce((n, p) => n + (p ? p.missing.length : 0), 0);
   const openAlerts = (alerts ?? []) as { id: string; level: "amber" | "red"; category: string; summary: string; created_at: string; profiles: { full_name: string } | null }[];
   type CK = Checkin & { checkin_items: (CheckinItem & { assignments: { title: string; kind: Assignment["kind"] } | null })[] };
@@ -108,180 +117,178 @@ export default async function ParentHome() {
     { href: "/parent/materials", label: "file with tasks to confirm", n: filesToReview, emoji: "📎" },
   ].filter((x) => x.n > 0);
 
-  return (
-    <main className="space-y-3">
-      {/* Header */}
-      <header className="flex items-center gap-3">
-        <div className="flex-1 min-w-0">
-          <div className="text-xs muted">{prettyDate(today)}{custodyOn ? ` · 🏠 ${custodian ? (custodian === profile.id ? "with you today" : `with ${parentName(custodianParent)} today`) : "shared day"}` : ""}</div>
-          <h1 className="h1 truncate">Salam, {profile.full_name.split(" ")[0]}</h1>
+  const alertNodes = openAlerts.map((a) => (
+    <section key={a.id} className={`card !py-3 space-y-2 ${a.level === "red" ? "border-bad" : "border-warn"}`}>
+      <div className="flex items-start gap-3">
+        <span className="text-2xl">{a.level === "red" ? "🚨" : "💛"}</span>
+        <div className="flex-1 text-sm">
+          <div className="font-bold">{a.level === "red" ? "Please talk to" : "A gentle heads-up about"} {a.profiles?.full_name?.split(" ")[0]}</div>
+          <div className="muted text-xs">{a.summary}. {a.level === "red" ? "Sit with him calmly today and listen first. If you think he is in immediate danger call 123." : "A relaxed conversation this week, without grades, would help."} What he wrote stays private.</div>
         </div>
-        <nav className="flex gap-1.5">
-          {[
-            { href: "/parent/plan", emoji: "📅", title: "Quiz plan" },
-            { href: "/parent/allowance", emoji: "💵", title: "Allowance" },
-            { href: "/parent/snaps", emoji: "📸", title: "Snaps" },
-            { href: "/parent/materials", emoji: "📎", title: "School files" },
-            { href: "/parent/reports", emoji: "📨", title: "Reports" },
-            { href: "/parent/guide", emoji: "❓", title: "Guide" },
-          ].map((b) => (
-            <Link key={b.href} href={b.href} title={b.title} className="h-10 w-10 rounded-full border-2 border-line bg-panel flex items-center justify-center text-lg hover:border-accent">{b.emoji}</Link>
-          ))}
-        </nav>
-      </header>
+        <form action={acknowledgeAlertAction.bind(null, a.id)}><button className="btn-ghost btn-sm">Done</button></form>
+      </div>
+    </section>
+  ));
 
-      {unread > 0 && (
-        <Link href="/parent/notifications" className="card !py-2.5 flex items-center gap-3 border-accent/60">
-          <span className="text-2xl">🔔</span>
-          <div className="flex-1 text-sm"><b>{unread} new</b> in your inbox: reports, alerts, allowance, school news and live pings.</div>
-          <span className="btn-ghost btn-sm">Open</span>
-        </Link>
-      )}
-
-      {/* Alerts */}
-      {openAlerts.map((a) => (
-        <section key={a.id} className={`card !py-3 space-y-2 ${a.level === "red" ? "border-bad" : "border-warn"}`}>
-          <div className="flex items-start gap-3">
-            <span className="text-2xl">{a.level === "red" ? "🚨" : "💛"}</span>
-            <div className="flex-1 text-sm">
-              <div className="font-bold">{a.level === "red" ? "Please talk to" : "A gentle heads-up about"} {a.profiles?.full_name?.split(" ")[0]}</div>
-              <div className="muted text-xs">{a.summary}. {a.level === "red" ? "Sit with him calmly today and listen first. If you think he is in immediate danger call 123." : "A relaxed conversation this week, without grades, would help."} What he wrote stays private.</div>
-            </div>
-            <form action={acknowledgeAlertAction.bind(null, a.id)}><button className="btn-ghost btn-sm">Done</button></form>
+  const kidsView: KidView[] = students.map((s, idx) => {
+    const mine = allCk.filter((c) => c.student_id === s.id);
+    const ck = mine.find((c) => c.checkin_date === today) ?? null;
+    const streak = computeStreak(mine.map((c) => c.checkin_date), today) || computeStreak(mine.map((c) => c.checkin_date), shiftDate(today, -1));
+    const balance = (ledger ?? []).filter((l) => l.student_id === s.id).reduce((a, l) => a + l.delta, 0);
+    const overdue = openAll.filter((a) => a.student_id === s.id && a.due_date && a.due_date < today && (a.kind === "homework" || a.kind === "project"));
+    const tests = openAll.filter((a) => a.student_id === s.id && (a.kind === "quiz" || a.kind === "exam") && a.due_date && a.due_date >= today && a.due_date <= weekAhead);
+    const last7 = Array.from({ length: 7 }, (_, i) => shiftDate(today, -6 + i));
+    const ticks: Record<string, boolean> = {};
+    (todayTicks ?? []).filter((t) => t.student_id === s.id).forEach((t) => (ticks[t.code] = t.value));
+    const aw = allowanceStatus[idx];
+    const plan = plans[idx];
+    const todayQuizzes = plan ? plan.quizzes.filter((q) => q.scheduled_for === today) : [];
+    const todayDone = todayQuizzes.filter((q) => q.attempts.some((a) => a.submitted_at)).length;
+    const prayed = (prayers ?? []).filter((p) => p.student_id === s.id);
+    const onTime = prayed.filter((p) => p.status === "on_time").length;
+    const lp = (pings ?? []).find((p) => p.user_id === s.id) ?? null;
+    const avatar = s.avatar_image_id ? avatarUrls.get(s.avatar_image_id) ?? null : null;
+    const where = lp && places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : null;
+    const school = schoolDay(today, timetable.filter((t) => t.student_id === s.id), daysOff);
+    const schoolTomorrow = schoolDay(shiftDate(today, 1), timetable.filter((t) => t.student_id === s.id), daysOff);
+    const cov = classLogCoverage(weekStart, today, timetable.filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), daysOff.map((d) => d.day));
+    const pr = presence(s.last_seen_at, s.last_path);
+    const mySnaps = ((todaySnapRows ?? []) as (SnapLite & { student_id: string })[]).filter((x) => x.student_id === s.id);
+    const snapsToday = snapTasks
+      .filter((t) => t.enabled && (t.student_id === null || t.student_id === s.id) && t.kind !== "handwriting")
+      .map((t) => ({ code: t.code, label: t.label, emoji: t.emoji, state: t.days.includes(new Date(today + "T00:00:00Z").getUTCDay()) ? taskDayState(t, mySnaps, today, hhmm) : ("none" as const) }));
+    const card = (
+      <section className="card space-y-3">
+        <div className="flex items-center gap-3">
+          <Link href="/parent/children" className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
+            {avatar ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={avatar} alt="" className="h-full w-full object-cover" />
+            ) : s.avatar_emoji}
+          </Link>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
+            <div className="text-xs muted">{pr.label ? <span className={pr.online ? "text-good" : ""}>{pr.online ? "🟢 " : ""}{pr.label} · </span> : null}{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
+            {(() => { const d = daysToBirthday(s.birth_date, today); return d !== null && d <= 7 ? <div className="text-xs text-warn">🎂 {d === 0 ? `Birthday today, turns ${ageOn(s.birth_date, today)}!` : `Birthday in ${d} day${d === 1 ? "" : "s"}`}</div> : null; })()}
           </div>
-        </section>
-      ))}
-
-      {live && <LiveFeed initial={live} tz={family.timezone} />}
-
-      {/* Needs you */}
-      {needs.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {needs.map((x) => (
-            <Link key={x.href} href={x.href} className="chip !border-accent/60">{x.emoji} {x.n} {x.label}{x.n === 1 ? "" : "s"}</Link>
-          ))}
+          <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
         </div>
-      )}
 
-      {/* Kids */}
-      <SideTabs storageKey="home-kids" tabs={students.map((s, idx) => {
-        const mine = allCk.filter((c) => c.student_id === s.id);
-        const ck = mine.find((c) => c.checkin_date === today) ?? null;
-        const streak = computeStreak(mine.map((c) => c.checkin_date), today) || computeStreak(mine.map((c) => c.checkin_date), shiftDate(today, -1));
-        const balance = (ledger ?? []).filter((l) => l.student_id === s.id).reduce((a, l) => a + l.delta, 0);
-        const overdue = openAll.filter((a) => a.student_id === s.id && a.due_date && a.due_date < today && (a.kind === "homework" || a.kind === "project"));
-        const tests = openAll.filter((a) => a.student_id === s.id && (a.kind === "quiz" || a.kind === "exam") && a.due_date && a.due_date >= today && a.due_date <= weekAhead);
-        const last7 = Array.from({ length: 7 }, (_, i) => shiftDate(today, -6 + i));
-        const ticks: Record<string, boolean> = {};
-        (todayTicks ?? []).filter((t) => t.student_id === s.id).forEach((t) => (ticks[t.code] = t.value));
-        const aw = allowanceStatus[idx];
-        const plan = plans[idx];
-        const todayQuizzes = plan ? plan.quizzes.filter((q) => q.scheduled_for === today) : [];
-        const todayDone = todayQuizzes.filter((q) => q.attempts.some((a) => a.submitted_at)).length;
-        const prayed = (prayers ?? []).filter((p) => p.student_id === s.id);
-        const onTime = prayed.filter((p) => p.status === "on_time").length;
-        const lp = (pings ?? []).find((p) => p.user_id === s.id) ?? null;
-        const avatar = s.avatar_image_id ? avatarUrls.get(s.avatar_image_id) ?? null : null;
-        const where = lp && places.length ? classifyPosition(lp.latitude, lp.longitude, places, s.id, lp.accuracy_m).label : null;
-        const school = schoolDay(today, timetable.filter((t) => t.student_id === s.id), daysOff);
-        const schoolTomorrow = schoolDay(shiftDate(today, 1), timetable.filter((t) => t.student_id === s.id), daysOff);
-        const cov = classLogCoverage(weekStart, today, timetable.filter((t) => t.student_id === s.id), ((weekLogs ?? []) as (ClassLogRow & { student_id: string })[]).filter((l) => l.student_id === s.id), daysOff.map((d) => d.day));
-        const pr = presence(s.last_seen_at, s.last_path);
-        return { id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(idx), avatarUrl: avatar, sub: pr.online ? "🟢 online" : ck ? "✓ checked in" : "no check-in", content: (
-          <section className="card space-y-3">
-            <div className="flex items-center gap-3">
-              <Link href="/parent/children" className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
-                {avatar ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={avatar} alt="" className="h-full w-full object-cover" />
-                ) : s.avatar_emoji}
-              </Link>
-              <div className="flex-1 min-w-0">
-                <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
-                <div className="text-xs muted">{(() => { const pr = presence(s.last_seen_at, s.last_path); return pr.label ? <span className={pr.online ? "text-good" : ""}>{pr.online ? "🟢 " : ""}{pr.label} · </span> : null; })()}{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
-                {(() => { const d = daysToBirthday(s.birth_date, today); return d !== null && d <= 7 ? <div className="text-xs text-warn">🎂 {d === 0 ? `Birthday today, turns ${ageOn(s.birth_date, today)}!` : `Birthday in ${d} day${d === 1 ? "" : "s"}`}</div> : null; })()}
-              </div>
-              <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
+        <Link href="/parent/children" className={`tile !p-2 block text-xs ${school.off ? "border-warn/60" : ""}`}>
+          {school.off ? (
+            <span><b>{school.reason === "Weekend" ? "🏖️ No school today" : `🏖️ ${school.reason}`}</b>{!schoolTomorrow.off && schoolTomorrow.lessons.length ? <span className="muted"> · tomorrow: {lessonsLine(schoolTomorrow.lessons, 4)}</span> : null}</span>
+          ) : (
+            <span><b>🏫 {school.lessons.length} lesson{school.lessons.length === 1 ? "" : "s"}</b> <span className="muted">{lessonsLine(school.lessons, 6)}</span></span>
+          )}
+        </Link>
+
+        {integrity[idx].length > 0 && (
+          <details className="text-xs rounded-xl border border-accent/40 p-2">
+            <summary className="cursor-pointer">🔎 Worth asking tonight · {integrity[idx].length} thing{integrity[idx].length === 1 ? "" : "s"}</summary>
+            <ul className="mt-1 space-y-1">
+              {integrity[idx].map((x) => <li key={x.code}><b>{x.label}.</b> <span className="muted">{x.ask}</span></li>)}
+            </ul>
+            <p className="muted mt-1">Signals, not verdicts. Ask with curiosity; the honest answer is the goal.</p>
+          </details>
+        )}
+        {cov.due > 0 && (
+          <div className={`text-xs ${cov.done === cov.due ? "text-good" : "text-warn"}`}>📖 Class log this week: {cov.done}/{cov.due}{cov.days.length ? ` · missing ${missingLine(cov.days)}` : " · complete"}</div>
+        )}
+
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} title={l ? `${p}: ${l.status}${l.entered_late ? " (logged later)" : ""}` : p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : l.status === "late" ? "bg-warn" : "bg-bad") : "bg-panel-2 border border-line"}`} />; })}</div></div>
+          <Link href="/parent/plan" className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{todayDone}/{todayQuizzes.length}</div><div className="text-[11px] muted">quizzes today</div></Link>
+          <Link href="/parent/allowance" className="tile !p-2"><div className="font-bold text-lg leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{aw ? `${aw.amount}` : "—"}</div><div className="text-[11px] muted">{aw ? `EGP · score ${aw.score}` : "allowance off"}</div></Link>
+        </div>
+
+        {family.allowance_enabled && (myTurn ? (
+          <div className="space-y-1">
+            <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗</div>
+            <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
+          </div>
+        ) : (
+          <details className="text-xs">
+            <summary className="cursor-pointer muted">🏠 With {parentName(custodianParent)} today, so the daily taps are theirs{Object.keys(ticks).length ? ` · ${Object.values(ticks).filter(Boolean).length} ✓ ${Object.values(ticks).filter((v) => !v).length} ✗ so far` : ""}. Tap anyway?</summary>
+            <div className="mt-1"><KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} /></div>
+          </details>
+        ))}
+
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 flex-1">
+            {last7.map((d) => {
+              const has = mine.some((c) => c.checkin_date === d);
+              return <div key={d} title={d} className={`h-1.5 flex-1 rounded ${has ? "bg-good" : d === today ? "bg-panel-2 border border-line" : "bg-bad/40"}`} />;
+            })}
+          </div>
+          <span className="text-[11px] muted">7 days</span>
+        </div>
+
+        {(overdue.length > 0 || tests.length > 0) && (
+          <div className="text-xs space-y-0.5">
+            {overdue.length > 0 && <div className="text-bad">⏰ Overdue: {overdue.map((o) => o.title).join(", ")}</div>}
+            {tests.length > 0 && <div className="text-warn">🎯 {tests.map((t) => `${t.title} (${prettyDate(t.due_date!)})`).join(", ")}</div>}
+          </div>
+        )}
+
+        {ck && (
+          <details className="text-sm">
+            <summary className="cursor-pointer muted text-xs">Today&apos;s check-in · {ck.mood ? MOOD[ck.mood] : ""} {ck.minutes_studied} min · {ck.checkin_items.filter((i) => i.status === "done").length}/{ck.checkin_items.length} tasks</summary>
+            <div className="mt-1 space-y-1">
+              {ck.checkin_items.map((i) => (
+                <div key={i.id} className="text-xs muted">{i.status === "done" ? "✅" : i.status === "partial" ? "🟡" : "❌"} {i.assignments ? `${KIND_EMOJI[i.assignments.kind]} ${i.assignments.title}` : "task"}</div>
+              ))}
+              {ck.learned && <div className="text-xs"><span className="muted">Learned:</span> {ck.learned}</div>}
+              {ck.stuck_on && <div className="text-xs text-warn"><span className="muted">Stuck on:</span> {ck.stuck_on}</div>}
             </div>
+          </details>
+        )}
+      </section>
+    );
+    return {
+      id: s.id,
+      name: s.full_name.split(" ")[0],
+      grade: s.grade,
+      color: kidColor(idx),
+      emoji: s.avatar_emoji,
+      avatarUrl: avatar,
+      online: pr.online,
+      presenceLabel: pr.label,
+      checkedIn: !!ck,
+      checkinLate: !!ck?.entered_late,
+      checkinTime: ck ? formatInTimeZone(new Date(ck.submitted_at), family.timezone, "HH:mm") : null,
+      prayers: PRAYERS.map((p) => ({ prayer: p, status: prayed.find((x) => x.prayer === p)?.status ?? null })),
+      prayersOnTime: onTime,
+      quizzesDone: todayDone,
+      quizzesTotal: todayQuizzes.length,
+      allowance: aw ? { amount: aw.amount, score: aw.score, allowance: aw.allowance } : null,
+      classLog: { done: cov.done, due: cov.due, missing: cov.days.length ? missingLine(cov.days) : null },
+      school: { off: school.off, reason: school.reason ?? null, line: lessonsLine(school.lessons, 6) },
+      ticks,
+      snapsToday,
+      overdue: overdue.map((o) => o.title),
+      tests: tests.map((t) => `${t.title} (${prettyDate(t.due_date!)})`),
+      balance,
+      streak,
+      integrityCount: integrity[idx].length,
+      card,
+    };
+  });
 
-            <Link href="/parent/children" className={`tile !p-2 block text-xs ${school.off ? "border-warn/60" : ""}`}>
-              {school.off ? (
-                <span><b>{school.reason === "Weekend" ? "🏖️ No school today" : `🏖️ ${school.reason}`}</b>{!schoolTomorrow.off && schoolTomorrow.lessons.length ? <span className="muted"> · tomorrow: {lessonsLine(schoolTomorrow.lessons, 4)}</span> : null}</span>
-              ) : (
-                <span><b>🏫 {school.lessons.length} lesson{school.lessons.length === 1 ? "" : "s"}</b> <span className="muted">{lessonsLine(school.lessons, 6)}</span></span>
-              )}
-            </Link>
-
-            {integrity[idx].length > 0 && (
-              <details className="text-xs rounded-xl border border-accent/40 p-2">
-                <summary className="cursor-pointer">🔎 Worth asking tonight · {integrity[idx].length} thing{integrity[idx].length === 1 ? "" : "s"}</summary>
-                <ul className="mt-1 space-y-1">
-                  {integrity[idx].map((x) => <li key={x.code}><b>{x.label}.</b> <span className="muted">{x.ask}</span></li>)}
-                </ul>
-                <p className="muted mt-1">Signals, not verdicts. Ask with curiosity; the honest answer is the goal.</p>
-              </details>
-            )}
-            {cov.due > 0 && (
-              <div className={`text-xs ${cov.done === cov.due ? "text-good" : "text-warn"}`}>📖 Class log this week: {cov.done}/{cov.due}{cov.days.length ? ` · missing ${missingLine(cov.days)}` : " · complete"}</div>
-            )}
-
-            <div className="grid grid-cols-3 gap-2 text-center">
-              <div className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{onTime}/5</div><div className="text-[11px] muted">prayers on time</div><div className="flex justify-center gap-1 mt-1">{PRAYERS.map((p) => { const l = prayed.find((x) => x.prayer === p); return <span key={p} title={l ? `${p}: ${l.status}${l.entered_late ? " (logged later)" : ""}` : p} className={`h-2 w-2 rounded-full ${l ? (l.status === "on_time" ? "bg-good" : l.status === "late" ? "bg-warn" : "bg-bad") : "bg-panel-2 border border-line"}`} />; })}</div></div>
-              <Link href="/parent/plan" className="tile !p-2"><div className="font-bold text-lg leading-none" style={{ fontFamily: "var(--font-display)" }}>{todayDone}/{todayQuizzes.length}</div><div className="text-[11px] muted">quizzes today</div></Link>
-              <Link href="/parent/allowance" className="tile !p-2"><div className="font-bold text-lg leading-none text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{aw ? `${aw.amount}` : "—"}</div><div className="text-[11px] muted">{aw ? `EGP · score ${aw.score}` : "allowance off"}</div></Link>
-            </div>
-
-            {family.allowance_enabled && (myTurn ? (
-              <div className="space-y-1">
-                <div className="text-[11px] font-semibold muted">Basics today · tap ✓ or ✗</div>
-                <KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} />
-              </div>
-            ) : (
-              <details className="text-xs">
-                <summary className="cursor-pointer muted">🏠 With {parentName(custodianParent)} today, so the daily taps are theirs{Object.keys(ticks).length ? ` · ${Object.values(ticks).filter(Boolean).length} ✓ ${Object.values(ticks).filter((v) => !v).length} ✗ so far` : ""}. Tap anyway?</summary>
-                <div className="mt-1"><KpiTicks studentId={s.id} kpis={kpis} ticks={ticks} /></div>
-              </details>
-            ))}
-
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1 flex-1">
-                {last7.map((d) => {
-                  const has = mine.some((c) => c.checkin_date === d);
-                  return <div key={d} title={d} className={`h-1.5 flex-1 rounded ${has ? "bg-good" : d === today ? "bg-panel-2 border border-line" : "bg-bad/40"}`} />;
-                })}
-              </div>
-              <span className="text-[11px] muted">7 days</span>
-            </div>
-
-            {(overdue.length > 0 || tests.length > 0) && (
-              <div className="text-xs space-y-0.5">
-                {overdue.length > 0 && <div className="text-bad">⏰ Overdue: {overdue.map((o) => o.title).join(", ")}</div>}
-                {tests.length > 0 && <div className="text-warn">🎯 {tests.map((t) => `${t.title} (${prettyDate(t.due_date!)})`).join(", ")}</div>}
-              </div>
-            )}
-
-            {ck && (
-              <details className="text-sm">
-                <summary className="cursor-pointer muted text-xs">Today&apos;s check-in · {ck.mood ? MOOD[ck.mood] : ""} {ck.minutes_studied} min · {ck.checkin_items.filter((i) => i.status === "done").length}/{ck.checkin_items.length} tasks</summary>
-                <div className="mt-1 space-y-1">
-                  {ck.checkin_items.map((i) => (
-                    <div key={i.id} className="text-xs muted">{i.status === "done" ? "✅" : i.status === "partial" ? "🟡" : "❌"} {i.assignments ? `${KIND_EMOJI[i.assignments.kind]} ${i.assignments.title}` : "task"}</div>
-                  ))}
-                  {ck.learned && <div className="text-xs"><span className="muted">Learned:</span> {ck.learned}</div>}
-                  {ck.stuck_on && <div className="text-xs text-warn"><span className="muted">Stuck on:</span> {ck.stuck_on}</div>}
-                </div>
-              </details>
-            )}
-          </section>
-        ) };
-      })} />
-
-      {/* Report line */}
-      <Link href="/parent/reports" className="flex items-center gap-2 text-xs muted px-1">
-        <span>📨</span>
-        <span className="flex-1">{report ? `Last report ${prettyDate(report.report_date)} · ${report.status}` : "No report sent yet"}</span>
-        <span className="underline">Reports</span>
-      </Link>
-    </main>
-  );
+  const data: HomeData = {
+    today,
+    dateLine: `${prettyDate(today)}${custodyOn ? ` · 🏠 ${custodian ? (custodian === profile.id ? "with you today" : `with ${parentName(custodianParent)} today`) : "shared day"}` : ""}`,
+    firstName: profile.full_name.split(" ")[0],
+    unread,
+    needs,
+    alerts: alertNodes,
+    live: live ? <LiveFeed initial={live} tz={family.timezone} /> : null,
+    kids: kidsView,
+    reportLine: report ? `Last report ${prettyDate(report.report_date)} · ${report.status}` : "No report sent yet",
+    allowanceEnabled: family.allowance_enabled,
+    kpiToday: kpis.filter((k) => k.enabled && k.source === "parent").map((k) => ({ label: k.label, emoji: k.emoji, code: k.code })),
+  };
+  const layout = (profile as { home_layout?: string }).home_layout ?? "b";
+  if (layout === "a") return <ParentLayoutA d={data} />;
+  if (layout === "c") return <ParentLayoutC d={data} />;
+  return <ParentLayoutB d={data} />;
 }

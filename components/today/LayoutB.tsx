@@ -60,7 +60,7 @@ export function LayoutB({ d }: { d: TodayData }) {
           <span>Streak {d.streak} 🔥</span>
           <span>{d.quizzesDoneWeek} quiz{d.quizzesDoneWeek === 1 ? "" : "zes"} done</span>
           <span>{d.onTimeCount}/5 prayers on time</span>
-          {d.allowance && <Link href="/rewards" className="underline">details</Link>}
+          {d.allowance && <Link href="/allowance" className="underline">details</Link>}
         </div>
       </section>
 
