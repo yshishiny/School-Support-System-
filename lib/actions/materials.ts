@@ -1,5 +1,8 @@
 "use server";
 
+import { ACCEPT_LABEL, FILE_KINDS } from "@/lib/materials/files";
+import { extractText } from "@/lib/materials/extract-text";
+
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireSession, requireStudent } from "@/lib/auth";
@@ -15,7 +18,7 @@ import { MATERIAL_BUCKET, type MaterialRow } from "@/lib/materials/server";
 import type { ExtractedItem } from "@/lib/ai/extract-items";
 
 const PATHS = ["/parent", "/parent/materials", "/parent/assignments", "/learn", "/today", "/calendar"];
-const MIMES = new Set(["application/pdf", "image/jpeg", "image/png", "image/webp"]);
+const MIMES = new Set(FILE_KINDS.map((k) => k.mime));
 
 export interface RegisterMaterialResult { error?: string; id?: string; title?: string; summary?: string; items?: number }
 
@@ -27,7 +30,7 @@ export async function registerMaterialAction(studentId: string, path: string, me
   const { profile, family } = await requireSession();
   if (!path.startsWith(`${family.id}/${studentId}/`)) return { error: "Bad upload path." };
   if (profile.role !== "parent" && profile.id !== studentId) return { error: "Not allowed." };
-  if (!MIMES.has(meta.mime)) return { error: "Only PDF, JPG, PNG or WEBP files." };
+  if (!MIMES.has(meta.mime)) return { error: `Only ${ACCEPT_LABEL} files.` };
   const admin = createAdminClient();
   const { data: student } = await admin.from("profiles").select("full_name, grade").eq("id", studentId).eq("family_id", family.id).maybeSingle();
   if (!student) return { error: "Child not found." };
@@ -54,6 +57,13 @@ function friendlyAiError(msg: string): string {
 }
 
 /** Runs the AI reading on a stored file and saves the result (or a friendly error). */
+/** PDFs and images go to the model as they are; Office, CSV and text files as extracted text. */
+function toInput(buf: Buffer, mime: string, name: string): MaterialInput {
+  const text = extractText(buf, mime);
+  if (text !== null) return { media_type: "text/plain", text, name };
+  return { media_type: mime as "application/pdf" | "image/jpeg" | "image/png" | "image/webp", data: buf.toString("base64") };
+}
+
 async function readAndStore(id: string, o: { path: string; mime: string; subject: string | null; instructions: string | null; fallbackTitle: string; grade: number | null; firstName: string; today: string }): Promise<RegisterMaterialResult> {
   const admin = createAdminClient();
   try {
@@ -61,7 +71,7 @@ async function readAndStore(id: string, o: { path: string; mime: string; subject
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(o.path);
     if (!file) throw new Error("Could not read the uploaded file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const reading = await readMaterial({ media_type: o.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { today: o.today, subject: o.subject, instructions: o.instructions, grade: o.grade, studentFirstName: o.firstName });
+    const reading = await readMaterial(toInput(buf, o.mime, o.fallbackTitle), { today: o.today, subject: o.subject, instructions: o.instructions, grade: o.grade, studentFirstName: o.firstName });
     await admin
       .from("materials")
       .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null })
@@ -252,7 +262,7 @@ export async function prepareWorksheetAction(materialId: string): Promise<Prepar
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(m.path);
     if (!file) throw new Error("Could not read the file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const t = await transcribeWorksheet({ media_type: m.mime as MaterialInput["media_type"], data: buf.toString("base64") }, { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
+    const t = await transcribeWorksheet(toInput(buf, m.mime, m.title), { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
     if (t.questions.length === 0) return { error: `No question could be transcribed. ${t.note}` };
     await admin.from("materials").update({ worksheet: { questions: t.questions, skipped: t.skipped, note: t.note, model: t.model, prepared_at: new Date().toISOString() } }).eq("id", m.id);
     PATHS.forEach((p) => revalidatePath(p));

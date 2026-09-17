@@ -4,7 +4,7 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedItemSchema } from "./extract-items";
 
-export type MaterialInput = { media_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; data: string };
+export type MaterialInput = { media_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; data: string } | { media_type: "text/plain"; text: string; name?: string };
 
 const MaterialSchema = z.object({
   title: z.string().describe("Short title a student would recognise, e.g. 'Unit 3 review: linear equations'"),
@@ -18,7 +18,7 @@ const MaterialSchema = z.object({
 });
 export type MaterialReading = z.infer<typeof MaterialSchema>;
 
-const SYSTEM = `You read a school file (PDF or photo) shared in a class WhatsApp group at an American-curriculum international school in Egypt. Files may be in English or Arabic (Ministry subjects: Arabic, Religion, Social Studies).
+const SYSTEM = `You read a school file (PDF, photo, Word, PowerPoint, Excel, CSV or text) shared in a class WhatsApp group at an American-curriculum international school in Egypt. Files may be in English or Arabic (Ministry subjects: Arabic, Religion, Social Studies).
 
 Rules:
 - Describe what the file is and what the student should do with it. Use the parent's instructions when given; they override your guess.
@@ -26,14 +26,19 @@ Rules:
 - Items: homework, quiz, exam, project, event, or note. Resolve dates against today's date given by the user; the Egyptian school week is Sunday to Thursday. If no date is stated anywhere, due_date is null and confidence is "low".
 - If the file is unreadable, say so in the summary and return no items.`;
 
-/** Reads one file with the fast model. PDFs up to 100 pages; images as they are. */
+/** The file as the model takes it: a PDF document, an image, or the extracted text of an Office/CSV/text file. */
+export function materialBlocks(doc: MaterialInput, prompt?: string): Anthropic.ContentBlockParam[] {
+  const tail: Anthropic.ContentBlockParam[] = prompt ? [{ type: "text", text: prompt }] : [];
+  if (doc.media_type === "text/plain") return [{ type: "text", text: `File${doc.name ? ` "${doc.name}"` : ""} (text extracted):\n\n${doc.text}` }, ...tail];
+  if (doc.media_type === "application/pdf") return [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: doc.data } }, ...tail];
+  return [{ type: "image", source: { type: "base64", media_type: doc.media_type, data: doc.data } }, ...tail];
+}
+
+/** Reads one file with the fast model. PDFs up to 100 pages; images as they are; Office and CSV as extracted text. */
 export async function readMaterial(doc: MaterialInput, ctx: { today: string; subject: string | null; instructions: string | null; grade: number | null; studentFirstName: string }): Promise<MaterialReading> {
   const client = new Anthropic();
   const lines = [`Today is ${ctx.today}.`, `Student: ${ctx.studentFirstName}${ctx.grade ? `, grade ${ctx.grade}` : ""}.`, ctx.subject ? `Subject chosen by the parent: ${ctx.subject}.` : "", ctx.instructions ? `Parent's instructions / what the teacher said: ${ctx.instructions}` : "", "Read the file and fill the fields."].filter(Boolean);
-  const content: Anthropic.ContentBlockParam[] =
-    doc.media_type === "application/pdf"
-      ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: doc.data } }, { type: "text", text: lines.join("\n") }]
-      : [{ type: "image", source: { type: "base64", media_type: doc.media_type, data: doc.data } }, { type: "text", text: lines.join("\n") }];
+  const content: Anthropic.ContentBlockParam[] = materialBlocks(doc, lines.join("\n"));
   const stream = client.messages.stream({
     model: modelFor("read-material"),
     max_tokens: 12000,

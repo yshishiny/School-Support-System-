@@ -2,6 +2,12 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.8.1 — More file types (17 September 2026)
+
+- **School files accepts Word (.docx), PowerPoint (.pptx), Excel (.xlsx, .xls), CSV and plain text**, next to PDF and photos, from both the parent page and the kids' Learn → Files. The text is extracted on the server and read by the AI the same way; worksheets in Word can be turned into practice too.
+- A file extension decides the type, so a CSV that Windows labels as Excel still uploads. Old binary .doc is not accepted: save it as .docx or PDF.
+- Migration 20260917152314 (materials bucket types).
+
 ## 1.8.0 — Late entries, balanced (17 September 2026)
 
 - **Prayers not logged on earlier days** can be filled in from the Allowance page for the whole allowance week (not only yesterday): on time, late, or missed, said honestly.

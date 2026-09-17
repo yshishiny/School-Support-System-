@@ -3,7 +3,7 @@ import { APP_BASELINE, APP_NAME, APP_OWNER, APP_TRADEMARK, APP_VERSION, APP_YEAR
 const FEATURES: [string, string][] = [
   ["Daily rhythm", "Evening check-in, class log for every timetable lesson with homework yes/no, prayer log with honest late entries, points, streaks and levels."],
   ["Learning", "Curriculum topics by grade, AI practice sets, daily recall quizzes, spaced review, SAT and ACT tracks, Arabic Ministry subjects, Quran memorisation."],
-  ["School files", "PDFs and photos from the class groups read once by the AI, turned into tasks and into on-system practice of the teacher's own worksheet."],
+  ["School files", "PDFs, photos, Word, PowerPoint, Excel, CSV and text files from the class groups read once by the AI, turned into tasks and into on-system practice of the teacher's own worksheet."],
   ["Planning", "A prepared week of quizzes per child, WhatsApp import and archive, school website checks, school days off."],
   ["Coach", "Weekly wellbeing checks (WHO-5 and short scales), a confidential coach chat with safety escalation, a weekly coach report, learner profile and interests, clinician-facing summaries."],
   ["Discipline and fairness", "Allowance earned through basics, snap tasks with AI screening and parent approval, catch-up windows for missed days, integrity signals as questions, Straight talk honesty check, timed one-attempt checkpoints."],

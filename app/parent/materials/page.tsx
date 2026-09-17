@@ -7,6 +7,7 @@ import { deleteMaterialAction, updateMaterialAction } from "@/lib/actions/materi
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { MaterialItemsReview, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { Tabs } from "@/components/Tabs";
+import { fileEmoji } from "@/lib/materials/files";
 import { SideTabs } from "@/components/SideTabs";
 import { kidColor } from "@/lib/kid-tabs";
 
@@ -36,7 +37,7 @@ export default async function MaterialsPage() {
     return (
       <section className="card space-y-2">
         <div className="flex items-start gap-2">
-          <span className="text-2xl">{m.mime === "application/pdf" ? "📄" : "🖼️"}</span>
+          <span className="text-2xl">{fileEmoji(m.mime)}</span>
           <div className="flex-1 min-w-0">
             <div className="font-bold">{m.title}</div>
             <div className="text-xs muted">{nameOf(m.student_id)} · {m.subject ?? "no subject"} · {m.kind ? KIND[m.kind] ?? m.kind : ""} · {prettyDate(m.created_at.slice(0, 10))} · {Math.round(m.size_bytes / 1024)} KB{m.status === "failed" ? " · ⚠️ not read" : m.status === "new" ? " · reading…" : ""}</div>
@@ -83,7 +84,7 @@ export default async function MaterialsPage() {
         <h1 className="h1">📎 School files</h1>
         <Link href="/parent/import" className="btn-ghost btn-sm">← Import</Link>
       </div>
-      <p className="text-sm muted">The PDFs and photos the teachers drop in the WhatsApp groups. Save the file from WhatsApp, upload it here with the subject and what the teacher asked. The AI reads it, suggests the tasks (you approve), and the boys can practise straight from the file on their Learn page. {quizCounts ? `${quizCounts} practice set${quizCounts === 1 ? "" : "s"} made from files so far.` : ""}</p>
+      <p className="text-sm muted">The files the teachers drop in the WhatsApp groups: PDF, photo, Word, PowerPoint, Excel, CSV or text. Save the file from WhatsApp, upload it here with the subject and what the teacher asked. The AI reads it, suggests the tasks (you approve), and the boys can practise straight from the file on their Learn page. {quizCounts ? `${quizCounts} practice set${quizCounts === 1 ? "" : "s"} made from files so far.` : ""}</p>
       <Tabs
         storageKey="materials"
         defaultId={needsAttention.length > 0 ? "review" : "upload"}

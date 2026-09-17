@@ -7,6 +7,7 @@ import { masteryMaps, masteryColor, type AttemptWithQuiz } from "@/lib/mastery";
 import { PracticeButton, PrepareWeekButton } from "@/components/LearnButtons";
 import { weekTopicsFor } from "@/lib/learning/resources";
 import { weekdayOf } from "@/lib/dates";
+import { fileEmoji } from "@/lib/materials/files";
 import { Tabs } from "@/components/Tabs";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
@@ -209,7 +210,7 @@ export default async function LearnPage() {
       {materials.map((m) => (
         <section key={m.id} className="card space-y-2">
           <div className="flex items-start gap-2">
-            <span className="text-3xl sticker-still">{m.mime === "application/pdf" ? "📄" : "🖼️"}</span>
+            <span className="text-3xl sticker-still">{fileEmoji(m.mime)}</span>
             <div className="flex-1 min-w-0">
               <div className="font-bold">{m.title}</div>
               <div className="text-xs muted">{m.subject ?? "no subject"} · {prettyDate(m.created_at.slice(0, 10))}{m.status !== "ready" ? " · not read yet" : ""}</div>

@@ -2,7 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { modelFor } from "./models";
-import type { MaterialInput } from "./read-material";
+import { materialBlocks, type MaterialInput } from "./read-material";
 
 const Item = z.object({
   subject: z.string(),
@@ -22,9 +22,7 @@ const SYSTEM = `You read a photo or PDF of a school grades sheet (report card, m
 
 export async function readGrades(doc: MaterialInput, ctx: { studentFirstName: string; grade: number | null; previousAverage: number | null }): Promise<GradesReading> {
   const client = new Anthropic();
-  const content: Anthropic.ContentBlockParam[] = doc.media_type === "application/pdf"
-    ? [{ type: "document", source: { type: "base64", media_type: "application/pdf", data: doc.data } }]
-    : [{ type: "image", source: { type: "base64", media_type: doc.media_type, data: doc.data } }];
+  const content: Anthropic.ContentBlockParam[] = materialBlocks(doc);
   content.push({ type: "text", text: `Student: ${ctx.studentFirstName}${ctx.grade ? `, grade ${ctx.grade}` : ""}. ${ctx.previousAverage !== null ? `Previous month's average: ${ctx.previousAverage}%.` : "No previous sheet on record."} Read the sheet.` });
   const stream = client.messages.stream({ model: modelFor("read-material"), max_tokens: 4000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content }], output_config: { format: zodOutputFormat(Schema) } });
   const message = await stream.finalMessage();

@@ -7,7 +7,6 @@ import { todayIn } from "@/lib/dates";
 import { readGrades } from "@/lib/ai/read-grades";
 import { MATERIAL_BUCKET } from "@/lib/materials/server";
 import { pingParents } from "@/lib/notify";
-import type { MaterialInput } from "@/lib/ai/read-material";
 
 const PATHS = ["/me", "/rewards", "/parent", "/parent/progress", "/parent/allowance"];
 
@@ -28,7 +27,7 @@ export async function registerGradeSheetAction(studentId: string, path: string, 
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(path);
     if (!file) throw new Error("Could not read the file back.");
     const buf = Buffer.from(await file.arrayBuffer());
-    const r = await readGrades({ media_type: mime as MaterialInput["media_type"], data: buf.toString("base64") }, { studentFirstName: student.full_name.split(" ")[0], grade: student.grade, previousAverage: prev?.average !== undefined && prev?.average !== null ? Number(prev.average) : null });
+    const r = await readGrades({ media_type: mime as "application/pdf" | "image/jpeg" | "image/png" | "image/webp", data: buf.toString("base64") }, { studentFirstName: student.full_name.split(" ")[0], grade: student.grade, previousAverage: prev?.average !== undefined && prev?.average !== null ? Number(prev.average) : null });
     await admin.from("grade_sheets").update({ status: "ready", items: r.items, average: r.average, appraisal: r.appraisal, error: null }).eq("id", row.id);
     void pingParents(family.id, `${student.full_name.split(" ")[0]}'s grades sheet is in`, `${r.period}${r.average !== null ? ` · average ${r.average}%` : ""}${prev?.average ? ` (was ${prev.average}%)` : ""}`, "/parent/progress");
     PATHS.forEach((p) => revalidatePath(p));
