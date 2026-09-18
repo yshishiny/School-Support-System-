@@ -8,6 +8,8 @@ export interface SpeechState {
   speaking: boolean;
   paused: boolean;
   available: boolean;
+  /** The browser refused to speak without a tap (autoplay policy); the next tap on play will fix it. */
+  blocked: boolean;
   /** Index of the word being said, for karaoke captions and the board reveal. */
   wordIndex: number;
   wordCount: number;
@@ -20,7 +22,7 @@ export interface SpeechState {
  * still "plays" silently so the lesson keeps its rhythm. Chrome's 15-second cut-off is worked around.
  */
 export function useSpeech(language: "en" | "ar", c: Character) {
-  const [state, setState] = useState<SpeechState>({ speaking: false, paused: false, available: true, wordIndex: 0, wordCount: 0, viseme: "rest" });
+  const [state, setState] = useState<SpeechState>({ speaking: false, paused: false, available: true, blocked: false, wordIndex: 0, wordCount: 0, viseme: "rest" });
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const wordsRef = useRef<string[]>([]);
   const wordRef = useRef(0);
@@ -112,15 +114,18 @@ export function useSpeech(language: "en" | "ar", c: Character) {
     // No usable voice (none installed, language missing, audio blocked): keep the line's rhythm silently.
     u.onerror = (e) => {
       if (activeRef.current !== u || e.error === "interrupted" || e.error === "canceled") return;
-      setState((s) => ({ ...s, available: false }));
+      if (e.error === "not-allowed") setState((s) => ({ ...s, blocked: true }));
+      else setState((s) => ({ ...s, available: false }));
       if (keepRef.current) window.clearInterval(keepRef.current);
       if (silentRef.current) window.clearTimeout(silentRef.current);
       silentRef.current = window.setTimeout(finish, Math.max(300, estRef.current - (Date.now() - startedRef.current)));
     };
     activeRef.current = u;
-    window.speechSynthesis.speak(u);
-    // Chrome stops long utterances after ~15 s unless nudged; a pause/resume keeps it going. Safari dislikes this.
-    if (!/safari/i.test(navigator.userAgent) || /chrome|android/i.test(navigator.userAgent)) {
+    // Android drops an utterance queued in the same tick as a cancel(); give it a moment.
+    window.setTimeout(() => { if (activeRef.current === u) window.speechSynthesis.speak(u); }, 60);
+    u.onstart = () => { if (activeRef.current === u) setState((s) => ({ ...s, blocked: false, available: true })); };
+    // Desktop Chrome stops long utterances after ~15 s unless nudged; a pause/resume keeps it going. Phones and Safari break on it.
+    if (/chrome/i.test(navigator.userAgent) && !/android|mobile|iphone|ipad|edg\//i.test(navigator.userAgent)) {
       keepRef.current = window.setInterval(() => { if (window.speechSynthesis.speaking && !window.speechSynthesis.paused) { window.speechSynthesis.pause(); window.speechSynthesis.resume(); } }, 9000);
     }
     // Safety net: if the browser never fires onend (it happens), close the line after the estimate plus margin.
@@ -137,9 +142,19 @@ export function useSpeech(language: "en" | "ar", c: Character) {
     setState((s) => ({ ...s, paused: false }));
   }, []);
 
+  /** Call inside a tap: browsers only allow speech after a user gesture, and iOS needs one real speak() to open the channel. */
+  const unlock = useCallback(() => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    u.rate = 2;
+    window.speechSynthesis.speak(u);
+    setState((s) => ({ ...s, blocked: false }));
+  }, []);
+
   useEffect(() => () => { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); clearTimers(); }, []);
 
-  return { ...state, say, stop, pause, resume };
+  return { ...state, say, stop, pause, resume, unlock };
 }
 
 type RecognitionCtor = new () => { lang: string; interimResults: boolean; maxAlternatives: number; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };

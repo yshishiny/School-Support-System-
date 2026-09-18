@@ -40,6 +40,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const total = beats.length;
   const speech = useSpeech(language, c);
   const mic = useRecognition(language);
+  const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>(startBeat > 0 ? "lesson" : "intro");
   const [i, setI] = useState(Math.min(startBeat, total - 1));
   const [auto, setAuto] = useState(true);
@@ -86,7 +87,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
 
   // Intro: walk in, wave, greet, announce the lesson.
   useEffect(() => {
-    if (phase !== "intro") return;
+    if (phase !== "intro" || !started) return;
     const t1 = window.setTimeout(() => {
       setWalking(false);
       setGestureOverride("wave");
@@ -97,15 +98,15 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     }, 1700);
     return () => window.clearTimeout(t1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase]);
+  }, [phase, started]);
 
   // Each beat: say it; afterwards wait at a check, else advance when on auto.
   useEffect(() => {
-    if (phase !== "lesson" || !beat) return;
+    if (phase !== "lesson" || !beat || !started) return;
     speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); });
     return () => { cancelAdvance(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, i]);
+  }, [phase, i, started]);
 
   // Outro: celebrate.
   useEffect(() => {
@@ -223,6 +224,14 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const overlay = (
     <>
       <Confetti burst={burst} />
+      {!started && (
+        <button type="button" onClick={() => { speech.unlock(); setStarted(true); }} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-[2px] text-white" dir={rtl ? "rtl" : undefined}>
+          <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-white text-[#2b1d2e] text-4xl shadow-2xl pulse">▶</span>
+          <span className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{rtl ? "اضغط لبدء الدرس" : "Tap to start the lesson"}</span>
+          <span className="text-sm text-white/80">{c.name} · {script.title}</span>
+          <span className="text-xs text-white/60">{rtl ? "ارفع الصوت 🔊" : "Turn the sound up 🔊"}</span>
+        </button>
+      )}
       <header className="absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-3 pt-[max(.5rem,env(safe-area-inset-top))]" dir={rtl ? "rtl" : undefined}>
         <Link href={exitHref} className="h-10 w-10 shrink-0 inline-flex items-center justify-center rounded-full bg-black/40 text-white backdrop-blur" aria-label="Exit">✕</Link>
         <div className="flex-1 min-w-0">
@@ -248,7 +257,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
         )}
         <div className="rounded-2xl bg-black/55 backdrop-blur px-3 py-2 min-h-[3.4rem] max-h-[19vh] overflow-auto">
           {line ? <Caption text={line} wordIndex={speech.speaking || speech.paused ? speech.wordIndex : 9999} rtl={rtl} /> : <p className="text-sm text-white/60">{rtl ? "…" : "…"}</p>}
-          {!speech.available && <p className="text-[11px] text-[#ffd166] mt-1">{rtl ? "لا يوجد صوت في هذا المتصفح، اقرأ النص." : "No voice on this browser: read along."}</p>}
+          {speech.blocked ? <p className="text-[11px] text-[#ffd166] mt-1">{rtl ? "اضغط ▶ لتسمع المعلم." : "Tap ▶ to hear the teacher."}</p> : !speech.available && <p className="text-[11px] text-[#ffd166] mt-1">{rtl ? "لا يوجد صوت في هذا المتصفح، اقرأ النص." : "No voice on this browser: read along."}</p>}
         </div>
         <div className="stage-controls flex items-center justify-between gap-1 rounded-2xl bg-black/55 backdrop-blur px-1.5 py-1 text-white" dir={rtl ? "rtl" : undefined}>
           <button type="button" className="flex-1 rounded-xl px-2 text-lg disabled:opacity-30" disabled={phase !== "lesson" || i === 0} onClick={() => goTo(i - 1)} aria-label="Back">⏮</button>
