@@ -12,6 +12,7 @@ import { useRecognition, useSpeech } from "./useSpeech";
 import { askTeacherAction, finishLessonAction, recordBeatAction } from "@/lib/actions/teach";
 import type { Character } from "@/lib/characters";
 import type { LessonScript } from "@/lib/ai/lesson-script";
+import type { CloudVoice } from "@/lib/tts";
 import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, wordsOf, boardLines, type Camera, type Gesture, type Mood } from "@/lib/teach/performance";
 import { runAction } from "@/lib/client-action";
 
@@ -19,6 +20,7 @@ type Beat = LessonScript["beats"][number];
 type Phase = "intro" | "lesson" | "outro";
 
 const ADVANCE_MS = 1300;
+const NO_CLOUD: CloudVoice[] = [];
 
 function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rtl: boolean }) {
   const words = useMemo(() => wordsOf(text), [text]);
@@ -34,12 +36,12 @@ function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rt
  * checks stop the flow until answered, a raised hand pauses for a question, and the recap ends with confetti.
  * `demo` runs the same stage with no server calls.
  */
-export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean }) {
+export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[] }) {
   const c = character;
   const rtl = language === "ar";
   const beats = script.beats;
   const total = beats.length;
-  const speech = useSpeech(language, c);
+  const speech = useSpeech(language, c, cloudVoices);
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>(startBeat > 0 ? "lesson" : "intro");
@@ -97,6 +99,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
       const hello = rtl ? c.lines.hello_ar : c.lines.hello;
       const today = rtl ? `درس اليوم: ${script.title}.` : `Today's lesson: ${script.title}.`;
       speak(`${hello} ${today}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(-1); });
+      if (beats[0]) speech.prefetch(beats[0].say);
     }, 1700);
     return () => window.clearTimeout(t1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -106,6 +109,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   useEffect(() => {
     if (phase !== "lesson" || !beat || !started) return;
     speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); });
+    if (beats[i + 1]) speech.prefetch(beats[i + 1].say);
     return () => { cancelAdvance(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, i, started]);
@@ -226,7 +230,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const overlay = (
     <>
       <Confetti burst={burst} />
-      {voiceOpen && <VoicePicker voices={speech.voices} current={speech.voiceId} language={language} onPick={(u) => { speech.setVoice(u); speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello); }} onPreview={(u) => speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello)} onClose={() => setVoiceOpen(false)} />}
+      {voiceOpen && <VoicePicker voices={speech.voices} cloudVoices={cloudVoices} current={speech.voiceId} language={language} onPick={(u) => { speech.setVoice(u); speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello); }} onPreview={(u) => speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello)} onClose={() => setVoiceOpen(false)} />}
       {!started && (
         <button type="button" onClick={() => { speech.unlock(); setStarted(true); }} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-[2px] text-white" dir={rtl ? "rtl" : undefined}>
           <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-white text-[#2b1d2e] text-4xl shadow-2xl pulse">▶</span>
