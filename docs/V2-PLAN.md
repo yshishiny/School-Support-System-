@@ -96,10 +96,10 @@ roughly US$0.20–0.40 per lesson minute and are excluded on purpose.
 
 | Phase | Weeks | Deliverable | Beta with the boys |
 |---|---|---|---|
-| 2.0 | 1–2 | Lesson engine, one character, captions + browser voice, end quiz, parent line | no (smoke test) |
-| 2.1 | 3–4 | Four characters, personalities, voice per character, talking avatar, visuals | yes, Math and Science |
-| 2.2 | 5–6 | Raise-your-hand Q&A, adaptive re-explanation, teach-from-file | yes, all subjects |
-| 2.3 | 7–8 | Arabic subjects and Quran lessons, coach and checkpoint integration, premium voice option | yes |
+| 2.0 | 1–2 | Lesson engine, one character, captions + browser voice, end quiz, parent line — **done (beta.1)** | no (smoke test) |
+| 2.1 | 3–4 | Four characters, personalities, voice per character, talking avatar, visuals — **done (beta.1)** | yes, Math and Science |
+| 2.2 | 5–6 | **The animated classroom — done (beta.3):** full-body rigged teachers with gestures, moods and lip-sync; a classroom scene per character; a board that fills as the teacher speaks; camera moves; karaoke captions; autoplay; checks with celebration; scratchpad; raise-your-hand by microphone or typing; public demo at `/demo/teacher` | yes, all subjects |
+| 2.3 | 7–8 | Adaptive re-explanation after a missed check, Arabic subjects and Quran lessons, coach and checkpoint integration, premium voice option, lesson line in the parent's report | yes |
 | 2.4 | 9–10 | Polish, cost review, promotion plan to 2.0 | release candidate |
 
 ## 11. Risks and guardrails

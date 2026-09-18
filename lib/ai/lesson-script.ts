@@ -21,6 +21,8 @@ const BeatSchema = z.object({
   say: z.string().describe("What the teacher says aloud, 35-90 words, in character, spoken language, no markdown"),
   show: ShowSchema.nullable(),
   check: CheckSchema.nullable().describe("Only for kind 'check'"),
+  gesture: z.enum(["idle", "wave", "explain", "point", "write", "think", "celebrate", "listen", "oops", "bow"]).nullable().describe("How the animated teacher moves during this beat: wave (greeting), explain (open hands), point (at the board), write (on the board), think (hand on chin, for checks), celebrate (arms up, recap), bow (thanks). Null lets the stage decide."),
+  mood: z.enum(["neutral", "happy", "think", "surprised", "encourage", "sad"]).nullable().describe("The teacher's face during this beat. Null lets the stage decide."),
 });
 const QuizItem = z.object({
   prompt: z.string(),
@@ -46,6 +48,7 @@ Rules:
 - "say" is spoken language: short sentences, no markdown, no bullet symbols, numbers written so they read well aloud. Stay in the character's manner but keep the teaching clear; the character adds warmth, not noise.
 - "show" carries the content the ear cannot hold: formulas, steps, tables, a simple SVG diagram. Unicode math only (x², √, ×, ÷, π). Keep SVGs simple: lines, circles, rects, text.
 - Checks test the idea just taught. Hints do not give the answer away.
+- The teacher is animated: give each beat a gesture and a mood that fit (wave for the hook, point or write when the board carries content, think for checks, celebrate for the recap; surprised for a twist, encourage after a hard idea).
 - The final quiz has exactly 3 questions on the whole lesson; prefix each skill_tag with the subject name and a colon.
 - Arabic lessons: everything in clear Modern Standard Arabic (Egyptian Ministry textbooks style), including the visuals.`;
 

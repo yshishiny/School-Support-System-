@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -6,6 +5,7 @@ import { characterById } from "@/lib/characters";
 import { Stage } from "@/components/teach/Stage";
 import type { LessonScript } from "@/lib/ai/lesson-script";
 
+/** The lesson on the full-screen stage; the child's progress in the session decides where it resumes. */
 export default async function LessonPage({ params }: { params: Promise<{ sessionId: string }> }) {
   const { sessionId } = await params;
   const { profile } = await requireStudent();
@@ -15,10 +15,5 @@ export default async function LessonPage({ params }: { params: Promise<{ session
   if (!row?.lesson_scripts) notFound();
   if (row.finished_at && row.quiz_id) redirect(`/quiz/${row.quiz_id}`);
   const s = row.lesson_scripts;
-  return (
-    <main className="space-y-3">
-      <div className="flex items-center justify-between"><Link href="/teach" className="text-sm muted">← Teacher</Link><span className="badge">beta</span></div>
-      <Stage sessionId={row.id} scriptId={s.id} character={characterById(row.character_id)} script={{ title: s.title, minutes: s.minutes, beats: s.script.beats, quiz: s.script.quiz }} language={s.language === "ar" ? "ar" : "en"} startBeat={row.beat_index} minutes={s.minutes} />
-    </main>
-  );
+  return <Stage sessionId={row.id} scriptId={s.id} character={characterById(row.character_id)} script={{ title: s.title, minutes: s.minutes, beats: s.script.beats, quiz: s.script.quiz }} language={s.language === "ar" ? "ar" : "en"} startBeat={row.beat_index} minutes={s.minutes} />;
 }

@@ -1,7 +1,7 @@
 /** The product identity shown under More → About and in the daily report footer. Bump on every release. */
 export const APP_NAME = "Study Portal";
-export const APP_VERSION = "2.0.0-beta.2";
-export const APP_BASELINE = "V2 beta · virtual teachers · carries everything up to 1.14.0";
+export const APP_VERSION = "2.0.0-beta.3";
+export const APP_BASELINE = "V2 beta · animated virtual teachers · carries everything up to 1.14.0";
 export const APP_OWNER = "Yasser Elshishiny";
 export const APP_TRADEMARK = "Betna Group";
 export const APP_YEAR = 2026;

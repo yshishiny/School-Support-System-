@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.0.0-beta.3 — The animated classroom, phase 2.2 (18 September 2026, `v2` branch)
+
+- **Full-body animated teachers.** Each of the four characters is now a rigged cartoon body (head, arms with elbows, legs, outfit, prop) that breathes, blinks, sways, walks in, and performs gestures: wave, explain with open hands, point at the board, write on the board, think with a hand on the chin, celebrate with arms up, listen with a hand to the ear, shrug, bow. Six moods on the face; the mouth follows the voice with real mouth shapes driven by the browser's word timing.
+- **A classroom stage, full screen.** A room per character (space deck, football pitch, lab, old Cairo), a chalkboard that fills as the teacher speaks (steps appear one by one, formulas chalk in, tables fill row by row, diagrams draw themselves stroke by stroke), a camera that eases between wide, board and teacher framings, karaoke captions that highlight the word being said, a timeline of the lesson's beats, and a control bar (back, play/pause, next, raise hand, scratchpad, auto/manual).
+- **Lesson flow.** The teacher walks in, greets in character and announces the lesson; beats play on their own (or manually); checks stop the flow, answers fly onto the board, a right answer brings confetti and a celebration, a wrong one a hint and a second try; the recap ends with a "lesson complete" card, the score of the checks, and the 3-question quiz.
+- **Tools for the child.** A scratchpad to draw over the board with a finger, and "raise your hand" with the microphone (where the browser has speech recognition) or typing; the teacher listens, answers in character, and returns to the lesson.
+- **Voice robustness.** Word boundaries where the browser reports them, time estimates where it does not; a browser with no voice, or no Arabic voice, still runs the lesson with captions at reading pace instead of skipping ahead; Chrome's 15-second cut-off is worked around.
+- **Scripts know the stage.** New lesson scripts carry a gesture and a mood per beat; older cached scripts get sensible defaults from the beat kind.
+- **Public demo.** `/demo/teacher` lets anyone meet the four teachers and watch a sample lesson (English or Arabic) without signing in; `/demo/teacher/rig` shows every pose for tuning.
+- Fixed: signed-out pages (login, join, demo) were bounced to /login by the device report in the app shell.
+
 ## 2.0.0-beta.2 — Beta rebased on 1.14.0 (18 September 2026)
 
 - The virtual-teachers beta now carries everything from the 1.x line up to 1.14.0 (parent inbox and layouts, allowance page, snaps, follow-up questions, school files loop, admin page, installable app, morning routine, screen time).

@@ -61,6 +61,70 @@ body {
 .wiggle:hover { animation: wiggle .5s ease-in-out; }
 .pop { animation: pop .4s cubic-bezier(.2,.9,.3,1.3) both; }
 @media (prefers-reduced-motion: reduce) { .sticker, .wiggle:hover, .pop, .pulse { animation: none; } }
+
+/* The teacher rig (components/teach/Teacher.tsx): joints tween, idle motion loops, gestures add their own beat. */
+.t-rig .t-joint { transition: transform .55s cubic-bezier(.22, 1, .36, 1); }
+.t-rig .t-breathe { animation: t-breathe 3.2s ease-in-out infinite; }
+.t-rig .t-sway { animation: t-sway 5.5s ease-in-out infinite; }
+.t-rig .t-blink { animation: t-blink 4.6s infinite; }
+.t-rig .t-shadow { transition: transform .4s ease, opacity .4s ease; }
+.t-rig.t-g-wave .t-fore-right { animation: t-wave .55s ease-in-out infinite alternate; }
+.t-rig.t-g-write .t-fore-right { animation: t-write .42s ease-in-out infinite alternate; }
+.t-rig.t-g-celebrate .t-sway { animation: t-jump .9s cubic-bezier(.3, 1.4, .5, 1) 2; }
+.t-rig.t-g-explain .t-fore-left { animation: t-nudge 1.6s ease-in-out infinite alternate; }
+.t-rig.t-g-explain .t-fore-right { animation: t-nudge 1.6s ease-in-out .8s infinite alternate-reverse; }
+.t-rig.t-g-think .t-head { animation: t-tilt 2.4s ease-in-out infinite alternate; }
+.t-rig.t-g-listen .t-head { animation: t-tilt 2s ease-in-out infinite alternate; }
+.t-rig.t-walking .t-leg-l { animation: t-leg .5s ease-in-out infinite alternate; }
+.t-rig.t-walking .t-leg-r { animation: t-leg .5s ease-in-out .5s infinite alternate-reverse; }
+.t-rig.t-walking .t-arm-left { animation: t-leg .5s ease-in-out .5s infinite alternate-reverse; }
+.t-rig.t-walking .t-arm-right { animation: t-leg .5s ease-in-out infinite alternate; }
+.t-rig.t-walking .t-sway { animation: t-bob .5s ease-in-out infinite alternate; }
+@keyframes t-breathe { 0%, 100% { transform: translateY(0) scaleY(1); } 50% { transform: translateY(-1.5px) scaleY(1.012); } }
+@keyframes t-sway { 0%, 100% { transform: rotate(-.7deg); } 50% { transform: rotate(.7deg); } }
+@keyframes t-blink { 0%, 93%, 100% { transform: scaleY(1); } 96% { transform: scaleY(.08); } }
+@keyframes t-wave { from { transform: rotate(-22deg); } to { transform: rotate(22deg); } }
+@keyframes t-write { from { transform: rotate(-7deg) translateX(0); } to { transform: rotate(6deg) translateX(3px); } }
+@keyframes t-nudge { from { transform: rotate(-6deg); } to { transform: rotate(8deg); } }
+@keyframes t-tilt { from { transform: rotate(var(--head)) translateX(-1px); } to { transform: rotate(calc(var(--head) + 4deg)) translateX(1px); } }
+@keyframes t-jump { 0%, 100% { transform: translateY(0); } 40% { transform: translateY(-26px); } 60% { transform: translateY(-22px); } }
+@keyframes t-leg { from { transform: rotate(-24deg); } to { transform: rotate(24deg); } }
+@keyframes t-bob { from { transform: translateY(0); } to { transform: translateY(-5px); } }
+@media (prefers-reduced-motion: reduce) { .t-rig .t-breathe, .t-rig .t-sway, .t-rig .t-fore, .t-rig .t-head, .t-rig .t-leg, .t-rig .t-arm-swing { animation: none !important; } }
+
+/* The classroom stage: camera framings, the board, captions, checks, confetti. */
+.stage-camera { transition: transform 1.1s cubic-bezier(.4, 0, .2, 1); transform-origin: 50% 50%; }
+.stage-camera.cam-wide { transform: scale(1); }
+.stage-camera.cam-board { transform: scale(var(--board-zoom, 1.06)); transform-origin: var(--board-origin, 50% 30%); }
+.stage-camera.cam-teacher { transform: scale(1.22); transform-origin: var(--teacher-origin, 24% 72%); }
+/* Board zoom keeps the board's far edge on screen: it grows toward the teacher, never off the side. */
+.stage-root { --board-origin: 50% 22%; --board-zoom: 1.05; --teacher-origin: 50% 66%; }
+@media (orientation: landscape) { .stage-root { --board-origin: 100% 40%; --board-zoom: 1.07; --teacher-origin: 18% 62%; } }
+.board { background: radial-gradient(120% 90% at 50% 0%, #2c5a48 0%, #1f4335 55%, #183629 100%); box-shadow: inset 0 0 60px rgba(0,0,0,.35), 0 18px 40px rgba(0,0,0,.35); }
+.board-frame { border: 10px solid #8a5a34; border-radius: 1.4rem; box-shadow: inset 0 0 0 2px rgba(0,0,0,.25); }
+.board-line { animation: board-line .55s cubic-bezier(.2,.9,.3,1.2) both; }
+.board-chalk { animation: board-chalk 1s ease-out both; text-shadow: 0 0 12px rgba(255,255,255,.35); }
+.board-draw { stroke-dasharray: 1; stroke-dashoffset: 1; animation: board-draw 1.4s ease-out forwards; }
+.board-fade { opacity: 0; animation: board-fade .5s ease-out forwards; }
+.board-svg [fill]:not([fill="none"]):not(text) { animation-name: board-draw, board-fillin; animation-duration: 1.4s, .6s; animation-delay: inherit, 1.2s; animation-fill-mode: forwards, forwards; }
+@keyframes board-line { from { opacity: 0; transform: translateY(10px) scale(.98); } to { opacity: 1; transform: none; } }
+@keyframes board-chalk { from { opacity: 0; letter-spacing: .3em; filter: blur(3px); } to { opacity: 1; letter-spacing: 0; filter: blur(0); } }
+@keyframes board-draw { to { stroke-dashoffset: 0; } }
+@keyframes board-fade { to { opacity: 1; } }
+@keyframes board-fillin { from { fill-opacity: 0; } to { fill-opacity: 1; } }
+.caption-word { transition: color .12s, background .12s; border-radius: .35rem; padding: 0 .1em; }
+.caption-word.said { color: #fff; }
+.caption-word.now { background: color-mix(in srgb, var(--stage-glow, #7c5cff) 45%, transparent); color: #fff; }
+.choice-card { animation: choice-in .5s cubic-bezier(.2,.9,.3,1.25) both; }
+@keyframes choice-in { from { opacity: 0; transform: translateY(24px) scale(.9); } to { opacity: 1; transform: none; } }
+.t-enter { animation: t-enter 1.6s cubic-bezier(.3,.8,.4,1) both; }
+@keyframes t-enter { from { transform: translateX(-70vw); } to { transform: translateX(0); } }
+.title-card { animation: title-card .8s cubic-bezier(.2,.9,.3,1.2) both; }
+@keyframes title-card { from { opacity: 0; transform: translateY(20px) scale(.94); } to { opacity: 1; transform: none; } }
+.confetti { position: absolute; top: -4%; width: 10px; height: 16px; border-radius: 2px; animation: confetti-fall 2.3s cubic-bezier(.25,.7,.4,1) forwards; }
+@keyframes confetti-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: .6; } }
+.stage-controls button { min-height: 44px; }
+@media (prefers-reduced-motion: reduce) { .stage-camera, .board-line, .board-chalk, .board-draw, .choice-card, .t-enter, .title-card, .confetti { animation: none !important; transition: none !important; stroke-dashoffset: 0; opacity: 1; } }
 [dir="rtl"] .prose-lesson, [lang="ar"] .prose-lesson, .font-arabic { font-family: var(--font-arabic); }
 
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }

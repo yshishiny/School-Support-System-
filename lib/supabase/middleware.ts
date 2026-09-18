@@ -3,7 +3,7 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { logAccess } from "@/lib/access/log";
 import { touchPresence } from "@/lib/access/presence";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron"];
+const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron", "/demo"];
 
 export async function updateSession(request: NextRequest, event?: NextFetchEvent) {
   let response = NextResponse.next({ request });
