@@ -35,20 +35,50 @@ export function useSpeech(language: "en" | "ar", c: Character) {
   const endRef = useRef<(() => void) | null>(null);
   const activeRef = useRef<SpeechSynthesisUtterance | null>(null);
 
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceId, setVoiceId] = useState<string | null>(null);
+
   useEffect(() => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) { setState((s) => ({ ...s, available: false })); return; }
     const pick = () => {
-      const voices = window.speechSynthesis.getVoices();
+      const all = window.speechSynthesis.getVoices();
       const lang = language === "ar" ? "ar" : "en";
-      const cands = voices.filter((v) => v.lang.toLowerCase().startsWith(lang));
-      const byGender = c.voice.preferFemale ? cands.find((v) => /female|zira|samantha|salma|hoda|laila|aria|jenny/i.test(v.name)) : cands.find((v) => /male|david|daniel|naayf|hamed|guy|ryan/i.test(v.name));
-      voiceRef.current = byGender ?? cands.find((v) => v.localService) ?? cands[0] ?? null;
-      if (voices.length) setState((s) => ({ ...s, available: true }));
+      const cands = all.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith(lang));
+      let stored: string | null = null;
+      try { stored = localStorage.getItem(storageKey(language)); } catch { /* private mode */ }
+      const byGender = c.voice.preferFemale ? cands.find((v) => /female|zira|samantha|salma|hoda|laila|aria|jenny|amira/i.test(v.name)) : cands.find((v) => /male|david|daniel|naayf|hamed|guy|ryan|shakir|tarik/i.test(v.name));
+      const chosen = cands.find((v) => v.voiceURI === stored)
+        ?? (lang === "ar" ? cands.find((v) => /eg/i.test(v.lang) || /egypt|مصر/i.test(v.name)) : undefined)
+        ?? byGender ?? cands.find((v) => v.localService) ?? cands[0] ?? null;
+      voiceRef.current = chosen;
+      setVoices(cands);
+      setVoiceId(chosen?.voiceURI ?? null);
+      if (all.length) setState((s) => ({ ...s, available: true }));
     };
     pick();
     window.speechSynthesis.onvoiceschanged = pick;
     return () => { window.speechSynthesis.onvoiceschanged = null; };
   }, [language, c]);
+
+  /** The child's pick for this language on this device (voices are installed per phone, so the choice lives here). */
+  const setVoice = useCallback((uri: string) => {
+    const v = voices.find((x) => x.voiceURI === uri) ?? null;
+    voiceRef.current = v;
+    setVoiceId(v?.voiceURI ?? null);
+    try { if (v) localStorage.setItem(storageKey(language), v.voiceURI); } catch { /* ignore */ }
+  }, [voices, language]);
+
+  /** A short sample in a given voice, without touching the lesson's line. */
+  const preview = useCallback((uri: string, text: string) => {
+    if (!("speechSynthesis" in window)) return;
+    const v = voices.find((x) => x.voiceURI === uri);
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = language === "ar" ? "ar-EG" : "en-US";
+    if (v) u.voice = v;
+    u.rate = c.voice.rate; u.pitch = c.voice.pitch;
+    window.setTimeout(() => window.speechSynthesis.speak(u), 60);
+  }, [voices, language, c]);
 
   const clearTimers = () => {
     if (tickRef.current) window.clearInterval(tickRef.current);
@@ -154,7 +184,18 @@ export function useSpeech(language: "en" | "ar", c: Character) {
 
   useEffect(() => () => { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); clearTimers(); }, []);
 
-  return { ...state, say, stop, pause, resume, unlock };
+  return { ...state, say, stop, pause, resume, unlock, voices, voiceId, setVoice, preview };
+}
+
+function storageKey(language: "en" | "ar") { return `teach:voice:${language}`; }
+
+/** "Microsoft Hoda - Arabic (Egypt)" → a short label and a flag for the list. */
+export function voiceLabel(v: SpeechSynthesisVoice): { name: string; region: string; egyptian: boolean } {
+  const lang = v.lang.replace("_", "-");
+  const region = lang.split("-")[1]?.toUpperCase() ?? "";
+  const egyptian = region === "EG" || /egypt|مصر/i.test(v.name);
+  const name = v.name.replace(/Microsoft |Google |Apple |Samsung |\(.*?\)|- .*$/g, "").trim() || v.name;
+  return { name, region, egyptian };
 }
 
 type RecognitionCtor = new () => { lang: string; interimResults: boolean; maxAlternatives: number; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void };

@@ -7,6 +7,7 @@ import { Classroom } from "./Classroom";
 import { Board } from "./Board";
 import { Scratchpad } from "./Scratchpad";
 import { Confetti } from "./Confetti";
+import { VoicePicker } from "./VoicePicker";
 import { useRecognition, useSpeech } from "./useSpeech";
 import { askTeacherAction, finishLessonAction, recordBeatAction } from "@/lib/actions/teach";
 import type { Character } from "@/lib/characters";
@@ -55,6 +56,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [pad, setPad] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
   const [burst, setBurst] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
   const [pending, start] = useTransition();
@@ -224,12 +226,13 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const overlay = (
     <>
       <Confetti burst={burst} />
+      {voiceOpen && <VoicePicker voices={speech.voices} current={speech.voiceId} language={language} onPick={(u) => { speech.setVoice(u); speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello); }} onPreview={(u) => speech.preview(u, rtl ? c.lines.hello_ar : c.lines.hello)} onClose={() => setVoiceOpen(false)} />}
       {!started && (
         <button type="button" onClick={() => { speech.unlock(); setStarted(true); }} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/55 backdrop-blur-[2px] text-white" dir={rtl ? "rtl" : undefined}>
           <span className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-white text-[#2b1d2e] text-4xl shadow-2xl pulse">▶</span>
           <span className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{rtl ? "اضغط لبدء الدرس" : "Tap to start the lesson"}</span>
           <span className="text-sm text-white/80">{c.name} · {script.title}</span>
-          <span className="text-xs text-white/60">{rtl ? "ارفع الصوت 🔊" : "Turn the sound up 🔊"}</span>
+          <span className="text-xs text-white/60">{rtl ? "ارفع الصوت 🔊 · يمكنك تغيير صوت المعلم من زر 🔊" : "Turn the sound up 🔊 · change the teacher's voice with the 🔊 button"}</span>
         </button>
       )}
       <header className="absolute inset-x-0 top-0 z-30 flex items-center gap-2 px-3 pt-[max(.5rem,env(safe-area-inset-top))]" dir={rtl ? "rtl" : undefined}>
@@ -265,6 +268,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
           <button type="button" className="flex-1 rounded-xl px-2 text-lg disabled:opacity-30" disabled={phase === "outro" || (phase === "lesson" && beat?.kind === "check" && !checkDone)} onClick={() => (phase === "intro" ? goTo(0) : goTo(i + 1))} aria-label="Next">⏭</button>
           <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${hand ? "bg-accent/60" : ""}`} onClick={raiseHand} aria-label="Raise your hand">✋</button>
           <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${pad ? "bg-accent/60" : ""}`} onClick={() => setPad((p) => !p)} aria-label="Scratchpad">✏️</button>
+          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${voiceOpen ? "bg-accent/60" : ""}`} onClick={() => { cancelAdvance(); speech.stop(); setVoiceOpen((v) => !v); }} aria-label="Teacher's voice">🔊</button>
           <span className="px-2 text-[11px] font-bold text-white/70 tabular-nums">{progress}%</span>
         </div>
       </div>
