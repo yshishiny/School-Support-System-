@@ -81,7 +81,7 @@ export default async function SettingsPage() {
         <InstallCard compact />
         <PushToggle />
       </section>
-      <TelegramSettings chatId={(profile as Profile).telegram_chat_id} botUsername={process.env.TELEGRAM_BOT_USERNAME ?? null} />
+      <TelegramSettings chatId={(profile as Profile).telegram_chat_id} botUsername={process.env.TELEGRAM_BOT_USERNAME || null} />
           </>) },
           { id: "parents", label: "Parents", emoji: "👨‍👩‍👦", content: (<>
       <ParentsPanel me={profile.id} parents={(parents ?? []) as ParentRow[]} invites={(invites ?? []) as InviteRow[]} pattern={family.custody_pattern ?? {}} overrides={(overrides ?? []) as OverrideRow[]} today={today} baseUrl={baseUrl} />
