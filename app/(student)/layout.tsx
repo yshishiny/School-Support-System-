@@ -8,7 +8,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
   const theme = themeById(profile.theme);
   return (
     <div className="theme-root" style={themeStyle(theme) as React.CSSProperties} data-theme={theme.id}>
-      <div className="absolute top-1 right-4 text-xs font-mono bg-opacity-20 px-2 py-1 rounded" style={{ backgroundColor: theme.accent }}>
+      <div className="absolute top-1 right-4 text-xs font-mono px-2 py-1 rounded opacity-70" style={{ backgroundColor: theme.vars.accent, color: theme.vars.bg }}>
         v{APP_VERSION}
       </div>
       <div className="mx-auto max-w-3xl px-4 pt-4 pb-24 overflow-x-clip">
