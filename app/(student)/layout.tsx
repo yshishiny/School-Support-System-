@@ -1,12 +1,16 @@
 import { requireStudent } from "@/lib/auth";
 import { BottomNav } from "@/components/Nav";
 import { themeById, themeStyle } from "@/lib/themes";
+import { APP_VERSION } from "@/lib/version";
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireStudent();
   const theme = themeById(profile.theme);
   return (
     <div className="theme-root" style={themeStyle(theme) as React.CSSProperties} data-theme={theme.id}>
+      <div className="absolute top-1 right-4 text-xs font-mono bg-opacity-20 px-2 py-1 rounded" style={{ backgroundColor: theme.accent }}>
+        v{APP_VERSION}
+      </div>
       <div className="mx-auto max-w-3xl px-4 pt-4 pb-24 overflow-x-clip">
       {children}
       <BottomNav
