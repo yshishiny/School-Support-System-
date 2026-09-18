@@ -26,7 +26,7 @@ export const isCloudVoice = (id: string | null | undefined) => !!id && id.starts
  * cloud, from word boundaries where the browser reports them, else from elapsed time. With no voice at all
  * the line still "plays" silently so the lesson keeps its rhythm. Chrome's 15-second cut-off is worked around.
  */
-export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: CloudVoice[] = []) {
+export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: CloudVoice[] = [], videoRef?: React.RefObject<HTMLVideoElement | null>) {
   const [state, setState] = useState<SpeechState>({ speaking: false, paused: false, available: true, blocked: false, wordIndex: 0, wordCount: 0, viseme: "rest" });
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceId, setVoiceId] = useState<string | null>(null);
@@ -45,6 +45,8 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const tokenRef = useRef(0);
   const cacheRef = useRef<Map<string, Promise<string>>>(new Map());
+  const modeRef = useRef<"browser" | "cloud" | "video">("browser");
+  const [videoPlaying, setVideoPlaying] = useState(false);
 
   useEffect(() => { voiceIdRef.current = voiceId; }, [voiceId]);
 
@@ -101,10 +103,13 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     if (typeof window !== "undefined" && "speechSynthesis" in window) window.speechSynthesis.cancel();
     const a = audioRef.current;
     if (a) { a.onended = null; a.ontimeupdate = null; a.onerror = null; a.pause(); }
+    const v = videoRef?.current;
+    if (v) { v.onended = null; v.ontimeupdate = null; v.onerror = null; v.pause(); }
+    setVideoPlaying(false);
     clearTimers();
     activeRef.current = null;
     setState((s) => ({ ...s, speaking: false, paused: false, viseme: "rest" }));
-  }, []);
+  }, [videoRef]);
 
   /** MP3 for a line in the current cloud voice, from the local cache or the server. */
   const fetchAudio = useCallback((text: string, cloudId: string): Promise<string> => {
@@ -194,7 +199,29 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     }
   }, [fetchAudio, finish, sayBrowser]);
 
-  const say = useCallback((text: string, onEnd?: () => void) => {
+  /** The line as a presenter clip: the video carries the voice; captions follow its progress. */
+  const sayVideo = useCallback(async (text: string, words: string[], url: string, token: number) => {
+    const v = videoRef?.current;
+    if (!v) { sayBrowser(text, words); return; }
+    const fallback = () => { if (tokenRef.current !== token) return; setVideoPlaying(false); modeRef.current = "cloud"; boundaryRef.current = false; startedRef.current = Date.now(); const id = voiceIdRef.current; if (isCloudVoice(id)) void sayCloud(text, words, id!.slice(CLOUD.length), token); else sayBrowser(text, words); };
+    try {
+      boundaryRef.current = true;
+      v.src = url;
+      v.ontimeupdate = () => { if (v.duration > 0) wordRef.current = Math.min(words.length - 1, Math.floor((v.currentTime / v.duration) * words.length)); };
+      v.onended = () => { if (tokenRef.current === token) { setVideoPlaying(false); finish(); } };
+      v.onerror = fallback;
+      await v.play();
+      if (tokenRef.current !== token) return;
+      setVideoPlaying(true);
+      setState((s) => ({ ...s, blocked: false, available: true }));
+    } catch (err) {
+      if (tokenRef.current !== token) return;
+      if (err instanceof Error && /NotAllowed/i.test(err.name)) { setState((s) => ({ ...s, blocked: true })); silentRef.current = window.setTimeout(finish, Math.max(300, estRef.current - (Date.now() - startedRef.current))); return; }
+      fallback();
+    }
+  }, [videoRef, finish, sayBrowser, sayCloud]);
+
+  const say = useCallback((text: string, onEnd?: () => void, videoUrl?: string | null) => {
     stop();
     const token = tokenRef.current;
     const words = wordsOf(text);
@@ -207,9 +234,10 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     setState((s) => ({ ...s, speaking: true, paused: false, wordIndex: 0, wordCount: words.length, viseme: "small" }));
     startTicker(words);
     const id = voiceIdRef.current;
-    if (isCloudVoice(id)) void sayCloud(text, words, id!.slice(CLOUD.length), token);
-    else sayBrowser(text, words);
-  }, [c, stop, sayCloud, sayBrowser]);
+    if (videoUrl && videoRef?.current) { modeRef.current = "video"; void sayVideo(text, words, videoUrl, token); }
+    else if (isCloudVoice(id)) { modeRef.current = "cloud"; void sayCloud(text, words, id!.slice(CLOUD.length), token); }
+    else { modeRef.current = "browser"; sayBrowser(text, words); }
+  }, [c, stop, sayCloud, sayBrowser, sayVideo, videoRef]);
 
   /** Warm the cache for the next line so it plays with no gap. */
   const prefetch = useCallback((text: string) => {
@@ -218,16 +246,18 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
   }, [fetchAudio]);
 
   const pause = useCallback(() => {
-    if (isCloudVoice(voiceIdRef.current)) audioRef.current?.pause();
+    if (modeRef.current === "video") videoRef?.current?.pause();
+    else if (modeRef.current === "cloud") audioRef.current?.pause();
     else if ("speechSynthesis" in window) window.speechSynthesis.pause();
     setState((s) => ({ ...s, paused: true, viseme: "rest" }));
-  }, []);
+  }, [videoRef]);
   const resume = useCallback(() => {
-    if (isCloudVoice(voiceIdRef.current)) void audioRef.current?.play().catch(() => null);
+    if (modeRef.current === "video") void videoRef?.current?.play().catch(() => null);
+    else if (modeRef.current === "cloud") void audioRef.current?.play().catch(() => null);
     else if ("speechSynthesis" in window) window.speechSynthesis.resume();
     startedRef.current = Date.now() - (wordRef.current / Math.max(1, wordsRef.current.length)) * estRef.current;
     setState((s) => ({ ...s, paused: false }));
-  }, []);
+  }, [videoRef]);
 
   /** The child's pick for this language on this device (voices are installed per phone, so the choice lives here). */
   const setVoice = useCallback((id: string) => {
@@ -264,12 +294,14 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     const a = audio();
     a.src = silentWav();
     void a.play().catch(() => null);
+    const v = videoRef?.current;
+    if (v) { v.src = silentWav(); void v.play().catch(() => null); }
     setState((s) => ({ ...s, blocked: false }));
-  }, []);
+  }, [videoRef]);
 
   useEffect(() => () => { if ("speechSynthesis" in window) window.speechSynthesis.cancel(); audioRef.current?.pause(); clearTimers(); }, []);
 
-  return { ...state, say, stop, pause, resume, unlock, prefetch, voices, voiceId, setVoice, preview, cloudVoices };
+  return { ...state, say, stop, pause, resume, unlock, prefetch, voices, voiceId, setVoice, preview, cloudVoices, videoPlaying };
 }
 
 function storageKey(language: "en" | "ar") { return `teach:voice:${language}`; }

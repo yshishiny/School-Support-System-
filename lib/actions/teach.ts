@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
+import { renderScript, videoEnabled, videoVoice } from "@/lib/video";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -77,6 +79,16 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
   }
   const { data: session, error: sErr } = await admin.from("lesson_sessions").insert({ student_id: profile.id, family_id: family.id, script_id: scriptId, character_id: character.id }).select("id").single();
   if (sErr || !session) return { error: sErr?.message ?? "Could not start the lesson." };
+  // Presenter clips render in the background from the first line, so most are ready before the child reaches them.
+  if (videoEnabled()) {
+    const voice = videoVoice(character, language);
+    const sid = scriptId;
+    if (voice) after(async () => {
+      const { data } = await admin.from("lesson_scripts").select("script").eq("id", sid).maybeSingle();
+      const beats = ((data?.script as { beats?: { say: string }[] } | null)?.beats ?? []).map((b) => b.say);
+      await renderScript({ characterId: character.id, voice, lines: beats });
+    });
+  }
   redirect(`/teach/${session.id}`);
 }
 

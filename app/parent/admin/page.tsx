@@ -5,6 +5,8 @@ import { configChecks, databaseChecks, githubCommits, googleStatus, jobChecks, r
 import { resolveErrorsAction } from "@/lib/actions/ops";
 import { schedulerStatus } from "@/lib/actions/ops-scheduler";
 import { SchedulerSwitch } from "@/components/SchedulerSwitch";
+import { VideoPresenters } from "@/components/VideoPresenters";
+import { presenterUrls, videoCap, videoEnabled, videoMonthCount } from "@/lib/video";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -44,6 +46,7 @@ export default async function AdminPage() {
     googleStatus(),
   ]);
   const sched = await schedulerStatus().catch(() => ({ enabled: false, appUrl: null, lastRun: null, lastOk: null }));
+  const [presenters, cap, used] = await Promise.all([presenterUrls().catch(() => ({})), videoCap().catch(() => 500), videoMonthCount().catch(() => 0)]);
   const openErrors = errors.filter((e) => !e.resolved_at);
   const worst = (rows: Check[]) => (rows.some((c) => c.tone === "bad") ? "bad" : rows.some((c) => c.tone === "warn") ? "warn" : "good");
   const overall = worst([...config, ...db, ...jobs.checks]);
@@ -125,6 +128,7 @@ export default async function AdminPage() {
               </section>
             </div>
           ) },
+          { id: "teachers", label: "Teachers", emoji: "🎬", content: <VideoPresenters enabled={videoEnabled()} presenters={presenters} cap={cap} used={used} /> },
           { id: "services", label: "Services", emoji: "🔌", content: (
             <div className="space-y-3">
               <section className="card space-y-1">

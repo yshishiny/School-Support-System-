@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.4 — Teachers on video (18 September 2026, `v2` branch)
+
+- **A human presenter, like a TV lesson.** With `DID_API_KEY` set, every scripted line is rendered by D-ID as a short clip of a realistic presenter speaking with the premium voice (Egyptian for Arabic), lip-synced. The clip plays in the teacher's place; the board, camera, checks, confetti, scratchpad and raise-your-hand stay exactly as they are. Lines that are not scripted (greeting, check feedback, answers to questions) keep the animated teacher and the voice.
+- **Rendered once, kept.** Clips are cached per line, presenter and voice in the private `lesson-videos` bucket; starting a lesson renders its script in the background from the first line, and the stage asks two lines ahead, so most clips are ready when the child reaches them. While a clip is still rendering the animated teacher speaks the line, and the clip is there next time.
+- **Admin → Teachers.** The presenter photo per character (public `presenters` bucket; the service's sample face until one is chosen), the count of clips this month and a monthly cap (default 500 ≈ 50 lessons). Migration `20260918160000`.
+- Cost: about US$1–3 per lesson script once on D-ID's API plans, shared by both children; nothing for replays.
+
 ## 2.0.0-beta.3 — The animated classroom, phase 2.2 (18 September 2026, `v2` branch)
 
 - **Full-body animated teachers.** Each of the four characters is now a rigged cartoon body (head, arms with elbows, legs, outfit, prop) that breathes, blinks, sways, walks in, and performs gestures: wave, explain with open hands, point at the board, write on the board, think with a hand on the chin, celebrate with arms up, listen with a hand to the ear, shrug, bow. Six moods on the face; the mouth follows the voice with real mouth shapes driven by the browser's word timing.

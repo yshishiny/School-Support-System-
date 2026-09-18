@@ -8,7 +8,8 @@ import { Board } from "./Board";
 import { Scratchpad } from "./Scratchpad";
 import { Confetti } from "./Confetti";
 import { VoicePicker } from "./VoicePicker";
-import { useRecognition, useSpeech } from "./useSpeech";
+import { isCloudVoice, useRecognition, useSpeech } from "./useSpeech";
+import { useClips } from "./useClips";
 import { askTeacherAction, finishLessonAction, recordBeatAction } from "@/lib/actions/teach";
 import type { Character } from "@/lib/characters";
 import type { LessonScript } from "@/lib/ai/lesson-script";
@@ -36,12 +37,14 @@ function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rt
  * checks stop the flow until answered, a raised hand pauses for a question, and the recap ends with confetti.
  * `demo` runs the same stage with no server calls.
  */
-export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[] }) {
+export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean }) {
   const c = character;
   const rtl = language === "ar";
   const beats = script.beats;
   const total = beats.length;
-  const speech = useSpeech(language, c, cloudVoices);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const speech = useSpeech(language, c, cloudVoices, videoRef);
+  const clips = useClips({ enabled: video && !demo, character: c.id, language, voice: isCloudVoice(speech.voiceId) ? speech.voiceId!.slice("cloud:".length) : null });
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>(startBeat > 0 ? "lesson" : "intro");
@@ -70,7 +73,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
 
   useEffect(() => { autoRef.current = auto; }, [auto]);
 
-  const speak = useCallback((text: string, onEnd?: () => void) => { setLine(text); speech.say(text, onEnd); }, [speech]);
+  const speak = useCallback((text: string, onEnd?: () => void, videoUrl?: string | null) => { setLine(text); speech.say(text, onEnd, videoUrl); }, [speech]);
   const cancelAdvance = () => { if (advanceRef.current) { window.clearTimeout(advanceRef.current); advanceRef.current = null; } };
 
   const goTo = useCallback((next: number) => {
@@ -99,7 +102,8 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
       const hello = rtl ? c.lines.hello_ar : c.lines.hello;
       const today = rtl ? `درس اليوم: ${script.title}.` : `Today's lesson: ${script.title}.`;
       speak(`${hello} ${today}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(-1); });
-      if (beats[0]) speech.prefetch(beats[0].say);
+      if (beats[0]) { speech.prefetch(beats[0].say); clips.warm(beats[0].say); }
+      if (beats[1]) clips.warm(beats[1].say);
     }, 1700);
     return () => window.clearTimeout(t1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -108,8 +112,11 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   // Each beat: say it; afterwards wait at a check, else advance when on auto.
   useEffect(() => {
     if (phase !== "lesson" || !beat || !started) return;
-    speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); });
-    if (beats[i + 1]) speech.prefetch(beats[i + 1].say);
+    const clip = clips.get(beat.say);
+    speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clip);
+    if (!clip) clips.warm(beat.say);
+    if (beats[i + 1]) { speech.prefetch(beats[i + 1].say); clips.warm(beats[i + 1].say); }
+    if (beats[i + 2]) clips.warm(beats[i + 2].say);
     return () => { cancelAdvance(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, i, started]);
@@ -146,7 +153,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   function togglePlay() {
     if (speech.paused) { speech.resume(); return; }
     if (speech.speaking) { cancelAdvance(); speech.pause(); return; }
-    if (phase === "lesson" && beat) speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); });
+    if (phase === "lesson" && beat) speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clips.get(beat.say));
   }
 
   function raiseHand() {
@@ -287,8 +294,11 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
           <Scratchpad open={pad} onClose={() => setPad(false)} />
         </div>
         <div className="relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]">
-          <div className={`h-full ${walking ? "t-enter" : ""}`}>
+          <div className={`h-full ${walking ? "t-enter" : ""} ${speech.videoPlaying ? "hidden" : ""}`}>
             <Teacher c={c} gesture={gesture} mood={mood} viseme={speech.speaking && !speech.paused ? speech.viseme : "rest"} walking={walking} className="!h-full !w-auto max-w-full drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" />
+          </div>
+          <div className={`presenter-frame h-full aspect-[3/4] max-w-full flex items-end justify-center ${speech.videoPlaying ? "" : "absolute inset-0 opacity-0 pointer-events-none"}`}>
+            <video ref={videoRef} playsInline preload="auto" className="h-full w-full rounded-[1.4rem] object-cover shadow-[0_18px_40px_rgba(0,0,0,.4)] ring-4 ring-white/15" />
           </div>
         </div>
       </div>
