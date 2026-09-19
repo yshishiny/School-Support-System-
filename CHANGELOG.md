@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.19 — Prayer in congregation counts for more (19 September 2026, `v2` branch)
+
+- **The log now knows where he prayed.** Claiming a prayer inside its window offers two buttons: at the mosque, or at home. The mosque is the first and larger of the two, because it is the one worth extra. A prayer already late cannot be claimed as congregation; he had to be there for it.
+- **Twenty points for a full day at the mosque.** All five in congregation on one day pays a bonus of 20 on top of the three each and the ten for five on time.
+- **Twenty-five for a week of Fajr there.** Seven days running with Fajr at the mosque pays 25, and again at fourteen days, twenty-one and so on — once per completed week, not every day after the first seven.
+- Both bonuses are keyed to the prayer that earned them, so no reload or double tap can pay them twice, and a bonus that fails to write never costs him the prayer itself.
+
 ## 2.0.0-beta.18 — Claim it back, and a planner you can filter (19 September 2026, `v2` branch)
 
 - **Money spent on the family or on school can be claimed back.** Next to anything he wrote down, a child can ask to be repaid — but only by saying which it was, why he spent it, and whether he asked permission first. Personal spending cannot be claimed at all, and the form says so. The request sits in your Wallets tab with his reason, whether he asked first marked in green or amber, and one tap to pay it back or turn it down with a word he reads. Approving credits his wallet once, keyed to that line.

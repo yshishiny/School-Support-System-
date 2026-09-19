@@ -78,17 +78,20 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
       }
     });
   };
-  const log = (prayer: PrayerName) => {
+  const log = (prayer: PrayerName, atMosque = false) => {
     setMsg(null);
+    setBusy(`now:${prayer}:${atMosque ? "mosque" : "home"}`);
     start(async () => {
       try {
         // The prayer is saved first: asking the phone for its position can sit behind a permission prompt for
         // seconds, and a tap that does nothing for that long reads as broken.
-        const res = await logPrayerAction(prayer);
-        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
+        const res = await logPrayerAction(prayer, atMosque);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"}${atMosque ? " at the mosque 🕌" : ""} · +${res.earned}`);
         if (!res.error) void getPosition(5000).then((pos) => recordPositionAction("prayer", pos)).catch(() => null);
       } catch {
         setMsg("That did not save. Check the connection and try again.");
+      } finally {
+        setBusy(null);
       }
     });
   };
@@ -122,7 +125,10 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
           </span>
         </div>
         {!r.logged && state === "open" && (
-          <button type="button" disabled={pending} onClick={() => log(r.prayer)} className="btn-primary mt-2 w-full min-h-12">{pending ? "…" : "I prayed it ✓"}</button>
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <button type="button" disabled={pending} onClick={() => log(r.prayer, true)} className="btn-primary min-h-12">{busy === `now:${r.prayer}:mosque` ? "…" : "🕌 At the mosque"}</button>
+            <button type="button" disabled={pending} onClick={() => log(r.prayer, false)} className="btn-ghost min-h-12">{busy === `now:${r.prayer}:home` ? "…" : "At home ✓"}</button>
+          </div>
         )}
         {!r.logged && state === "late_only" && pastButtons(r.prayer, date)}
       </div>
@@ -142,7 +148,7 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
               <span className="text-xl">🕌</span>
               <div className="flex-1">
                 <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>Prayers</div>
-                <div className="text-xs muted">{onTimeCount}/5 on time today · +3 · +1 late · +10 all five</div>
+                <div className="text-xs muted">{onTimeCount}/5 on time today · +3 each · +10 all five · +20 all five at the mosque · +25 a week of Fajr there</div>
               </div>
               <button type="button" onClick={() => setOpen(false)} className="btn-ghost btn-sm min-h-10 px-3" aria-label="Close">✕</button>
             </div>
