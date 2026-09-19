@@ -8,6 +8,7 @@ import { Avatar } from "@/components/teach/Avatar";
 import { Tabs } from "@/components/Tabs";
 import { isArabicSubject, subjectEmoji, subjectLabel } from "@/lib/plan";
 import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
+import { isSchoolStage } from "@/lib/allowance";
 import type { Topic } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -18,6 +19,9 @@ export default async function TeachPage() {
   const supabase = await createClient();
   const today = todayIn(family.timezone);
   const chosen = profile.character_id ? characterById(profile.character_id) : null;
+  // A university student or a postgraduate has no school grade, so the family curriculum has nothing for her:
+  // her lessons come from the material she uploads.
+  const atSchool = isSchoolStage((profile as { stage?: string | null }).stage);
   const [{ data: topics }, { data: logs }, { data: materials }, { data: sessions }] = await Promise.all([
     supabase.from("topics").select("*").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
     supabase.from("lesson_logs").select("subject_name, topic_id, note, log_date").eq("student_id", profile.id).gte("log_date", shiftDate(today, -7)).order("log_date", { ascending: false }),
@@ -72,17 +76,31 @@ export default async function TeachPage() {
 
       {(materials ?? []).length > 0 && (
         <section className="card space-y-1">
-          <h2 className="h2">📎 Teach me from a school file</h2>
+          <h2 className="h2">📎 Teach me from {atSchool ? "a school file" : "one of your files"}</h2>
           <ul className="divide-y divide-line">
             {(materials ?? []).map((m) => <li key={m.id} className="py-2 flex items-center gap-2 text-sm"><span className="flex-1 min-w-0">{m.title}<span className="muted text-xs"> · {m.subject ?? ""}</span></span><StartLessonButton materialId={m.id} /></li>)}
           </ul>
         </section>
       )}
 
-      <section className="space-y-2">
-        <h2 className="h2">📚 Any topic</h2>
-        <Tabs storageKey="teach-subject" size="sm" tabs={subjects.map((s) => ({ id: s, label: subjectLabel(s), emoji: subjectEmoji(s), content: <div className="card" dir={isArabicSubject(s) ? "rtl" : undefined}>{topicList(all.filter((t) => t.subject === s))}</div> }))} />
-      </section>
+      {subjects.length > 0 && (
+        <section className="space-y-2">
+          <h2 className="h2">📚 Any topic</h2>
+          <Tabs storageKey="teach-subject" size="sm" tabs={subjects.map((s) => ({ id: s, label: subjectLabel(s), emoji: subjectEmoji(s), content: <div className="card" dir={isArabicSubject(s) ? "rtl" : undefined}>{topicList(all.filter((t) => t.subject === s))}</div> }))} />
+        </section>
+      )}
+
+      {subjects.length === 0 && (materials ?? []).length === 0 && (
+        <section className="card space-y-2">
+          <h2 className="h2">{atSchool ? "No topics yet" : "Teach me from my own material"}</h2>
+          <p className="text-sm muted">
+            {atSchool
+              ? "Nobody has added the curriculum for your grade yet. Upload a file from school and the teacher will build the lesson from it."
+              : "There is no school curriculum at your level, so your teacher works from what you give it: a lecture handout, a paper, a chapter. Upload one and it becomes a full lesson with a board and questions."}
+          </p>
+          <Link href="/learn" className="btn-primary">Upload something to learn from</Link>
+        </section>
+      )}
 
       {past.length > 0 && (
         <section className="card">
@@ -97,7 +115,7 @@ export default async function TeachPage() {
           </ul>
         </section>
       )}
-      <p className="text-xs muted">Beta · {CHARACTERS.length} teachers · lessons are written from your school files and curriculum, cached, and improved when flagged.</p>
+      <p className="text-xs muted">Beta · {CHARACTERS.length} teachers · lessons are written from {atSchool ? "your school files and curriculum" : "the files you upload"}, cached, and improved when flagged.</p>
     </main>
   );
 }

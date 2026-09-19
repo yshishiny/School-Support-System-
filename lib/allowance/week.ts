@@ -32,7 +32,8 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     .map((t) => (isRota(t)
       ? { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind, rota: true, dates: taskDueDates(t, studentId, weekDates) }
       : { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind }));
-  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks);
+  const { data: who } = await admin.from("profiles").select("stage").eq("id", studentId).maybeSingle();
+  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks, (who?.stage as string | null) ?? "school");
   const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }, { data: snapRows }] = await Promise.all([
     admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", start).lte("tick_date", end),
     admin.from("prayer_logs").select("log_date, prayer, status, entered_late").eq("student_id", studentId).gte("log_date", start).lte("log_date", end),

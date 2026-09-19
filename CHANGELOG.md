@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.16 — A university student is not a school pupil (19 September 2026, `v2` branch)
+
+- **The allowance stopped marking grown-ups down for school things.** Every learner was scored against the same list, so a postgraduate lost points for not attempting a weekly checkpoint on the family curriculum, not uploading a school grades sheet, and not logging classes against a school timetable. Those five measures now switch themselves off for anyone past school; prayers, check-ins, manners, the chores and the coach check-in still count, because those apply to everyone in the house.
+- **The teacher no longer shows an empty shelf.** With no school grade there is no curriculum to list, so the page offered an empty tab strip. It now says plainly that lessons come from the material you upload, with a button to add one, and calls them "your files" rather than "school files".
+- Families where nobody's stage is set are unaffected: no stage means school, exactly as before.
+
 ## 2.0.0-beta.15 — A planner that knows the school day (19 September 2026, `v2` branch)
 
 - **The planner was empty because it only ever showed typed-in homework.** The app already knew the timetable, the quizzes booked for each date and the days off, and showed none of it. The planner is now the next two weeks as a strip of days you tap: each day carries its classes with times and rooms, the quizzes already booked, and anything due.

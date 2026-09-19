@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { amountFor, bandFor, eligibilityHint, mergeKpis, scoreWeek, weekFor, DEFAULT_KPIS } from "./allowance";
+import { amountFor, bandFor, eligibilityHint, mergeKpis, scoreWeek, weekFor, DEFAULT_KPIS, SCHOOL_ONLY_KPIS } from "./allowance";
 
 describe("weekFor", () => {
   it("ends on the pay day and starts six days earlier", () => {
@@ -117,5 +117,45 @@ describe("eligibility", () => {
     const r = scoreWeek({ ...base, ticks, checkinDates: [], prayerDays: {}, plannedAttempted: 0, wellbeingDone: false });
     expect(r.bestBand).toBe("some"); // app KPIs can still be recovered
     expect(eligibilityHint(r, 250).tone).toBe("warn");
+  });
+});
+
+describe("a learner who is past school", () => {
+  it("keeps every measure for a child at school", () => {
+    const k = mergeKpis(null, [], "school");
+    expect(k.find((x) => x.code === "checkpoint")?.enabled).toBe(true);
+    expect(k.find((x) => x.code === "grades")?.enabled).toBe(true);
+    expect(k.find((x) => x.code === "classlog")?.enabled).toBe(true);
+  });
+
+  it("drops the school-only measures for a university student and a postgraduate", () => {
+    for (const stage of ["university", "postgraduate", "adult"]) {
+      const k = mergeKpis(null, [], stage);
+      for (const code of SCHOOL_ONLY_KPIS) expect(k.find((x) => x.code === code)?.enabled, `${stage}/${code}`).toBe(false);
+      // What still applies to anyone in the house stays on.
+      expect(k.find((x) => x.code === "prayers")?.enabled).toBe(true);
+      expect(k.find((x) => x.code === "checkins")?.enabled).toBe(true);
+      expect(k.find((x) => x.code === "manners")?.enabled).toBe(true);
+    }
+  });
+
+  it("treats a missing stage as school, so nothing changes for existing families", () => {
+    expect(mergeKpis(null, [], null).find((x) => x.code === "checkpoint")?.enabled).toBe(true);
+    expect(mergeKpis(null, []).find((x) => x.code === "checkpoint")?.enabled).toBe(true);
+  });
+
+  it("does not mark a postgraduate down for a checkpoint she can never have", () => {
+    const kpis = mergeKpis(null, [], "postgraduate");
+    const week = scoreWeek({
+      kpis, start: "2026-09-12", end: "2026-09-18", today: "2026-09-18",
+      ticks: [], prayerDays: {}, checkinDates: [], plannedTotal: 0, plannedAttempted: 0,
+      wellbeingDue: false, wellbeingDone: false,
+      checkpoint: { status: "expired" },
+      classLog: { due: 10, done: 0, missingLine: null },
+      gradesSheet: { uploaded: false, dayOfMonth: 28 },
+    });
+    expect(week.results.some((r) => r.code === "checkpoint")).toBe(false);
+    expect(week.results.some((r) => r.code === "classlog")).toBe(false);
+    expect(week.results.some((r) => r.code === "grades")).toBe(false);
   });
 });

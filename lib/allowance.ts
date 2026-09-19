@@ -34,14 +34,27 @@ export const DEFAULT_KPIS: KpiDef[] = [
 
 export type KpiOverride = { code: string; weight?: number; enabled?: boolean };
 
+/**
+ * Measures that only make sense for a child at school. A university student or a postgraduate has no weekly
+ * checkpoint on the family curriculum, no monthly grades sheet from a school, and no timetable of classes to log
+ * in a check-in — marking them down for those is nonsense, which is what their scores were.
+ */
+export const SCHOOL_ONLY_KPIS = ["classlog", "checkpoint", "grades", "homework", "quizzes"] as const;
+
+export function isSchoolStage(stage: string | null | undefined): boolean {
+  return (stage ?? "school") === "school";
+}
+
 /** Snap tasks become KPIs too (code "snap:<task code>"), so "show your win" pays into the same score. */
 export interface SnapKpiInput { code: string; label: string; emoji: string; weight: number; enabled: boolean; days: number[]; kind: string; dates?: string[]; rota?: boolean }
 
-export function mergeKpis(overrides: KpiOverride[] | null | undefined, snapTasks: SnapKpiInput[] = []): KpiDef[] {
+export function mergeKpis(overrides: KpiOverride[] | null | undefined, snapTasks: SnapKpiInput[] = [], stage?: string | null): KpiDef[] {
   const map = new Map((overrides ?? []).map((o) => [o.code, o]));
+  const school = isSchoolStage(stage);
   const base = DEFAULT_KPIS.map((k) => {
     const o = map.get(k.code);
-    return o ? { ...k, weight: o.weight ?? k.weight, enabled: o.enabled ?? k.enabled } : k;
+    const merged = o ? { ...k, weight: o.weight ?? k.weight, enabled: o.enabled ?? k.enabled } : k;
+    return school || !(SCHOOL_ONLY_KPIS as readonly string[]).includes(k.code) ? merged : { ...merged, enabled: false };
   });
   const snaps = snapTasks.map<KpiDef>((t) => ({ code: `snap:${t.code}`, label: `Snap: ${t.label}`, emoji: t.emoji, source: "snap", weight: t.weight, enabled: t.enabled, days: t.days, dates: t.dates, hint: t.rota ? "Shared chore: it only counts on the days it is his turn." : t.kind === "handwriting" ? "One sample on its day." : "A picture on each due day; the AI screens, you approve." }));
   return [...base, ...snaps];
