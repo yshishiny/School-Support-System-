@@ -89,8 +89,8 @@ export default async function TodayPage() {
   const yesterdayDate = shiftDate(today, -1);
   const logged = new Map<PrayerName, PL>(((prayers ?? []) as PL[]).filter((p) => p.log_date === today).map((p) => [p.prayer as PrayerName, p]));
   const loggedY = new Map<PrayerName, PL>(((prayers ?? []) as PL[]).filter((p) => p.log_date === yesterdayDate).map((p) => [p.prayer as PrayerName, p]));
-  const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), state: prayerState(w, now), logged: (logged.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: logged.get(w.prayer)?.entered_late ?? false }));
-  const yesterdayRows: PrayerRow[] = prayerWindows(yesterdayDate, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), state: prayerState(w, now), logged: (loggedY.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: loggedY.get(w.prayer)?.entered_late ?? false }));
+  const prayerRows: PrayerRow[] = prayerWindows(today, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), endMs: w.end.getTime(), state: prayerState(w, now), logged: (logged.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: logged.get(w.prayer)?.entered_late ?? false }));
+  const yesterdayRows: PrayerRow[] = prayerWindows(yesterdayDate, lat, lng).map((w) => ({ prayer: w.prayer, time: formatPrayerTime(w.start, family.timezone), startMs: w.start.getTime(), endMs: w.end.getTime(), state: prayerState(w, now), logged: (loggedY.get(w.prayer)?.status as PrayerStatus | undefined) ?? null, enteredLate: loggedY.get(w.prayer)?.entered_late ?? false }));
   const openPrayer = prayerRows.find((r) => r.state === "open" && !r.logged) ?? null;
   const onTimeCount = [...logged.values()].filter((p) => p.status === "on_time").length;
 

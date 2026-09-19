@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.8 — Prayers you can actually claim on a phone (19 September 2026, `v2` branch)
+
+- **The prayer panel was being cut off.** It opened as a small anchored dropdown inside the home header, and that header clips whatever overflows it. On a phone the header ends about a hundred pixels down, so most of the list — the later prayers, their buttons and the whole "yesterday" section — was drawn outside the card and never reached the screen. The panel is now a full-width sheet that rises from the bottom of the screen above everything else, scrolls on its own, and is closed by the backdrop, the Escape key or a Close button.
+- **Buttons big enough for a thumb.** Each prayer is its own row: a full-width "I prayed it ✓" while the window is open, and three equal buttons (On time · Late · Missed) once it has closed, all at least forty-four pixels tall. The same three buttons on the allowance page were a wrapping row of tiny chips; they are now an even grid.
+- **The window now opens by itself.** Whether a prayer could be claimed was decided when the page was rendered and never revisited, so a phone left open since the morning kept showing a countdown long after the prayer had come in, with no button to tap. Each row now works this out from the current time, every twenty seconds.
+- **The tap saves first.** Claiming asked the phone for its location before saving, so a permission prompt or a weak signal left the button doing nothing for up to five seconds. The prayer is saved immediately and the location follows in the background.
+
 ## 2.0.0-beta.7 — Exact geometry, a laser pointer, a presenter who keeps talking (19 September 2026, `v2` branch)
 
 - **Geometry is drawn by maths, not by hand.** Constructions (points, lines, rays, segments, angles, transversals, triangles, polygons, circles) and coordinate graphs are no longer drawn by the model as raw SVG. The illustrator now describes the figure — "a line through P parallel to l₁", "the angle at X from B to T", "where these two lines cross" — and the app computes it: parallels are truly parallel, right angles are square, lines meet exactly at their intersection, and every angle arc sits on its two real rays. Graphs get their axes, arrowheads, ticks, units, grid, series and marked points from the data, with labels kept inside the plot.

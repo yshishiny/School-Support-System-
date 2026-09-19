@@ -30,11 +30,13 @@ export function PastPrayersFill({ days }: { days: PastDay[] }) {
         <div key={d.date} className="tile space-y-1.5">
           <div className="text-sm font-semibold">{d.label} <span className="muted font-normal text-xs">· {d.missing.length} not logged</span></div>
           {d.missing.filter((p) => !done.has(`${d.date}:${p}`)).map((p) => (
-            <div key={p} className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="w-16 font-semibold">{NAME[p]}</span>
-              <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => log(d.date, p, "on_time")}>Prayed on time</button>
-              <button type="button" disabled={pending} className="btn-ghost btn-sm" onClick={() => log(d.date, p, "late")}>Prayed late</button>
-              <button type="button" disabled={pending} className="btn-ghost btn-sm text-bad" onClick={() => log(d.date, p, "missed")}>Missed it</button>
+            <div key={p} className="rounded-xl bg-panel-2/60 p-2 space-y-1.5">
+              <div className="text-xs font-semibold">{NAME[p]}</div>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "on_time")}>On time</button>
+                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "late")}>Late</button>
+                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs !text-bad" onClick={() => log(d.date, p, "missed")}>Missed</button>
+              </div>
             </div>
           ))}
         </div>
