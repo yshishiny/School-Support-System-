@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.10 — The beta looks like the beta (19 September 2026, `v2` branch)
+
+- **Its own icon.** The beta draws its app icon instead of loading a stored one: an orange tile with a test tube, against the live site's purple tile with books. On a phone's home screen the two are told apart at a glance, and the beta installs as its own app ("Portal Beta") rather than replacing the real one.
+- **Its own colour.** Orange accents, a warm background, an orange line along the top of every screen, and the browser's own bar tinted to match. The version badge is now a chip that says BETA in the beta's colours, on every page rather than only the home page.
+- Everything the two sites store is still one database: the beta is a different face on the same family data, which is exactly why it now says so everywhere.
+
 ## 2.0.0-beta.9 — The cats' tray, taken in turns (19 September 2026, `v2` branch)
 
 - **A chore two children share.** Cleaning the cat litter is now a photo task like the bed or the desk, and it belongs to one brother at a time: Omar this week, Youssef the next, and so on. Whose turn it is is worked out from the day the rota started, so it never drifts and every part of the app agrees. The child on duty sees "your turn until Friday, then Youssef"; the other sees when it comes back to him.
