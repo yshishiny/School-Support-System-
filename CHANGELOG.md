@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.15.1 — A page that outlived a deployment can prove it (19 September 2026)
+
+- Every build now carries the commit it was made from. When a page hits an error it asks the server which build is answering: if they differ, the page was left open across a deployment and reloads itself rather than showing anybody a fault. If they match, the error is real — and is reported with both stamps, so the next report says plainly whether the code is wrong.
+
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
 ## 1.15.0 — Prayers you can claim on a phone, and a chore the brothers share (19 September 2026)
