@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.12 — A new look for V2, and the cats fed as well as cleaned (19 September 2026, `v2` branch)
+
+- **The beta is redrawn.** A near-black ground with a warm glow instead of flat navy; surfaces that sit above it on real layered shadows with a hairline of light along the top edge rather than a heavy outline; one champagne-gold accent with an ice-blue second; and controls with a physical edge — a lit top, a dark lip underneath, and a press that moves. Headings are tighter with a metal rule under the page title, inputs are sunken, the bottom bar reads as one machined strip.
+- **Only the beta changes.** Every rule is scoped to the beta site, so the stable one the family uses each day is untouched.
+- **Fixed on the way:** a button label could break mid-word on a narrow card and render as a disc; labels no longer wrap inside a button.
+- **Feeding the cats, not just cleaning up after them.** Two more chores on the same weekly rota as the litter tray: fed in the morning (six until ten) and fed again in the late afternoon (four until nine), each a picture of the filled bowl and fresh water. One brother owns all the cat care for the week, then it passes over.
+
 ## 2.0.0-beta.11 — The lesson laid out for a phone (19 September 2026, `v2` branch)
 
 - **The board is the lesson.** On a phone held upright the stage used to give the board 42% of the screen and the rest to a teacher two centimetres tall, leaving a third of the display empty. The board now fills the screen and the teacher stands in front of it, which is what the ⛶ button already did; a tablet or a laptop keeps the two-panel stage.

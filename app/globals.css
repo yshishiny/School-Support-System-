@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* The beta's own skin: unlayered, so it wins over the shared component layer. */
+@import "./v2-skin.css";
 
 @theme {
   --color-bg: #0b1020;
@@ -19,7 +21,7 @@
 
 html { color-scheme: dark; }
 /* The beta runs on the family's real data, so every one of its screens carries a warm edge the live site never has. */
-html[data-site="beta"] body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 200; background: linear-gradient(90deg, #ff8a3d, #ffd166); pointer-events: none; }
+html[data-site="beta"] body::before { content: ""; position: fixed; inset: 0 0 auto 0; height: 3px; z-index: 200; background: linear-gradient(90deg, #f0d9a4, #d9b061 45%, #7bdff2); pointer-events: none; }
 body {
   --theme-glow: #1d1a4a;
   background: var(--color-bg);

@@ -20,7 +20,7 @@ export interface Brand {
 }
 
 const LIVE: Brand = { beta: false, name: "Study Portal", shortName: "Study Portal", accent: "#7c5cff", accent2: "#22d3ee", bg: "#0b1020", themeColor: "#0b1020", glyph: "📚", label: "live" };
-const BETA: Brand = { beta: true, name: "Study Portal Beta", shortName: "Portal Beta", accent: "#ff8a3d", accent2: "#ffd166", bg: "#16100b", themeColor: "#16100b", glyph: "🧪", label: "beta" };
+const BETA: Brand = { beta: true, name: "Study Portal Beta", shortName: "Portal Beta", accent: "#d9b061", accent2: "#7bdff2", bg: "#0a0b12", themeColor: "#0a0b12", glyph: "🧪", label: "beta" };
 
 /** Which site this deployment is. The branch decides on Vercel; the version string is the fallback elsewhere. */
 export function isBeta(): boolean {
