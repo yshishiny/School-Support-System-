@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   CREDITS_PER_CHILD_DAY, CREDITS_PER_EGP, MAX_INVITES, REFERRAL_CREDITS,
-  accessUntil, creditBalance, creditsFor, egpFor, grantWindow, hasAccess, inviteCode, planById, priceList,
+  INVITES_CEILING, REFERRAL_BONUS_CREDITS,
+  accessUntil, bonusDue, commissionFor, creditBalance, creditsFor, egpFor, grantWindow, hasAccess, inviteCode,
+  invitesAllowed, planById, priceAfterWelcome, priceList, tierFor,
 } from "./access";
 
 describe("the price list holds together", () => {
@@ -113,5 +115,65 @@ describe("invite codes", () => {
     expect(code).toHaveLength(6);
     expect(code).toMatch(/^[ACDEFHJKMNPRTVWXY3479]{6}$/);
     expect(code).not.toMatch(/[OIL01258BGSZ]/);
+  });
+});
+
+describe("the ambassador ladder", () => {
+  it("starts everyone as a parent, earning nothing on commission", () => {
+    expect(tierFor(0).id).toBe("parent");
+    expect(tierFor(4).id).toBe("parent");
+    expect(commissionFor(4, 22_500)).toBe(0);
+  });
+
+  it("promotes at five paying families, and again at twenty", () => {
+    expect(tierFor(5).id).toBe("ambassador");
+    expect(tierFor(19).id).toBe("ambassador");
+    expect(tierFor(20).id).toBe("partner");
+    expect(tierFor(100).id).toBe("partner");
+  });
+
+  it("pays a fifth, then a quarter, of what those families spend", () => {
+    expect(commissionFor(5, 22_500)).toBe(4_500);
+    expect(commissionFor(20, 22_500)).toBe(5_625);
+    expect(egpFor(commissionFor(20, 60_000))).toBe(300);
+  });
+
+  it("counts families that paid, not families that joined", () => {
+    // Twenty joined but only four paid is still a parent.
+    expect(tierFor(4).rate).toBe(0);
+  });
+});
+
+describe("invitations grow with success", () => {
+  it("gives two to begin with", () => {
+    expect(invitesAllowed(0)).toBe(2);
+  });
+  it("adds two for each family that converted", () => {
+    expect(invitesAllowed(1)).toBe(4);
+    expect(invitesAllowed(5)).toBe(12);
+  });
+  it("stops somewhere, so nobody can flood the world", () => {
+    expect(invitesAllowed(1000)).toBe(INVITES_CEILING);
+    expect(invitesAllowed(-3)).toBe(2);
+  });
+});
+
+describe("the double-sided referral", () => {
+  it("takes a quarter off the newcomer's first purchase, once", () => {
+    expect(priceAfterWelcome(22_500, false)).toBe(16_875);
+    expect(egpFor(priceAfterWelcome(22_500, false))).toBe(338);
+    expect(priceAfterWelcome(22_500, true)).toBe(22_500);
+  });
+
+  it("pays the inviter on the second purchase, not the first, and never twice", () => {
+    expect(bonusDue(1, false)).toBe(false);
+    expect(bonusDue(2, false)).toBe(true);
+    expect(bonusDue(3, false)).toBe(true);
+    expect(bonusDue(2, true)).toBe(false);
+  });
+
+  it("is worth a child-month to the inviter", () => {
+    expect(REFERRAL_BONUS_CREDITS).toBe(planById("child_month")!.credits);
+    expect(egpFor(REFERRAL_BONUS_CREDITS)).toBe(450);
   });
 });

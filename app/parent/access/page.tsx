@@ -3,8 +3,9 @@ import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { loadAccess } from "@/lib/actions/access";
-import { MAX_INVITES, REFERRAL_CREDITS, accessUntil, egpFor, priceList } from "@/lib/access";
+import { WELCOME_DISCOUNT, accessUntil, egpFor, priceAfterWelcome, priceList } from "@/lib/access";
 import { BuyAccess, InviteBox } from "@/components/AccessForms";
+import { AmbassadorPanel } from "@/components/AmbassadorPanel";
 import type { Profile } from "@/lib/types";
 
 /** What the family has, what a plan costs, and the two invites that pay them back. */
@@ -18,6 +19,7 @@ export default async function AccessPage() {
   ]);
   const students = (kids ?? []) as Profile[];
   const prices = priceList();
+  const welcome = !!state.invitedBy && !state.welcomeUsed;
 
   return (
     <main className="space-y-4">
@@ -32,6 +34,9 @@ export default async function AccessPage() {
           <div className="text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{state.credits.toLocaleString()}</div>
         </div>
         <p className="text-xs muted">Worth about {egpFor(state.credits).toLocaleString()} EGP. Credits buy lesson access; they come from what you pay, and from families you invite.</p>
+        {state.invitedBy && !state.welcomeUsed && (
+          <p className="text-xs text-good">You came in on an invitation, so {Math.round(WELCOME_DISCOUNT * 100)}% comes off your first purchase.</p>
+        )}
       </section>
 
       <section className="card space-y-2">
@@ -54,27 +59,34 @@ export default async function AccessPage() {
       <section className="space-y-2">
         <h2 className="h2">Plans</h2>
         <p className="text-xs muted">A month for one child is 450 EGP. The family plan covers every child in the house and costs less than three separate ones.</p>
-        {prices.map(({ plan, egp, perChildPerMonth }) => (
-          <div key={plan.id} className="card !py-3 space-y-2">
-            <div className="flex items-baseline gap-2">
-              <span className="flex-1 min-w-0 font-bold" style={{ fontFamily: "var(--font-display)" }}>{plan.label}</span>
-              <span className="text-lg font-bold">{egp.toLocaleString()} EGP</span>
+        {prices.map(({ plan, egp, perChildPerMonth }) => {
+          const price = welcome ? priceAfterWelcome(plan.credits, false) : plan.credits;
+          return (
+            <div key={plan.id} className="card !py-3 space-y-2">
+              <div className="flex items-baseline gap-2">
+                <span className="flex-1 min-w-0 font-bold" style={{ fontFamily: "var(--font-display)" }}>{plan.label}</span>
+                {welcome && <span className="text-sm muted line-through">{egp.toLocaleString()}</span>}
+                <span className="text-lg font-bold">{egpFor(price).toLocaleString()} EGP</span>
+              </div>
+              <p className="text-xs muted">
+                {plan.blurb} · {price.toLocaleString()} credits
+                {perChildPerMonth ? ` · works out at ${perChildPerMonth} EGP a month` : ""}
+              </p>
+              <BuyAccess planId={plan.id} scope={plan.scope} credits={price} balance={state.credits} students={students.map((s) => ({ id: s.id, name: s.full_name.split(" ")[0] }))} />
             </div>
-            <p className="text-xs muted">
-              {plan.blurb} · {plan.credits.toLocaleString()} credits
-              {perChildPerMonth ? ` · works out at ${perChildPerMonth} EGP a month` : ""}
-            </p>
-            <BuyAccess planId={plan.id} scope={plan.scope} credits={plan.credits} balance={state.credits} students={students.map((s) => ({ id: s.id, name: s.full_name.split(" ")[0] }))} />
-          </div>
-        ))}
+          );
+        })}
       </section>
+
+      <AmbassadorPanel view={{ tier: state.tier, payingReferred: state.payingReferred, commissionEarned: state.commissionEarned, referred: state.referred }} />
 
       <section className="card space-y-3">
         <div>
-          <h2 className="h2">Invite two families</h2>
+          <h2 className="h2">Invitations</h2>
           <p className="text-xs muted">
-            You can invite {MAX_INVITES} families. When one of them starts using it, {REFERRAL_CREDITS} credits land in your balance —
-            about {egpFor(REFERRAL_CREDITS)} EGP off your next month.
+            A quarter comes off their first month. Once they have paid twice — a family that stayed, not one that
+            just signed — a whole free month lands in your balance. Every family that joins and pays earns you two
+            more invitations.
           </p>
         </div>
         <InviteBox invites={state.invites} left={state.invitesLeft} />

@@ -9,9 +9,55 @@
 export const CREDITS_PER_EGP = 50;
 export const CREDITS_PER_CHILD_DAY = 750;
 
-/** A family may invite two others; each one that starts using it pays the inviter back. */
+/** Every family starts with two invitations, and earns two more for each one that turns into a paying family. */
 export const MAX_INVITES = 2;
+export const INVITES_PER_CONVERSION = 2;
+export const INVITES_CEILING = 50;
+
+/** A quarter off the newcomer's first purchase, on one purchase only. */
+export const WELCOME_DISCOUNT = 0.25;
+
+/**
+ * What the inviter is paid, and when. Not on a signature: on the invited family's *second* purchase, because a
+ * family that pays twice is a family that stayed, and paying for a signature is how referral schemes rot.
+ */
+export const REFERRAL_BONUS_CREDITS = 22_500; // a child-month
+export const PAYMENTS_BEFORE_BONUS = 2;
+
+/** Kept for the older grant made on redemption; the real reward is the bonus above. */
 export const REFERRAL_CREDITS = 500;
+
+export type Tier = "parent" | "ambassador" | "partner";
+
+export const TIERS: { id: Tier; label: string; from: number; rate: number; blurb: string }[] = [
+  { id: "parent", label: "Parent", from: 0, rate: 0, blurb: "Two invitations, and a free month for each family that stays." },
+  { id: "ambassador", label: "Ambassador", from: 5, rate: 0.2, blurb: "A fifth of what your families pay, every month they stay." },
+  { id: "partner", label: "Partner", from: 20, rate: 0.25, blurb: "A quarter of what your families pay, and your own page and price." },
+];
+
+/** A family counts towards a tier once it has paid, not once it has joined. */
+export function tierFor(payingFamilies: number): (typeof TIERS)[number] {
+  return [...TIERS].reverse().find((t) => payingFamilies >= t.from) ?? TIERS[0];
+}
+
+export function commissionFor(payingFamilies: number, creditsSpent: number): number {
+  return Math.round(creditsSpent * tierFor(payingFamilies).rate);
+}
+
+/** Two to begin with, two more for each family that converted, so a dormant inviter cannot flood anyone. */
+export function invitesAllowed(converted: number): number {
+  return Math.min(INVITES_CEILING, MAX_INVITES + INVITES_PER_CONVERSION * Math.max(0, converted));
+}
+
+/** The newcomer's discount applies once, to their first purchase. */
+export function priceAfterWelcome(credits: number, used: boolean): number {
+  return used ? credits : Math.round(credits * (1 - WELCOME_DISCOUNT));
+}
+
+/** Whether the inviter's bonus falls due on this purchase: exactly on the second one, never again. */
+export function bonusDue(purchasesByInvited: number, alreadyRewarded: boolean): boolean {
+  return !alreadyRewarded && purchasesByInvited >= PAYMENTS_BEFORE_BONUS;
+}
 
 export type PlanId = "child_2days" | "child_week" | "child_month" | "family_month" | "family_term";
 

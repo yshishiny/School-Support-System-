@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-beta.21 — The ambassador programme (19 September 2026, `v2` branch)
+
+- **The referral is double-sided now.** A family that arrives on an invitation gets a quarter off its first purchase, shown struck through on the price list. The inviter is paid a whole free month — 450 EGP of credits — but only once the newcomer has paid a *second* time. Paying on the second purchase means paying for a family that stayed, not for a signature.
+- **An ambassador ladder, one level deep.** Five families that have paid makes you an Ambassador on a fifth of what they spend; twenty makes you a Partner on a quarter. Commission is calculated on money actually received and lands as credits each time one of your families buys. Nobody earns from anybody's recruits but their own.
+- **A dashboard that can be read out loud.** Your tier, how many families paid, what they have paid in pounds, what you have earned, a bar to the next tier, and every family you brought with the date they joined, how many times they have paid, whether they are still using it, and whether your free month came through.
+- **Invitations grow with success.** Two to begin with, two more for every family that joins and pays, to a ceiling of fifty. A dormant inviter cannot flood anybody.
+- Redeeming a code no longer pays anything immediately; it records who invited whom and unlocks the welcome price. A reward that fails to write never costs the buyer their access.
+
 ## 2.0.0-beta.20 — The virtual teacher can be sold (19 September 2026, `v2` branch)
 
 - **Credits are the unit.** Everything — a gift, a purchase, a thank-you for an invitation — is the same currency, at fifty credits to the pound. The two anchors you set fix the rest: 1,500 credits buys one child two days, and a month for one child is 450 EGP.

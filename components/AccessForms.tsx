@@ -79,7 +79,7 @@ export function InviteBox({ invites, left }: { invites: { id: string; code: stri
         </ul>
       )}
 
-      {left > 0 && (
+      {left > 0 ? (
         <form
           className="flex flex-wrap gap-2"
           action={(fd) => start(async () => {
@@ -93,6 +93,8 @@ export function InviteBox({ invites, left }: { invites: { id: string; code: stri
           <input name="label" className="input flex-1 min-w-32 !py-2" placeholder="Who is it for? (their family name)" maxLength={60} aria-label="Who the invite is for" />
           <button className="btn-ghost btn-sm min-h-11" disabled={pending}>{pending ? "…" : `Make an invite (${left} left)`}</button>
         </form>
+      ) : (
+        <p className="text-xs muted">All your invitations are out. Each family that joins and pays earns you two more.</p>
       )}
 
       <form

@@ -5,7 +5,8 @@ import { requireParent, requireSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
 import {
-  MAX_INVITES, REFERRAL_CREDITS, accessUntil, creditBalance, grantWindow, hasAccess, inviteCode, planById,
+  REFERRAL_BONUS_CREDITS, accessUntil, bonusDue, commissionFor, creditBalance, grantWindow, hasAccess, inviteCode,
+  invitesAllowed, planById, priceAfterWelcome, tierFor,
   type AccessGrant, type CreditEntry,
 } from "@/lib/access";
 
@@ -16,22 +17,59 @@ export interface AccessState {
   grants: AccessGrant[];
   invites: { id: string; code: string; label: string | null; accepted: boolean; rewarded: boolean }[];
   invitesLeft: number;
+  /** The families this one brought, and what each has actually paid. */
+  referred: { familyId: string; name: string; joinedOn: string; payments: number; creditsSpent: number; live: boolean; bonusPaid: boolean }[];
+  payingReferred: number;
+  tier: ReturnType<typeof tierFor>;
+  commissionEarned: number;
+  welcomeUsed: boolean;
+  invitedBy: string | null;
 }
 
 /** Everything a family needs to see about what it has bought and what it has left. */
 export async function loadAccess(familyId: string): Promise<AccessState> {
   const admin = createAdminClient();
-  const [{ data: credits }, { data: grants }, { data: invites }] = await Promise.all([
-    admin.from("credit_entries").select("delta, kind").eq("family_id", familyId),
+  const [{ data: credits }, { data: grants }, { data: invites }, { data: me }, { data: children }] = await Promise.all([
+    admin.from("credit_entries").select("delta, kind, ref_type").eq("family_id", familyId),
     admin.from("access_grants").select("student_id, starts_on, ends_on, plan").eq("family_id", familyId),
-    admin.from("access_invites").select("id, code, label, accepted_at, rewarded_at").eq("family_id", familyId).order("created_at"),
+    admin.from("access_invites").select("id, code, label, accepted_at, rewarded_at, accepted_family_id").eq("family_id", familyId).order("created_at"),
+    admin.from("families").select("welcome_used, invited_by_family_id").eq("id", familyId).maybeSingle(),
+    admin.from("families").select("id, name, created_at").eq("invited_by_family_id", familyId),
   ]);
   const list = (invites ?? []).map((i) => ({ id: i.id as string, code: i.code as string, label: (i.label as string | null) ?? null, accepted: !!i.accepted_at, rewarded: !!i.rewarded_at }));
+  const kids = (children ?? []) as { id: string; name: string | null; created_at: string }[];
+
+  // What each referred family has actually paid for, which is what the ladder and the commission are built on.
+  const today = new Date().toISOString().slice(0, 10);
+  const referred = await Promise.all(kids.map(async (f) => {
+    const { data: theirGrants } = await admin.from("access_grants").select("credits_spent, ends_on").eq("family_id", f.id);
+    const rows = (theirGrants ?? []) as { credits_spent: number; ends_on: string }[];
+    const paid = rows.filter((g) => Number(g.credits_spent) > 0);
+    const invite = (invites ?? []).find((i) => i.accepted_family_id === f.id);
+    return {
+      familyId: f.id,
+      name: f.name ?? "A family",
+      joinedOn: f.created_at.slice(0, 10),
+      payments: paid.length,
+      creditsSpent: paid.reduce((n, g) => n + Number(g.credits_spent), 0),
+      live: rows.some((g) => g.ends_on >= today),
+      bonusPaid: !!invite?.rewarded_at,
+    };
+  }));
+
+  const payingReferred = referred.filter((r) => r.payments > 0).length;
+  const entries = (credits ?? []) as (CreditEntry & { ref_type: string | null })[];
   return {
-    credits: creditBalance((credits ?? []) as CreditEntry[]),
+    credits: creditBalance(entries),
     grants: (grants ?? []) as AccessGrant[],
     invites: list,
-    invitesLeft: Math.max(0, MAX_INVITES - list.length),
+    invitesLeft: Math.max(0, invitesAllowed(referred.filter((r) => r.payments >= 1).length) - list.length),
+    referred,
+    payingReferred,
+    tier: tierFor(payingReferred),
+    commissionEarned: entries.filter((e) => e.ref_type === "commission").reduce((n, e) => n + e.delta, 0),
+    welcomeUsed: !!me?.welcome_used,
+    invitedBy: (me?.invited_by_family_id as string | null) ?? null,
   };
 }
 
@@ -73,7 +111,10 @@ export async function buyAccessAction(formData: FormData): Promise<{ error?: str
   }
 
   const state = await loadAccess(family.id);
-  if (state.credits < plan.credits) return { error: `That costs ${plan.credits} credits and you have ${state.credits}.` };
+  // A family that came in on an invitation pays a quarter less, on their first purchase only.
+  const price = state.invitedBy ? priceAfterWelcome(plan.credits, state.welcomeUsed) : plan.credits;
+  const discounted = price < plan.credits;
+  if (state.credits < price) return { error: `That costs ${price} credits and you have ${state.credits}.` };
 
   const today = todayIn(family.timezone);
   // Extend rather than overlap: buying early must never throw away days already paid for.
@@ -84,20 +125,64 @@ export async function buyAccessAction(formData: FormData): Promise<{ error?: str
 
   const { data: grant, error } = await admin
     .from("access_grants")
-    .insert({ family_id: family.id, student_id: studentId || null, plan: plan.id, ...window, credits_spent: plan.credits, created_by: profile.id })
+    .insert({ family_id: family.id, student_id: studentId || null, plan: plan.id, ...window, credits_spent: price, discounted, created_by: profile.id })
     .select("id")
     .single();
   if (error || !grant) return { error: error?.message ?? "Could not record that." };
-  await admin.from("credit_entries").insert({ family_id: family.id, delta: -plan.credits, reason: plan.label, kind: "spend", ref_type: "access_grant", ref_id: grant.id, granted_by: profile.id });
+  await admin.from("credit_entries").insert({ family_id: family.id, delta: -price, reason: discounted ? `${plan.label} (welcome price)` : plan.label, kind: "spend", ref_type: "access_grant", ref_id: grant.id, granted_by: profile.id });
+  if (discounted) await admin.from("families").update({ welcome_used: true }).eq("id", family.id);
+  await rewardInviter(family.id, grant.id as string, price);
   PATHS.forEach((p) => revalidatePath(p));
-  return { ok: `Done. Access runs to ${window.ends_on}.` };
+  return { ok: `Done${discounted ? " at the welcome price" : ""}. Access runs to ${window.ends_on}.` };
+}
+
+/**
+ * What a purchase by an invited family pays its inviter: commission at their tier every time, and once — on the
+ * second purchase, never the first — a free month. Paying on the second purchase means paying for a family that
+ * stayed rather than for a signature. Never throws: the buyer's access must not depend on the inviter's reward.
+ */
+async function rewardInviter(buyerFamilyId: string, grantId: string, creditsSpent: number): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data: buyer } = await admin.from("families").select("name, invited_by_family_id").eq("id", buyerFamilyId).maybeSingle();
+    const inviterId = buyer?.invited_by_family_id as string | null;
+    if (!inviterId) return;
+
+    // The inviter's tier is decided by how many of their families have paid at all.
+    const { data: theirFamilies } = await admin.from("families").select("id").eq("invited_by_family_id", inviterId);
+    const ids = (theirFamilies ?? []).map((f) => f.id as string);
+    const { data: allGrants } = await admin.from("access_grants").select("family_id, credits_spent").in("family_id", ids.length ? ids : [inviterId]);
+    const paidRows = ((allGrants ?? []) as { family_id: string; credits_spent: number }[]).filter((g) => Number(g.credits_spent) > 0);
+    const payingFamilies = new Set(paidRows.map((g) => g.family_id)).size;
+
+    const commission = commissionFor(payingFamilies, creditsSpent);
+    if (commission > 0) {
+      await admin.from("credit_entries").insert({
+        family_id: inviterId, delta: commission, kind: "referral",
+        reason: `Commission on ${buyer?.name ?? "a family you brought"}`,
+        ref_type: "commission", ref_id: grantId,
+      });
+    }
+
+    // The free month, once, on this family's second purchase.
+    const { data: invite } = await admin.from("access_invites").select("id, rewarded_at").eq("family_id", inviterId).eq("accepted_family_id", buyerFamilyId).maybeSingle();
+    const purchases = paidRows.filter((g) => g.family_id === buyerFamilyId).length;
+    if (invite && bonusDue(purchases, !!invite.rewarded_at)) {
+      const { error } = await admin.from("credit_entries").insert({
+        family_id: inviterId, delta: REFERRAL_BONUS_CREDITS, kind: "referral",
+        reason: `${buyer?.name ?? "A family you brought"} stayed: a free month`,
+        ref_type: "referral_bonus", ref_id: invite.id as string,
+      });
+      if (!error) await admin.from("access_invites").update({ rewarded_at: new Date().toISOString() }).eq("id", invite.id);
+    }
+  } catch { /* the purchase stands; a reward that fails is chased from the dashboard */ }
 }
 
 /** A parent makes one of their two invite links. */
 export async function createInviteAction(formData: FormData): Promise<{ error?: string; ok?: string; code?: string }> {
   const { profile, family } = await requireParent();
   const state = await loadAccess(family.id);
-  if (state.invitesLeft <= 0) return { error: `You can invite ${MAX_INVITES} families, and both are used.` };
+  if (state.invitesLeft <= 0) return { error: "All your invitations are out. You get two more for each family that joins and pays." };
   const label = String(formData.get("label") ?? "").trim().slice(0, 60) || null;
   const admin = createAdminClient();
   for (let attempt = 0; attempt < 5; attempt += 1) {
@@ -128,8 +213,8 @@ export async function redeemInviteAction(formData: FormData): Promise<{ error?: 
   const { data: used } = await admin.from("access_invites").select("id").eq("accepted_family_id", family.id).maybeSingle();
   if (used) return { error: "Your family has already used an invite." };
 
-  await admin.from("access_invites").update({ accepted_family_id: family.id, accepted_at: new Date().toISOString(), rewarded_at: new Date().toISOString() }).eq("id", invite.id);
-  await admin.from("credit_entries").insert({ family_id: invite.family_id as string, delta: REFERRAL_CREDITS, reason: "A family you invited started using it", kind: "referral", ref_type: "access_invite", ref_id: invite.id });
+  await admin.from("access_invites").update({ accepted_family_id: family.id, accepted_at: new Date().toISOString() }).eq("id", invite.id);
+  await admin.from("families").update({ invited_by_family_id: invite.family_id as string }).eq("id", family.id);
   PATHS.forEach((p) => revalidatePath(p));
-  return { ok: "Welcome. The family who invited you has been thanked." };
+  return { ok: "Welcome. A quarter comes off your first month, and the family who invited you is thanked once you stay." };
 }
