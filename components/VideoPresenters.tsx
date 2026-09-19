@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearPresenterAction, retryFailedClipsAction, setVideoCapAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
+import { clearPresenterAction, retryFailedClipsAction, setVideoCapAction, setVideoModeAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
 import { CHARACTERS } from "@/lib/characters";
 import { runAction } from "@/lib/client-action";
 
 /** Admin → Teachers: the presenter photo per character and the monthly clip cap. */
-export function VideoPresenters({ enabled, presenters, cap, used, stats }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] } }) {
+export function VideoPresenters({ enabled, presenters, cap, used, stats, mode }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] }; mode: "hook_recap" | "all" }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -18,6 +18,14 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats }: { ena
         <h2 className="h2">🎬 Teachers on video</h2>
         <p className="text-xs muted">Each scripted line becomes a short clip of a human presenter speaking with the premium voice (D-ID). Clips are rendered once per line and kept; while a clip renders, the animated teacher speaks the line. Needs <code>DID_API_KEY</code> in Vercel and the premium voices (Azure) switched on.</p>
         <div className="text-sm">{enabled ? "🟢 On" : "⚪ Off · DID_API_KEY not set"} · {used} clip{used === 1 ? "" : "s"} this month of {cap}</div>
+        <div className="space-y-1">
+          {([["hook_recap", "Hook and recap only", "The presenter opens and closes the lesson on video; the middle beats use the animated teacher with the premium voice. About 2 clips per lesson, ~70% cheaper."], ["all", "Every line", "The presenter speaks every scripted line. 8–12 clips per lesson."]] as const).map(([id, label, blurb]) => (
+            <label key={id} className={`tile flex items-start gap-2 cursor-pointer ${mode === id ? "border-accent" : ""}`}>
+              <input type="radio" name="video_mode" className="mt-1" checked={mode === id} disabled={pending} onChange={() => start(async () => { await setVideoModeAction(id); router.refresh(); })} />
+              <span><span className="font-semibold text-sm">{label}</span><span className="block text-xs muted">{blurb}</span></span>
+            </label>
+          ))}
+        </div>
         <div className="text-sm flex flex-wrap items-center gap-2">
           <span className="chip">✅ {stats.done} ready</span><span className="chip">⏳ {stats.pending} rendering</span><span className="chip">❌ {stats.failed} failed</span>
           <button type="button" className="btn-ghost btn-sm" disabled={pending || !enabled} onClick={() => start(async () => { setSync(null); const r = await runAction(() => syncClipsAction(), setSync); if (r?.error) setSync(r.error); else if (r?.summary) setSync(r.summary); router.refresh(); })}>{pending ? "Checking…" : "Check renders now"}</button>

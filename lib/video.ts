@@ -40,6 +40,20 @@ export async function presenterUrls(): Promise<Record<string, { url: string; cus
   return out;
 }
 
+export type VideoMode = "hook_recap" | "all";
+export type BeatKind = "hook" | "explain" | "example" | "check" | "recap";
+
+/** Which lines get a presenter clip: the personal moments only (default, about 70% cheaper) or every line. */
+export async function videoMode(): Promise<VideoMode> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("ops_settings").select("value").eq("key", "video_mode").maybeSingle();
+  return data?.value === "all" ? "all" : "hook_recap";
+}
+
+export function videoKinds(mode: VideoMode): BeatKind[] {
+  return mode === "all" ? ["hook", "explain", "example", "check", "recap"] : ["hook", "recap"];
+}
+
 export async function videoCap(): Promise<number> {
   const admin = createAdminClient();
   const { data } = await admin.from("ops_settings").select("value").eq("key", "video_cap").maybeSingle();
@@ -86,10 +100,11 @@ async function pollTalk(talkId: string): Promise<{ status: string; result_url?: 
  * A clip for one line: returns it when rendered, starts it when new (within the cap), and while it renders says so.
  * The stage plays the animated teacher with the voice in the meantime, so the lesson never waits on this.
  */
-export async function requestClip(o: { characterId: string; voice: string; text: string; create?: boolean }): Promise<VideoAnswer> {
+export async function requestClip(o: { characterId: string; voice: string; text: string; create?: boolean; kind?: string | null }): Promise<VideoAnswer> {
   if (!videoEnabled()) return { status: "off", reason: "not configured" };
   const text = o.text.trim().slice(0, MAX_CHARS);
   if (!text) return { status: "error", reason: "nothing to say" };
+  if (o.create !== false && o.kind && !videoKinds(await videoMode()).includes(o.kind as BeatKind)) o.create = false;
   const presenters = await presenterUrls();
   const presenter = presenters[o.characterId]?.url ?? SAMPLE_PRESENTER;
   const id = clipId(o.characterId, presenter, o.voice, text);
@@ -180,9 +195,11 @@ export async function clipStats(): Promise<{ done: number; pending: number; fail
   return { done: n("done"), pending: n("pending"), failed: n("error"), errors: [...new Set((errs ?? []).map((e) => e.error).filter((x): x is string => !!x))] };
 }
 
-/** Starts every line of a script rendering, in order, so the clips are ready by the time the child reaches them. */
-export async function renderScript(o: { characterId: string; voice: string; lines: string[] }): Promise<void> {
-  for (const text of o.lines) {
-    try { await requestClip({ characterId: o.characterId, voice: o.voice, text }); } catch { /* next line */ }
+/** Starts the script's video lines rendering, in order, so the clips are ready by the time the child reaches them. */
+export async function renderScript(o: { characterId: string; voice: string; beats: { kind: string; say: string }[] }): Promise<void> {
+  const kinds = videoKinds(await videoMode());
+  for (const b of o.beats) {
+    if (!kinds.includes(b.kind as BeatKind)) continue;
+    try { await requestClip({ characterId: o.characterId, voice: o.voice, text: b.say }); } catch { /* next line */ }
   }
 }

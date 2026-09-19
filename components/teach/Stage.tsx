@@ -22,6 +22,7 @@ type Phase = "intro" | "lesson" | "outro";
 
 const ADVANCE_MS = 1300;
 const NO_CLOUD: CloudVoice[] = [];
+const HOOK_RECAP = ["hook", "recap"];
 
 function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rtl: boolean }) {
   const words = useMemo(() => wordsOf(text), [text]);
@@ -37,7 +38,7 @@ function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rt
  * checks stop the flow until answered, a raised hand pauses for a question, and the recap ends with confetti.
  * `demo` runs the same stage with no server calls.
  */
-export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean }) {
+export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false, videoKinds = HOOK_RECAP }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean; /** Which beat kinds get a clip. */ videoKinds?: string[] }) {
   const c = character;
   const rtl = language === "ar";
   const beats = script.beats;
@@ -45,6 +46,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const videoRef = useRef<HTMLVideoElement>(null);
   const speech = useSpeech(language, c, cloudVoices, videoRef);
   const clips = useClips({ enabled: video && !demo, character: c.id, language, voice: isCloudVoice(speech.voiceId) ? speech.voiceId!.slice("cloud:".length) : null });
+  const warmBeat = (k: number) => { const b = beats[k]; if (b && videoKinds.includes(b.kind)) clips.warm(b.say, b.kind); };
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>(startBeat > 0 ? "lesson" : "intro");
@@ -102,8 +104,8 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
       const hello = rtl ? c.lines.hello_ar : c.lines.hello;
       const today = rtl ? `درس اليوم: ${script.title}.` : `Today's lesson: ${script.title}.`;
       speak(`${hello} ${today}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(-1); });
-      if (beats[0]) { speech.prefetch(beats[0].say); clips.warm(beats[0].say); }
-      if (beats[1]) clips.warm(beats[1].say);
+      if (beats[0]) { speech.prefetch(beats[0].say); warmBeat(0); }
+      warmBeat(1);
     }, 1700);
     return () => window.clearTimeout(t1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -114,9 +116,9 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     if (phase !== "lesson" || !beat || !started) return;
     const clip = clips.get(beat.say);
     speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clip);
-    if (!clip) clips.warm(beat.say);
-    if (beats[i + 1]) { speech.prefetch(beats[i + 1].say); clips.warm(beats[i + 1].say); }
-    if (beats[i + 2]) clips.warm(beats[i + 2].say);
+    if (!clip) warmBeat(i);
+    if (beats[i + 1]) speech.prefetch(beats[i + 1].say);
+    warmBeat(i + 1); warmBeat(i + 2);
     return () => { cancelAdvance(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, i, started]);
@@ -254,7 +256,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
             {beats.map((b, k) => { const bl = beatLabel(b.kind); return <button key={k} type="button" title={bl.label} onClick={() => goTo(k)} className={`h-2.5 flex-1 max-w-8 rounded-full transition ${k < i || phase === "outro" ? "bg-[#ffd166]" : k === i && phase === "lesson" ? "bg-white scale-y-150" : "bg-white/30"}`} aria-label={`${bl.label} ${k + 1}`} />; })}
           </div>
         </div>
-        {video && !demo && phase === "lesson" && speech.speaking && !speech.videoPlaying && <span className="shrink-0 rounded-full bg-black/40 px-2 py-1 text-[10px] font-bold text-white/80 backdrop-blur" title={rtl ? "يُجهَّز الفيديو لهذا الدرس" : "The video for this lesson is being prepared"}>🎬 {rtl ? "يُجهَّز" : "preparing"}</span>}
+        {video && !demo && phase === "lesson" && beat && videoKinds.includes(beat.kind) && speech.speaking && !speech.videoPlaying && <span className="shrink-0 rounded-full bg-black/40 px-2 py-1 text-[10px] font-bold text-white/80 backdrop-blur" title={rtl ? "يُجهَّز الفيديو لهذا الدرس" : "The video for this lesson is being prepared"}>🎬 {rtl ? "يُجهَّز" : "preparing"}</span>}
         <button type="button" onClick={() => setAuto((a) => !a)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold backdrop-blur ${auto ? "bg-good/80 text-white" : "bg-black/40 text-white/80"}`}>{auto ? (rtl ? "تلقائي" : "Auto ▶") : (rtl ? "يدوي" : "Manual")}</button>
       </header>
 

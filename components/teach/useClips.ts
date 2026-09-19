@@ -19,19 +19,19 @@ export function useClips(o: { enabled: boolean; character: string; language: "en
     return () => { timers.forEach((t) => window.clearTimeout(t)); timers.clear(); };
   }, []);
 
-  const ask = useCallback(async (text: string, create: boolean): Promise<Answer> => {
-    const res = await fetch("/api/video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, character, language, voice, create }) });
+  const ask = useCallback(async (text: string, kind: string, create: boolean): Promise<Answer> => {
+    const res = await fetch("/api/video", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text, character, language, voice, create, kind }) });
     if (!res.ok) return { status: "off" };
     return (await res.json()) as Answer;
   }, [character, language, voice]);
 
-  const warm = useCallback((text: string, attempt = 0) => {
+  const warm = useCallback((text: string, kind: string, attempt = 0) => {
     if (!enabled || !text || ready.current.has(text) || off.current.has(text) || polling.current.has(text)) return;
     polling.current.set(text, 0);
-    ask(text, attempt === 0).then((a) => {
+    ask(text, kind, attempt === 0).then((a) => {
       polling.current.delete(text);
       if (a.status === "done") { ready.current.set(text, a.url); return; }
-      if (a.status === "pending" && attempt < 30) { const t = window.setTimeout(() => { polling.current.delete(text); warm(text, attempt + 1); }, 5000); polling.current.set(text, t); return; }
+      if (a.status === "pending" && attempt < 30) { const t = window.setTimeout(() => { polling.current.delete(text); warm(text, kind, attempt + 1); }, 5000); polling.current.set(text, t); return; }
       off.current.add(text);
     }).catch(() => { polling.current.delete(text); });
   }, [enabled, ask]);

@@ -48,6 +48,14 @@ export async function retryFailedClipsAction(): Promise<{ summary: string }> {
   return { summary: `${data?.length ?? 0} failed clip${(data?.length ?? 0) === 1 ? "" : "s"} will be rendered again on the next play.` };
 }
 
+/** Which lines get video: the hook and recap only (default) or every line. */
+export async function setVideoModeAction(mode: string): Promise<void> {
+  await requireAdmin();
+  const admin = createAdminClient();
+  await admin.from("ops_settings").upsert({ key: "video_mode", value: mode === "all" ? "all" : "hook_recap", updated_at: new Date().toISOString() });
+  revalidatePath("/parent/admin");
+}
+
 /** The monthly ceiling on new clips (each is one spoken line, about 20-40 seconds). */
 export async function setVideoCapAction(form: FormData): Promise<{ error?: string; ok?: boolean }> {
   await requireAdmin();
