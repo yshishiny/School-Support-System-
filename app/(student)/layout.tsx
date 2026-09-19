@@ -6,6 +6,8 @@ import { SiteBadge } from "@/components/SiteBadge";
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {
   const { profile } = await requireStudent();
   const theme = themeById(profile.theme);
+  // A grown child the parent marked as a rater gets one extra place: her brothers' pictures waiting for a tick.
+  const isRater = !!(profile as { rater?: boolean }).rater;
   return (
     <div className="theme-root" style={themeStyle(theme) as React.CSSProperties} data-theme={theme.id}>
       <SiteBadge />
@@ -15,6 +17,7 @@ export default async function StudentLayout({ children }: { children: React.Reac
         items={[
           { href: "/today", label: "Today", emoji: "🔥" },
           { href: "/snaps", label: "Snaps", emoji: "📸" },
+          ...(isRater ? [{ href: "/snaps/review", label: "Check", emoji: "🧐" }] : []),
           { href: "/learn", label: "Learn", emoji: "🧠" },
           { href: "/teach", label: "Teacher", emoji: "🧑‍🏫" },
           { href: "/coach", label: "Coach", emoji: "🦸" },

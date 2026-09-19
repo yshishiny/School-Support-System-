@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.17 — The sisters can approve their brothers' snaps (19 September 2026, `v2` branch)
+
+- **A rater finally has somewhere to rate.** A parent could already mark a grown child as a rater, and the permission to approve a picture was already written and enforced, but there was no screen showing her anything — so the setting did nothing for photographs. There is now a "Check" page: her brothers' pending snaps, each with the picture, what the task asked for, what the coach thought, and one tap to approve or send back with a reason.
+- **Never her own.** Her own pictures are filtered out on the way in and refused on the way through, so a rater cannot tick herself. Every decision is attributed to her and a parent can change it.
+- It appears in the bottom bar and on her Snaps page with the number waiting, and only for a child the parent marked as a rater.
+
 ## 2.0.0-beta.16 — A university student is not a school pupil (19 September 2026, `v2` branch)
 
 - **The allowance stopped marking grown-ups down for school things.** Every learner was scored against the same list, so a postgraduate lost points for not attempting a weekly checkpoint on the family curriculum, not uploading a school grades sheet, and not logging classes against a school timetable. Those five measures now switch themselves off for anyone past school; prayers, check-ins, manners, the chores and the coach check-in still count, because those apply to everyone in the house.

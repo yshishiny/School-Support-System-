@@ -56,6 +56,11 @@ export default async function SnapsPage() {
   const weekDone = meter.reduce((s, m) => s + m.done, 0);
   const openNow = dailyTasks.filter((t) => windowOpen(t, hhmm) && ["due", "rejected"].includes(taskDayState(t, snaps, today, hhmm)));
   const pendingCount = snaps.filter((s) => s.status === "pending").length;
+  // A rater also sees how many of her brothers' pictures are waiting on her.
+  const isRater = !!(profile as { rater?: boolean }).rater;
+  const { count: toCheck } = isRater
+    ? await supabase.from("snaps").select("id", { count: "exact", head: true }).eq("family_id", family.id).neq("student_id", profile.id).eq("status", "pending")
+    : { count: 0 };
 
   return (
     <main className="space-y-4">
@@ -67,6 +72,17 @@ export default async function SnapsPage() {
         </div>
         <Link href="/today" className="btn-ghost btn-sm">Today</Link>
       </header>
+
+      {isRater && (
+        <Link href="/snaps/review" className={`card !py-3 flex items-center gap-3 ${toCheck ? "border-2 border-accent" : ""}`}>
+          <span className="text-3xl">🧐</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold">Check your brothers&apos; snaps</div>
+            <div className="text-xs muted">{toCheck ? `${toCheck} waiting for your tick` : "Nothing waiting just now"}</div>
+          </div>
+          <span className="text-muted">›</span>
+        </Link>
+      )}
 
       {tasks.length === 0 && <p className="card muted text-sm">No snap tasks yet. Ask a parent to switch some on under Snaps → Tasks.</p>}
 
