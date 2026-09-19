@@ -6,7 +6,7 @@ import { resolveErrorsAction } from "@/lib/actions/ops";
 import { schedulerStatus } from "@/lib/actions/ops-scheduler";
 import { SchedulerSwitch } from "@/components/SchedulerSwitch";
 import { VideoPresenters } from "@/components/VideoPresenters";
-import { clipStats, presenterUrls, videoCap, videoEnabled, videoMode, videoMonthCount } from "@/lib/video";
+import { clipStats, presenterGenders, presenterUrls, videoCap, videoEnabled, videoMode, videoMonthCount } from "@/lib/video";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -46,7 +46,7 @@ export default async function AdminPage() {
     googleStatus(),
   ]);
   const sched = await schedulerStatus().catch(() => ({ enabled: false, appUrl: null, lastRun: null, lastOk: null }));
-  const [presenters, cap, used, stats, mode] = await Promise.all([presenterUrls().catch(() => ({})), videoCap().catch(() => 500), videoMonthCount().catch(() => 0), clipStats().catch(() => ({ done: 0, pending: 0, failed: 0, errors: [] as string[] })), videoMode().catch(() => "hook_recap" as const)]);
+  const [presenters, cap, used, stats, mode, genders] = await Promise.all([presenterUrls().catch(() => ({})), videoCap().catch(() => 500), videoMonthCount().catch(() => 0), clipStats().catch(() => ({ done: 0, pending: 0, failed: 0, errors: [] as string[] })), videoMode().catch(() => "hook_recap" as const), presenterGenders().catch(() => ({}))]);
   const openErrors = errors.filter((e) => !e.resolved_at);
   const worst = (rows: Check[]) => (rows.some((c) => c.tone === "bad") ? "bad" : rows.some((c) => c.tone === "warn") ? "warn" : "good");
   const overall = worst([...config, ...db, ...jobs.checks]);
@@ -128,7 +128,7 @@ export default async function AdminPage() {
               </section>
             </div>
           ) },
-          { id: "teachers", label: "Teachers", emoji: "🎬", content: <VideoPresenters enabled={videoEnabled()} presenters={presenters} cap={cap} used={used} stats={stats} mode={mode} /> },
+          { id: "teachers", label: "Teachers", emoji: "🎬", content: <VideoPresenters enabled={videoEnabled()} presenters={presenters} cap={cap} used={used} stats={stats} mode={mode} genders={genders} /> },
           { id: "services", label: "Services", emoji: "🔌", content: (
             <div className="space-y-3">
               <section className="card space-y-1">

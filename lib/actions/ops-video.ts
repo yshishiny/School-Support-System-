@@ -48,6 +48,16 @@ export async function retryFailedClipsAction(): Promise<{ summary: string }> {
   return { summary: `${data?.length ?? 0} failed clip${(data?.length ?? 0) === 1 ? "" : "s"} will be rendered again on the next play.` };
 }
 
+/** The voice gender for a presenter photo: a woman's face speaks with a woman's voice whatever the character's default. */
+export async function setPresenterGenderAction(characterId: string, gender: string): Promise<void> {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const key = `presenter_gender:${characterById(characterId).id}`;
+  if (gender === "m" || gender === "f") await admin.from("ops_settings").upsert({ key, value: gender, updated_at: new Date().toISOString() });
+  else await admin.from("ops_settings").delete().eq("key", key);
+  revalidatePath("/parent/admin");
+}
+
 /** Which lines get video: the hook and recap only (default) or every line. */
 export async function setVideoModeAction(mode: string): Promise<void> {
   await requireAdmin();

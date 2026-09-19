@@ -100,7 +100,8 @@ roughly US$0.20–0.40 per lesson minute and are excluded on purpose.
 | 2.1 | 3–4 | Four characters, personalities, voice per character, talking avatar, visuals — **done (beta.1)** | yes, Math and Science |
 | 2.2 | 5–6 | **The animated classroom — done (beta.3):** full-body rigged teachers with gestures, moods and lip-sync; a classroom scene per character; a board that fills as the teacher speaks; camera moves; karaoke captions; autoplay; checks with celebration; scratchpad; raise-your-hand by microphone or typing; public demo at `/demo/teacher` | yes, all subjects |
 | 2.3a | 7 | **Premium voices and video presenters — done (beta.4):** Azure neural voices with Egyptian Arabic, a voice picker per phone, D-ID presenter clips per scripted line with cache, background rendering, presenter photos and a monthly cap under Admin → Teachers | yes |
-| 2.3b | 8 | Adaptive re-explanation after a missed check, Arabic subjects and Quran lessons, coach and checkpoint integration, lesson line in the parent's report | yes |
+| 2.3b | 8 | **Illustrated lessons — done (beta.5):** step-by-step scenes cued to the teacher's words, with a pointer and glow on the element being explained; presenter voice gender | yes |
+| 2.3c | 9 | Interactive manipulatives (drag a point, change an angle, slide a value on a graph), adaptive re-explanation after a missed check, Quran lessons, coach and checkpoint integration, lesson line in the parent's report | yes |
 | 2.4 | 9–10 | Polish, cost review, promotion plan to 2.0 | release candidate |
 
 ## 11. Risks and guardrails

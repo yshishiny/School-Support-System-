@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { sanitizeSvg } from "@/lib/svg";
 import { boardLines } from "@/lib/teach/performance";
 
-export interface BoardShow { type: "text" | "steps" | "formula" | "table" | "svg"; content: string }
+import { Scene } from "./Scene";
+
+export interface BoardShow { type: "text" | "steps" | "formula" | "table" | "svg" | "scene"; content: string; cues?: { phrase: string; step: number }[] | null }
 
 /** An AI diagram drawn stroke by stroke: every shape gets a unit path length and a staggered draw animation. */
 function DrawnSvg({ svg }: { svg: string }) {
   const ref = useRef<HTMLDivElement>(null);
+  const html = useMemo(() => ({ __html: svg }), [svg]);
   useEffect(() => {
     const root = ref.current;
     if (!root) return;
@@ -20,14 +23,14 @@ function DrawnSvg({ svg }: { svg: string }) {
     });
     root.querySelectorAll<SVGElement>("text").forEach((el, i) => { el.classList.add("board-fade"); el.style.animationDelay = `${0.6 + Math.min(2.4, i * 0.15)}s`; });
   }, [svg]);
-  return <div ref={ref} className="board-svg rounded-xl bg-white/95 p-2 [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[38vh]" dangerouslySetInnerHTML={{ __html: svg }} />;
+  return <div ref={ref} className="board-svg rounded-xl bg-white/95 p-2 [&>svg]:w-full [&>svg]:h-auto [&>svg]:max-h-[38vh]" dangerouslySetInnerHTML={html} />;
 }
 
 /**
  * The classroom board. Content appears as the teacher speaks: lines are revealed up to `revealed`,
  * formulas are chalked in, tables fill row by row, diagrams draw themselves.
  */
-export function Board({ show, revealed, rtl, title, kindLabel, idle = false, children }: { show: BoardShow | null; revealed: number; rtl: boolean; title: string; kindLabel: string; /** Nothing to show for this beat: a quiet "listen" note instead of an empty board. */ idle?: boolean; children?: React.ReactNode }) {
+export function Board({ show, revealed, step = 99, rtl, title, kindLabel, idle = false, children }: { show: BoardShow | null; revealed: number; /** For scenes: the highest step spoken so far. */ step?: number; rtl: boolean; title: string; kindLabel: string; /** Nothing to show for this beat: a quiet "listen" note instead of an empty board. */ idle?: boolean; children?: React.ReactNode }) {
   const lines = show ? boardLines(show) : [];
   const n = Math.min(lines.length, Math.max(0, revealed));
   return (
@@ -40,6 +43,7 @@ export function Board({ show, revealed, rtl, title, kindLabel, idle = false, chi
       <div className={`absolute inset-x-4 top-9 bottom-4 overflow-auto text-[#f6f1e2] ${rtl ? "text-right font-arabic" : ""}`} style={{ fontFamily: rtl ? "var(--font-arabic)" : "var(--font-display)" }}>
         {!show && idle && <div className="h-full flex items-center justify-center text-[#d9d2b8]/50 text-sm italic">{rtl ? "استمع…" : "Listen…"}</div>}
         {show?.type === "svg" && (() => { const s = sanitizeSvg(show.content); return s ? <DrawnSvg svg={s} /> : <p className="text-sm">{show.content}</p>; })()}
+        {show?.type === "scene" && (() => { const s = sanitizeSvg(show.content); return s ? <Scene svg={s} step={step} /> : <p className="text-sm">{show.content}</p>; })()}
         {show?.type === "formula" && (
           <div key={show.content} className="h-full flex items-center justify-center">
             <div className="board-chalk text-[clamp(1.6rem,6vw,3.2rem)] font-bold text-center leading-tight px-2 py-3 rounded-2xl">{show.content}</div>

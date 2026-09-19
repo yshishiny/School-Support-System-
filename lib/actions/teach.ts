@@ -3,12 +3,12 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { renderScript, videoEnabled, videoVoice } from "@/lib/video";
+import { presenterGenders, renderScript, videoEnabled, videoVoice } from "@/lib/video";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
-import { generateLessonScript, type LessonScript } from "@/lib/ai/lesson-script";
+import { generateLessonScript, SCRIPT_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
 import { answerInLesson } from "@/lib/ai/lesson-answer";
 import { learnerPromptLine } from "@/lib/learner";
 import { classifyRisk } from "@/lib/ai/coach-chat";
@@ -39,14 +39,14 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     topic = data as Topic | null;
     if (!topic) return { error: "Topic not found." };
     language = topic.language ?? "en";
-    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("topic_id", topic.id).eq("character_id", character.id).eq("language", language).is("flagged_at", null).order("version", { ascending: false }).limit(1).maybeSingle();
+    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("topic_id", topic.id).eq("character_id", character.id).eq("language", language).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
     scriptId = cached?.id ?? null;
   } else if (source.materialId) {
     const { data } = await admin.from("materials").select("id, title, subject, digest, language").eq("id", source.materialId).eq("student_id", profile.id).maybeSingle();
     material = data;
     if (!material?.digest) return { error: "This file has not been read yet." };
     language = material.language === "arabic" ? "ar" : "en";
-    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("material_id", material.id).eq("character_id", character.id).is("flagged_at", null).order("version", { ascending: false }).limit(1).maybeSingle();
+    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("material_id", material.id).eq("character_id", character.id).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
     scriptId = cached?.id ?? null;
   } else {
     return { error: "Pick a topic or a file." };
@@ -71,7 +71,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     const { model, ...body } = script;
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION })
       .select("id")
       .single();
     if (error || !row) return { error: error?.message ?? "Could not save the lesson." };
@@ -81,7 +81,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
   if (sErr || !session) return { error: sErr?.message ?? "Could not start the lesson." };
   // Presenter clips render in the background from the first line, so most are ready before the child reaches them.
   if (videoEnabled()) {
-    const voice = videoVoice(character, language);
+    const voice = videoVoice(character, language, null, (await presenterGenders())[character.id]);
     const sid = scriptId;
     if (voice) after(async () => {
       const { data } = await admin.from("lesson_scripts").select("script, title").eq("id", sid).maybeSingle();

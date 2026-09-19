@@ -5,9 +5,17 @@ import { effortFor, modelFor } from "./models";
 import { normaliseQuestions } from "./generate-quiz";
 import type { Character } from "@/lib/characters";
 
+/** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2). */
+export const SCRIPT_VERSION = 2;
+
+const CueSchema = z.object({
+  phrase: z.string().describe("2-6 words copied verbatim from this beat's 'say'; when the teacher reaches them, the step appears"),
+  step: z.number().int().min(1).max(8),
+});
 const ShowSchema = z.object({
-  type: z.enum(["text", "steps", "formula", "table", "svg"]).describe("text: 1-3 short lines · steps: numbered lines separated by newlines · formula: one formula in unicode · table: rows as 'a | b | c' lines · svg: a small self-contained <svg> (max 600 chars, viewBox 0 0 320 180, no scripts)"),
+  type: z.enum(["text", "steps", "formula", "table", "svg", "scene"]).describe("text: 1-3 short lines · steps: numbered lines separated by newlines · formula: one formula in unicode · table: rows as 'a | b | c' lines · svg: a small static <svg> (max 600 chars) · scene: a large illustrated diagram built step by step as the teacher speaks (see rules)"),
   content: z.string(),
+  cues: z.array(CueSchema).nullable().describe("Only for type 'scene': one cue per step, in order. Null otherwise."),
 });
 const CheckSchema = z.object({
   question: z.string(),
@@ -46,7 +54,13 @@ Structure (6 to 12 beats): hook (1) → explain (2-4) → example (1-2, every st
 Rules:
 - Faithful to the source: the school file first, then the curriculum topic. Never invent facts, dates or formulas.
 - "say" is spoken language: short sentences, no markdown, no bullet symbols, numbers written so they read well aloud. Stay in the character's manner but keep the teaching clear; the character adds warmth, not noise.
-- "show" carries the content the ear cannot hold: formulas, steps, tables, a simple SVG diagram. Unicode math only (x², √, ×, ÷, π). Keep SVGs simple: lines, circles, rects, text.
+- "show" carries the content the ear cannot hold: formulas, steps, tables, diagrams. Unicode math only (x², √, ×, ÷, π).
+- ILLUSTRATE. Every explain and example beat in math, science, geography and technical subjects, and every beat where an object, shape, process, map, timeline or apparatus is described, uses show.type "scene": a large diagram of the very thing being talked about, built up as the teacher speaks. Rules for a scene:
+  · content is one self-contained <svg viewBox="0 0 640 360"> on a white board: thick strokes (stroke-width 4-6), big labels (font-size 24-30, font-family sans-serif), clear colours (#e63946 red, #2a9d8f teal, #3a86ff blue, #f4a261 orange, #8338ec purple, #2b2d42 ink), no scripts, no external images, at most 2,500 characters.
+  · Draw the base picture first (no data-step), then wrap each addition in <g data-step="1">, <g data-step="2"> … in the order the teacher mentions them: the parallel lines, then the transversal, then the pair of angles with their arcs and labels; the cell outline, then the membrane, then the nucleus; the axes, then the line, then the point being read. 3 to 6 steps. Each step adds the element AND its label (a letter, a name, a value).
+  · cues: for every step, the exact 2-6 words from "say" (copied verbatim, same language) at which that step should appear. Say the name of the thing as you draw it, so the words and the picture meet.
+  · Angles: draw the arc; equal angles get the same colour. Graphs: label axes and units. Processes: arrows in the direction of flow. Arabic scenes: Arabic labels, digits as in Egyptian textbooks.
+- Use "svg" only for a tiny static icon, "steps" for procedures, "formula" for one formula, "table" for comparisons.
 - Checks test the idea just taught. Hints do not give the answer away.
 - The teacher is animated: give each beat a gesture and a mood that fit (wave for the hook, point or write when the board carries content, think for checks, celebrate for the recap; surprised for a twist, encourage after a hard idea).
 - The final quiz has exactly 3 questions on the whole lesson; prefix each skill_tag with the subject name and a colon.
@@ -79,7 +93,7 @@ export async function generateLessonScript(spec: LessonSpec): Promise<LessonScri
   ].filter(Boolean);
   const stream = client.messages.stream({
     model,
-    max_tokens: 12000,
+    max_tokens: 20000,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: lines.join("\n") }],
     output_config: { format: zodOutputFormat(LessonScriptSchema), ...effortFor("lesson", "medium") },

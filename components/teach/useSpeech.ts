@@ -26,7 +26,7 @@ export const isCloudVoice = (id: string | null | undefined) => !!id && id.starts
  * cloud, from word boundaries where the browser reports them, else from elapsed time. With no voice at all
  * the line still "plays" silently so the lesson keeps its rhythm. Chrome's 15-second cut-off is worked around.
  */
-export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: CloudVoice[] = [], videoRef?: React.RefObject<HTMLVideoElement | null>) {
+export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: CloudVoice[] = [], videoRef?: React.RefObject<HTMLVideoElement | null>, preferFemale: boolean = !!c.voice.preferFemale) {
   const [state, setState] = useState<SpeechState>({ speaking: false, paused: false, available: true, blocked: false, wordIndex: 0, wordCount: 0, viseme: "rest" });
   const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
   const [voiceId, setVoiceId] = useState<string | null>(null);
@@ -54,13 +54,13 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     const hasBrowser = typeof window !== "undefined" && "speechSynthesis" in window;
     let stored: string | null = null;
     try { stored = localStorage.getItem(storageKey(language)); } catch { /* private mode */ }
-    const cloudDefault = cloudVoices.find((v) => v.gender === (c.voice.preferFemale ? "f" : "m")) ?? cloudVoices[0] ?? null;
+    const cloudDefault = cloudVoices.find((v) => v.gender === (preferFemale ? "f" : "m")) ?? cloudVoices[0] ?? null;
     const storedCloud = stored && isCloudVoice(stored) && cloudVoices.some((v) => CLOUD + v.id === stored) ? stored : null;
     const pick = () => {
       const all = hasBrowser ? window.speechSynthesis.getVoices() : [];
       const lang = language === "ar" ? "ar" : "en";
       const cands = all.filter((v) => v.lang.toLowerCase().replace("_", "-").startsWith(lang));
-      const byGender = c.voice.preferFemale ? cands.find((v) => /female|zira|samantha|salma|hoda|laila|aria|jenny|amira/i.test(v.name)) : cands.find((v) => /male|david|daniel|naayf|hamed|guy|ryan|shakir|tarik/i.test(v.name));
+      const byGender = preferFemale ? cands.find((v) => /female|zira|samantha|salma|hoda|laila|aria|jenny|amira/i.test(v.name)) : cands.find((v) => /male|david|daniel|naayf|hamed|guy|ryan|shakir|tarik/i.test(v.name));
       const browserPick = cands.find((v) => v.voiceURI === stored)
         ?? (lang === "ar" ? cands.find((v) => /eg/i.test(v.lang) || /egypt|مصر/i.test(v.name)) : undefined)
         ?? byGender ?? cands.find((v) => v.localService) ?? cands[0] ?? null;
@@ -74,7 +74,7 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     pick();
     if (hasBrowser) window.speechSynthesis.onvoiceschanged = pick;
     return () => { if (hasBrowser) window.speechSynthesis.onvoiceschanged = null; };
-  }, [language, c, cloudVoices]);
+  }, [language, c, cloudVoices, preferFemale]);
 
   const audio = () => {
     if (!audioRef.current) { audioRef.current = new Audio(); audioRef.current.preload = "auto"; }

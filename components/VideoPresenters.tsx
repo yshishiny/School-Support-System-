@@ -2,12 +2,12 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearPresenterAction, retryFailedClipsAction, setVideoCapAction, setVideoModeAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
+import { clearPresenterAction, retryFailedClipsAction, setPresenterGenderAction, setVideoCapAction, setVideoModeAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
 import { CHARACTERS } from "@/lib/characters";
 import { runAction } from "@/lib/client-action";
 
 /** Admin → Teachers: the presenter photo per character and the monthly clip cap. */
-export function VideoPresenters({ enabled, presenters, cap, used, stats, mode }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] }; mode: "hook_recap" | "all" }) {
+export function VideoPresenters({ enabled, presenters, cap, used, stats, mode, genders }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] }; mode: "hook_recap" | "all"; genders: Record<string, "m" | "f" | null> }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
@@ -54,6 +54,10 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats, mode }:
                 <div className="flex-1 min-w-0 space-y-1.5">
                   <div className="font-bold">{c.emoji} {c.name}</div>
                   <div className="text-[11px] muted">{p?.custom ? "Your photo" : "Sample face (upload one)"}</div>
+                  <div className="flex items-center gap-1 text-xs">
+                    <span className="muted">Voice:</span>
+                    {(["f", "m"] as const).map((g) => { const on = (genders[c.id] ?? (c.voice.preferFemale ? "f" : "m")) === g; return <button key={g} type="button" disabled={pending} className={`chip !px-2.5 !py-0.5 ${on ? "chip-on" : ""}`} onClick={() => start(async () => { await setPresenterGenderAction(c.id, g); router.refresh(); })}>{g === "f" ? "♀ woman" : "♂ man"}</button>; })}
+                  </div>
                   <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { setMsg(null); const r = await runAction(() => uploadPresenterAction(c.id, f), setMsg); if (r?.error) setMsg(r.error); router.refresh(); }); }} className="flex flex-wrap items-center gap-1.5">
                     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs max-w-[11rem]" />
                     <button className="btn-primary btn-sm" disabled={pending}>Upload</button>

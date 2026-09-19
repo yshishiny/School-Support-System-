@@ -14,7 +14,7 @@ import { askTeacherAction, finishLessonAction, recordBeatAction } from "@/lib/ac
 import type { Character } from "@/lib/characters";
 import type { LessonScript } from "@/lib/ai/lesson-script";
 import type { CloudVoice } from "@/lib/tts";
-import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, wordsOf, boardLines, type Camera, type Gesture, type Mood } from "@/lib/teach/performance";
+import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, sceneStep, wordsOf, boardLines, type Camera, type Gesture, type Mood } from "@/lib/teach/performance";
 import { runAction } from "@/lib/client-action";
 import { closingLine, greetingLine } from "@/lib/teach/lines";
 
@@ -39,13 +39,13 @@ function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rt
  * checks stop the flow until answered, a raised hand pauses for a question, and the recap ends with confetti.
  * `demo` runs the same stage with no server calls.
  */
-export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false, videoKinds = HOOK_RECAP }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean; /** Which beat kinds get a clip. */ videoKinds?: string[] }) {
+export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false, videoKinds = HOOK_RECAP, preferFemale }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean; /** Which beat kinds get a clip. */ videoKinds?: string[]; /** The presenter's voice gender, when it differs from the character's. */ preferFemale?: boolean }) {
   const c = character;
   const rtl = language === "ar";
   const beats = script.beats;
   const total = beats.length;
   const videoRef = useRef<HTMLVideoElement>(null);
-  const speech = useSpeech(language, c, cloudVoices, videoRef);
+  const speech = useSpeech(language, c, cloudVoices, videoRef, preferFemale ?? !!c.voice.preferFemale);
   const [videoOn, setVideoOn] = useState(true);
   useEffect(() => { try { setVideoOn(localStorage.getItem("teach:video") !== "off"); } catch { /* ignore */ } }, []);
   const useVideo = video && !demo && videoOn;
@@ -209,6 +209,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const camera: Camera = hand ? "teacher" : phase === "lesson" && beat && speech.speaking ? cameraFor(beat) : "wide";
   const lines = beat?.show ? boardLines(beat.show).length : 0;
   const revealed = phase !== "lesson" ? 0 : speech.speaking ? revealCount(lines, speech.wordIndex / Math.max(1, speech.wordCount - 1)) : lines;
+  const step = phase === "lesson" && beat?.show?.type === "scene" ? sceneStep(beat.say, beat.show.cues, speech.wordIndex, !speech.speaking) : 99;
   const progress = phase === "outro" ? 100 : phase === "intro" ? 0 : Math.round((i / Math.max(1, total)) * 100);
   const label = phase === "intro" ? (rtl ? "البداية" : "Welcome") : phase === "outro" ? (rtl ? "النهاية" : "Done") : beat ? beatLabel(beat.kind).label : "";
   const exitHref = demo ? "/login" : "/teach";
@@ -312,7 +313,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     <Classroom scene={c.rig.scene} camera={camera} overlay={overlay}>
       <div className="absolute inset-0 grid grid-rows-[42%_1fr] gap-2 px-3 pt-[calc(max(.5rem,env(safe-area-inset-top))+3.4rem)] pb-[calc(max(.5rem,env(safe-area-inset-bottom))+10rem)] landscape:grid-rows-1 landscape:grid-cols-[32%_1fr] landscape:pb-[calc(max(.5rem,env(safe-area-inset-bottom))+8.5rem)]">
         <div className="relative min-h-0 order-1 landscape:order-2">
-          <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} rtl={rtl} title={script.title} kindLabel={label}>{boardBody}</Board>
+          <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} step={step} rtl={rtl} title={script.title} kindLabel={label}>{boardBody}</Board>
           <Scratchpad open={pad} onClose={() => setPad(false)} />
         </div>
         <div className="relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]">

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.5 — Illustrated lessons (19 September 2026, `v2` branch)
+
+- **Scenes: the lesson drawn in front of the child.** Explain and example beats now carry a large labelled diagram of the very thing being taught (the parallel lines and the transversal with the angle arcs, the cell and its membrane, the graph with its axes), built up in 3–6 steps. Each step appears exactly when the teacher says its phrase, the newest element glows and a pointer sits over it, so the child looks where the teacher is talking. Arabic scenes carry Arabic labels. No per-play cost: scenes are part of the script.
+- Scripts are versioned: lessons written before scenes existed are rewritten on the next start (script version 2). Older cached scripts still play as they were.
+- **Presenter voice gender** under Admin → Teachers: a woman's face speaks with a woman's voice (phone voice, premium voice and video clips alike), whatever the character's default.
+- Fixed: the board's drawn diagrams could lose their animation state on re-render (innerHTML was re-applied on every spoken word).
+
 ## 2.0.0-beta.4 — Teachers on video (18 September 2026, `v2` branch)
 
 - **A human presenter, like a TV lesson.** With `DID_API_KEY` set, every scripted line is rendered by D-ID as a short clip of a realistic presenter speaking with the premium voice (Egyptian for Arabic), lip-synced. The clip plays in the teacher's place; the board, camera, checks, confetti, scratchpad and raise-your-hand stay exactly as they are. Lines that are not scripted (greeting, check feedback, answers to questions) keep the animated teacher and the voice.

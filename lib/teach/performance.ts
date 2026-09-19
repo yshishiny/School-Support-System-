@@ -9,10 +9,12 @@ export type Mood = "neutral" | "happy" | "think" | "surprised" | "encourage" | "
 export type Camera = "wide" | "board" | "teacher";
 export type Viseme = "rest" | "small" | "open" | "wide" | "round" | "closed";
 
+export interface SceneCue { phrase: string; step: number }
+
 export interface BeatLike {
   kind: "hook" | "explain" | "example" | "check" | "recap";
   say: string;
-  show?: { type: "text" | "steps" | "formula" | "table" | "svg"; content: string } | null;
+  show?: { type: "text" | "steps" | "formula" | "table" | "svg" | "scene"; content: string; cues?: SceneCue[] | null } | null;
   gesture?: Gesture | null;
   mood?: Mood | null;
 }
@@ -75,6 +77,30 @@ export function boardLines(show: NonNullable<BeatLike["show"]>): string[] {
   if (show.type === "steps" || show.type === "table") return show.content.split("\n").map((l) => l.trim()).filter(Boolean);
   if (show.type === "text") return show.content.split("\n").map((l) => l.trim()).filter(Boolean);
   return [show.content];
+}
+
+/**
+ * The word at which each scene step should appear: where its cue phrase starts in the spoken line, or, when the
+ * phrase is not found verbatim, spread evenly through the line so every step still shows up.
+ */
+export function cueWords(say: string, cues: SceneCue[]): { step: number; word: number }[] {
+  const total = wordsOf(say).length;
+  const lower = say.toLowerCase();
+  const sorted = [...cues].sort((a, b) => a.step - b.step);
+  return sorted.map((c, k) => {
+    const at = lower.indexOf(c.phrase.trim().toLowerCase());
+    const word = at >= 0 ? wordIndexAt(say, at) : Math.floor(((k + 1) / (sorted.length + 1)) * total);
+    return { step: c.step, word };
+  });
+}
+
+/** The highest scene step whose cue has been spoken; every step once the line is over; all steps when there are no cues. */
+export function sceneStep(say: string, cues: SceneCue[] | null | undefined, wordIndex: number, finished: boolean): number {
+  if (!cues || cues.length === 0) return 99;
+  if (finished) return Math.max(...cues.map((c) => c.step));
+  let step = 0;
+  for (const c of cueWords(say, cues)) if (c.word <= wordIndex) step = Math.max(step, c.step);
+  return step;
 }
 
 /** How many board lines are visible when `spokenFraction` (0..1) of the beat has been said. Front-loaded so the board stays ahead of the voice. */

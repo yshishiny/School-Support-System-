@@ -34,10 +34,11 @@ export function cloudVoiceList(language: "en" | "ar"): CloudVoice[] {
   return CLOUD_VOICES.filter((v) => v.lang.startsWith(language));
 }
 
-/** The character's default premium voice: by gender, Egyptian for Arabic. */
-export function defaultCloudVoice(c: Character, language: "en" | "ar"): CloudVoice | null {
+/** The character's default premium voice: by gender (the presenter's, when set), Egyptian for Arabic. */
+export function defaultCloudVoice(c: Character, language: "en" | "ar", gender?: "m" | "f" | null): CloudVoice | null {
   const list = cloudVoiceList(language);
-  return list.find((v) => v.gender === (c.voice.preferFemale ? "f" : "m")) ?? list[0] ?? null;
+  const g = gender ?? (c.voice.preferFemale ? "f" : "m");
+  return list.find((v) => v.gender === g) ?? list[0] ?? null;
 }
 
 function escapeXml(s: string): string {

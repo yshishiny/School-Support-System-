@@ -70,10 +70,22 @@ export async function videoMonthCount(): Promise<number> {
   return count ?? 0;
 }
 
-/** The voice a presenter speaks with: the chosen premium voice, else the character's default. */
-export function videoVoice(c: Character, language: "en" | "ar", chosen?: string | null): string | null {
+/** The voice gender chosen for each presenter photo under Admin → Teachers (null = the character's own). */
+export async function presenterGenders(): Promise<Record<string, "m" | "f" | null>> {
+  const admin = createAdminClient();
+  const { data } = await admin.from("ops_settings").select("key, value").like("key", "presenter_gender:%");
+  const out: Record<string, "m" | "f" | null> = {};
+  for (const c of CHARACTERS) {
+    const v = (data ?? []).find((r) => r.key === `presenter_gender:${c.id}`)?.value;
+    out[c.id] = v === "m" || v === "f" ? v : null;
+  }
+  return out;
+}
+
+/** The voice a presenter speaks with: the chosen premium voice, else the character's default in the presenter's gender. */
+export function videoVoice(c: Character, language: "en" | "ar", chosen?: string | null, gender?: "m" | "f" | null): string | null {
   if (chosen && CLOUD_VOICES.some((v) => v.id === chosen && v.lang.startsWith(language))) return chosen;
-  return defaultCloudVoice(c, language)?.id ?? null;
+  return defaultCloudVoice(c, language, gender)?.id ?? null;
 }
 
 function clipId(characterId: string, presenter: string, voice: string, text: string): string {
