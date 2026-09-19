@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.15 — A planner that knows the school day (19 September 2026, `v2` branch)
+
+- **The planner was empty because it only ever showed typed-in homework.** The app already knew the timetable, the quizzes booked for each date and the days off, and showed none of it. The planner is now the next two weeks as a strip of days you tap: each day carries its classes with times and rooms, the quizzes already booked, and anything due.
+- **One screen, not a scroll.** Three counts at the top (classes this week, quizzes booked, things due), late work in a red box that cannot be missed, the chosen day below, and everything undated or further out folded away behind one line.
+- A day with no school says so, rather than looking broken.
+
 ## 2.0.0-beta.14 — Money owed shows up as money owed (19 September 2026, `v2` branch)
 
 - **A week that closes with money in it credits the wallet at once**, instead of waiting to be marked paid. What a child has earned and not been given is now visible to both of you the moment the week ends.
