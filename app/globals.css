@@ -131,6 +131,11 @@ body {
 .confetti { position: absolute; top: -4%; width: 10px; height: 16px; border-radius: 2px; animation: confetti-fall 2.3s cubic-bezier(.25,.7,.4,1) forwards; }
 @keyframes confetti-fall { 0% { transform: translateY(0) rotate(0); opacity: 1; } 100% { transform: translateY(110vh) rotate(720deg); opacity: .6; } }
 .stage-controls button { min-height: 44px; }
+/* The presenter is speaking from audio only (no clip for this line): a small equaliser over the frame. */
+.speaking-bars { position: absolute; bottom: .6rem; inset-inline-end: .6rem; display: flex; gap: 3px; align-items: flex-end; height: 18px; padding: 4px 6px; border-radius: 999px; background: rgba(0,0,0,.45); }
+.speaking-bars i { display: block; width: 3px; height: 6px; border-radius: 2px; background: #fff; animation: speak-bar .7s ease-in-out infinite alternate; }
+.speaking-bars i:nth-child(2) { animation-delay: .15s; } .speaking-bars i:nth-child(3) { animation-delay: .3s; } .speaking-bars i:nth-child(4) { animation-delay: .45s; }
+@keyframes speak-bar { from { height: 4px; } to { height: 14px; } }
 @media (prefers-reduced-motion: reduce) { .stage-camera, .board-line, .board-chalk, .board-draw, .choice-card, .t-enter, .title-card, .confetti { animation: none !important; transition: none !important; stroke-dashoffset: 0; opacity: 1; } }
 [dir="rtl"] .prose-lesson, [lang="ar"] .prose-lesson, .font-arabic { font-family: var(--font-arabic); }
 

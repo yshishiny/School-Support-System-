@@ -39,7 +39,7 @@ function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rt
  * checks stop the flow until answered, a raised hand pauses for a question, and the recap ends with confetti.
  * `demo` runs the same stage with no server calls.
  */
-export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false, videoKinds = HOOK_RECAP, preferFemale }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean; /** Which beat kinds get a clip. */ videoKinds?: string[]; /** The presenter's voice gender, when it differs from the character's. */ preferFemale?: boolean }) {
+export function Stage({ sessionId, scriptId, character, script, language, startBeat, minutes, demo = false, cloudVoices = NO_CLOUD, video = false, videoKinds = HOOK_RECAP, preferFemale, presenterUrl }: { sessionId: string; scriptId: string; character: Character; script: LessonScript; language: "en" | "ar"; startBeat: number; minutes: number; demo?: boolean; cloudVoices?: CloudVoice[]; /** Presenter clips are on for this lesson (D-ID configured, premium voice available). */ video?: boolean; /** Which beat kinds get a clip. */ videoKinds?: string[]; /** The presenter's voice gender, when it differs from the character's. */ preferFemale?: boolean; /** The presenter's photo, shown until the first clip plays. */ presenterUrl?: string | null }) {
   const c = character;
   const rtl = language === "ar";
   const beats = script.beats;
@@ -72,6 +72,18 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<string | null>(null);
   const [pad, setPad] = useState(false);
+  const [layout, setLayout] = useState<"stage" | "board">("stage");
+  useEffect(() => { try { const l = localStorage.getItem("teach:layout"); if (l === "board") setLayout("board"); } catch { /* ignore */ } }, []);
+  const setLayoutKeep = (l: "stage" | "board") => { setLayout(l); try { localStorage.setItem("teach:layout", l); } catch { /* ignore */ } };
+  // The phone's own picture-in-picture takes the presenter out of the page: give the board the room.
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const enter = () => setLayout("board");
+    const leave = () => { try { setLayout(localStorage.getItem("teach:layout") === "board" ? "board" : "stage"); } catch { setLayout("stage"); } };
+    v.addEventListener("enterpictureinpicture", enter); v.addEventListener("leavepictureinpicture", leave);
+    return () => { v.removeEventListener("enterpictureinpicture", enter); v.removeEventListener("leavepictureinpicture", leave); };
+  }, []);
   const [voiceOpen, setVoiceOpen] = useState(false);
   const [burst, setBurst] = useState(0);
   const [msg, setMsg] = useState<string | null>(null);
@@ -206,7 +218,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
 
   const gesture: Gesture = gestureOverride ?? (phase === "lesson" && beat ? (speech.speaking ? gestureFor(beat) : beat.kind === "check" ? "think" : "idle") : "idle");
   const mood: Mood = moodOverride ?? (phase === "lesson" && beat ? moodFor(beat) : "happy");
-  const camera: Camera = hand ? "teacher" : phase === "lesson" && beat && speech.speaking ? cameraFor(beat) : "wide";
+  const camera: Camera = layout === "board" ? "wide" : hand ? "teacher" : phase === "lesson" && beat && speech.speaking ? cameraFor(beat) : "wide";
   const lines = beat?.show ? boardLines(beat.show).length : 0;
   const revealed = phase !== "lesson" ? 0 : speech.speaking ? revealCount(lines, speech.wordIndex / Math.max(1, speech.wordCount - 1)) : lines;
   const step = phase === "lesson" && beat?.show?.type === "scene" ? sceneStep(beat.say, beat.show.cues, speech.wordIndex, !speech.speaking) : 99;
@@ -302,6 +314,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
           <button type="button" className="flex-1 rounded-xl px-2 text-lg disabled:opacity-30" disabled={phase === "outro" || (phase === "lesson" && beat?.kind === "check" && !checkDone)} onClick={() => (phase === "intro" ? goTo(0) : goTo(i + 1))} aria-label="Next">⏭</button>
           <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${hand ? "bg-accent/60" : ""}`} onClick={raiseHand} aria-label="Raise your hand">✋</button>
           <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${pad ? "bg-accent/60" : ""}`} onClick={() => setPad((p) => !p)} aria-label="Scratchpad">✏️</button>
+          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${layout === "board" ? "bg-accent/60" : ""}`} onClick={() => setLayoutKeep(layout === "board" ? "stage" : "board")} aria-label="Board size" title={rtl ? "سبورة كبيرة والمعلم في الزاوية" : "Big board, teacher in the corner"}>⛶</button>
           <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${voiceOpen ? "bg-accent/60" : ""}`} onClick={() => { cancelAdvance(); speech.stop(); setVoiceOpen((v) => !v); }} aria-label="Teacher's voice">🔊</button>
           <span className="px-2 text-[11px] font-bold text-white/70 tabular-nums">{progress}%</span>
         </div>
@@ -311,17 +324,20 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
 
   return (
     <Classroom scene={c.rig.scene} camera={camera} overlay={overlay}>
-      <div className="absolute inset-0 grid grid-rows-[42%_1fr] gap-2 px-3 pt-[calc(max(.5rem,env(safe-area-inset-top))+3.4rem)] pb-[calc(max(.5rem,env(safe-area-inset-bottom))+10rem)] landscape:grid-rows-1 landscape:grid-cols-[32%_1fr] landscape:pb-[calc(max(.5rem,env(safe-area-inset-bottom))+8.5rem)]">
+      <div className={`absolute inset-0 grid gap-2 px-3 pt-[calc(max(.5rem,env(safe-area-inset-top))+3.4rem)] pb-[calc(max(.5rem,env(safe-area-inset-bottom))+10rem)] landscape:pb-[calc(max(.5rem,env(safe-area-inset-bottom))+8.5rem)] ${layout === "board" ? "grid-rows-1 grid-cols-1" : "grid-rows-[42%_1fr] landscape:grid-rows-1 landscape:grid-cols-[32%_1fr]"}`}>
         <div className="relative min-h-0 order-1 landscape:order-2">
           <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} step={step} rtl={rtl} title={script.title} kindLabel={label}>{boardBody}</Board>
           <Scratchpad open={pad} onClose={() => setPad(false)} />
         </div>
-        <div className="relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]">
-          <div className={`h-full ${walking ? "t-enter" : ""} ${speech.videoPlaying ? "hidden" : ""}`}>
-            <Teacher c={c} gesture={gesture} mood={mood} viseme={speech.speaking && !speech.paused ? speech.viseme : "rest"} walking={walking} className="!h-full !w-auto max-w-full drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" />
-          </div>
-          <div className={`presenter-frame h-full aspect-[3/4] max-w-full flex items-end justify-center ${speech.videoPlaying ? "" : "absolute inset-0 opacity-0 pointer-events-none"}`}>
-            <video ref={videoRef} playsInline preload="auto" className="h-full w-full rounded-[1.4rem] object-cover shadow-[0_18px_40px_rgba(0,0,0,.4)] ring-4 ring-white/15" />
+        <div className={layout === "board" ? "absolute z-10 start-4 bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+10.5rem)] landscape:bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+9rem)] h-[26%] landscape:h-[38%] flex items-end" : "relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]"}>
+          {!useVideo && (
+            <div className={`h-full ${walking ? "t-enter" : ""}`}>
+              <Teacher c={c} gesture={gesture} mood={mood} viseme={speech.speaking && !speech.paused ? speech.viseme : "rest"} walking={walking} className="!h-full !w-auto max-w-full drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" />
+            </div>
+          )}
+          <div className={`presenter-frame relative h-full aspect-[3/4] max-w-full flex items-end justify-center ${useVideo ? "" : "absolute inset-0 opacity-0 pointer-events-none"}`}>
+            <video ref={videoRef} playsInline preload="auto" poster={presenterUrl ?? undefined} className="h-full w-full rounded-[1.4rem] object-cover shadow-[0_18px_40px_rgba(0,0,0,.4)] ring-4 ring-white/15 bg-black/20" />
+            {useVideo && speech.speaking && !speech.paused && !speech.videoPlaying && <span className="speaking-bars" aria-hidden><i /><i /><i /><i /></span>}
           </div>
         </div>
       </div>
