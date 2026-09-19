@@ -9,9 +9,10 @@ const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 /** Is the server on a newer build than the one this tab downloaded? Then the fault is the skew, not the page. */
 async function serverBuild(): Promise<string | null> {
   try {
-    const res = await fetch("/api/build", { cache: "no-store" });
-    const body = (await res.json()) as { id?: unknown };
-    return typeof body.id === "string" ? body.id : null;
+    const res = await fetch("/api/version", { cache: "no-store" });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { commit?: unknown };
+    return typeof body.commit === "string" ? body.commit : null;
   } catch {
     return null;
   }
