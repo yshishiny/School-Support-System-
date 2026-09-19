@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { synthesize } from "@/lib/tts";
+import { speakable } from "@/lib/teach/speakable";
 
 export const maxDuration = 30;
 
@@ -13,7 +14,7 @@ export async function POST(req: Request) {
   try { body = await req.json(); } catch { return NextResponse.json({ error: "Bad request." }, { status: 400 }); }
   if (typeof body.text !== "string" || typeof body.voice !== "string") return NextResponse.json({ error: "text and voice are required." }, { status: 400 });
   try {
-    const audio = await synthesize({ text: body.text, voice: body.voice, rate: Number(body.rate) || 1, pitch: Number(body.pitch) || 1 });
+    const audio = await synthesize({ text: speakable(body.text, body.voice.startsWith("ar") ? "ar" : "en"), voice: body.voice, rate: Number(body.rate) || 1, pitch: Number(body.pitch) || 1 });
     return new NextResponse(new Uint8Array(audio), { headers: { "Content-Type": "audio/mpeg", "Cache-Control": "private, max-age=86400" } });
   } catch (err) {
     return NextResponse.json({ error: err instanceof Error ? err.message : "Could not synthesise." }, { status: 502 });

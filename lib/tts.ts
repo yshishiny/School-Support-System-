@@ -55,7 +55,9 @@ export async function synthesize(o: { text: string; voice: string; rate: number;
   const text = o.text.trim().slice(0, MAX_CHARS);
   if (!text) throw new Error("Nothing to say.");
   const ratePct = Math.round((Math.min(1.3, Math.max(0.7, o.rate)) - 1) * 100);
-  const pitchPct = Math.round((Math.min(1.3, Math.max(0.7, o.pitch)) - 1) * 40);
+  // Neural voices sound unnatural when their pitch is shifted; the character's manner comes from the words and the rate.
+  const pitchPct = 0;
+  void o.pitch;
   const hash = createHash("sha256").update(`${voice.id}|${ratePct}|${pitchPct}|${text}`).digest("hex").slice(0, 40);
   const path = `${voice.id}/${hash}.mp3`;
   const admin = createAdminClient();

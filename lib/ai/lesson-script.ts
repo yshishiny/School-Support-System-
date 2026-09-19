@@ -5,8 +5,8 @@ import { effortFor, modelFor } from "./models";
 import { normaliseQuestions } from "./generate-quiz";
 import type { Character } from "@/lib/characters";
 
-/** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2). */
-export const SCRIPT_VERSION = 2;
+/** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2, spoken-word rules and tashkeel in 3). */
+export const SCRIPT_VERSION = 3;
 
 const CueSchema = z.object({
   phrase: z.string().describe("2-6 words copied verbatim from this beat's 'say'; when the teacher reaches them, the step appears"),
@@ -53,7 +53,8 @@ Structure (6 to 12 beats): hook (1) → explain (2-4) → example (1-2, every st
 
 Rules:
 - Faithful to the source: the school file first, then the curriculum topic. Never invent facts, dates or formulas.
-- "say" is spoken language: short sentences, no markdown, no bullet symbols, numbers written so they read well aloud. Stay in the character's manner but keep the teaching clear; the character adds warmth, not noise.
+- "say" is read aloud by a text-to-speech voice, so it must be pure spoken language: short sentences, no markdown, no bullet symbols, NO mathematical symbols or notation at all. Write "three eighths plus two eighths equals five eighths", "x squared", "angle A", "ninety degrees", "line A B is parallel to line C D", "the square root of sixteen"; never "3/8 + 2/8 = 5/8", "x²", "∠A", "90°", "AB ∥ CD", "√16". Spell out numbers under one hundred. Units and abbreviations in full ("centimetres", "for example"). Symbols belong in "show", never in "say". Stay in the character's manner but keep the teaching clear; the character adds warmth, not noise.
+- Arabic "say": fully vowelled (تشكيل كامل على كل كلمة) so the voice pronounces every word correctly, in clear Modern Standard Arabic; numbers written as words (ثلاثةُ أثمانٍ). "show" and the quiz stay without tashkeel.
 - "show" carries the content the ear cannot hold: formulas, steps, tables, diagrams. Unicode math only (x², √, ×, ÷, π).
 - ILLUSTRATE. Every explain and example beat in math, science, geography and technical subjects, and every beat where an object, shape, process, map, timeline or apparatus is described, uses show.type "scene": a large diagram of the very thing being talked about, built up as the teacher speaks. Rules for a scene:
   · content is one self-contained <svg viewBox="0 0 640 360"> on a white board: thick strokes (stroke-width 4-6), big labels (font-size 24-30, font-family sans-serif), clear colours (#e63946 red, #2a9d8f teal, #3a86ff blue, #f4a261 orange, #8338ec purple, #2b2d42 ink), no scripts, no external images, at most 2,500 characters.

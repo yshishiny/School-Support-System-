@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Character } from "@/lib/characters";
 import type { CloudVoice } from "@/lib/tts";
 import { estimateSeconds, visemeFor, wordIndexAt, wordsOf, type Viseme } from "@/lib/teach/performance";
+import { speakable } from "@/lib/teach/speakable";
 
 export interface SpeechState {
   speaking: boolean;
@@ -143,7 +144,10 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
   const sayBrowser = useCallback((text: string, words: string[]) => {
     const hasVoice = typeof window !== "undefined" && "speechSynthesis" in window;
     if (!hasVoice) { silentRef.current = window.setTimeout(finish, estRef.current); return; }
-    const u = new SpeechSynthesisUtterance(text);
+    // The voice hears symbols as words; boundaries come back on that text and are mapped onto the caption's words.
+    const spoken = speakable(text, language);
+    const spokenWords = Math.max(1, wordsOf(spoken).length);
+    const u = new SpeechSynthesisUtterance(spoken);
     u.lang = language === "ar" ? "ar-EG" : "en-US";
     if (voiceRef.current) u.voice = voiceRef.current;
     u.rate = c.voice.rate;
@@ -151,7 +155,7 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     u.onboundary = (e) => {
       if (e.name && e.name !== "word") return;
       boundaryRef.current = true;
-      wordRef.current = wordIndexAt(text, e.charIndex);
+      wordRef.current = Math.min(words.length - 1, Math.round((wordIndexAt(spoken, e.charIndex) / spokenWords) * words.length));
     };
     u.onend = () => { if (activeRef.current === u) finish(); };
     // No usable voice (none installed, language missing, audio blocked): keep the line's rhythm silently.
@@ -173,7 +177,6 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     }
     // Safety net: if the browser never fires onend (it happens), close the line after the estimate plus margin.
     silentRef.current = window.setTimeout(() => { if (activeRef.current === u && !window.speechSynthesis.speaking) finish(); }, estRef.current * 1.8 + 3000);
-    void words;
   }, [c, language, finish]);
 
   const sayCloud = useCallback(async (text: string, words: string[], cloudId: string, token: number) => {
@@ -276,7 +279,7 @@ export function useSpeech(language: "en" | "ar", c: Character, cloudVoices: Clou
     }
     if (!("speechSynthesis" in window)) return;
     const v = voices.find((x) => x.voiceURI === id);
-    const u = new SpeechSynthesisUtterance(text);
+    const u = new SpeechSynthesisUtterance(speakable(text, language));
     u.lang = language === "ar" ? "ar-EG" : "en-US";
     if (v) u.voice = v;
     u.rate = c.voice.rate; u.pitch = c.voice.pitch;
