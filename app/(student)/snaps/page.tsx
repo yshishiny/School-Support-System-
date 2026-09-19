@@ -3,7 +3,7 @@ import { formatInTimeZone } from "date-fns-tz";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
-import { dueSnapTasks, handwritingScore, snapDaysDone, taskDayState, windowOpen, type DayState, type HandwritingAnalysis, type SnapLite } from "@/lib/snaps";
+import { dueSnapTasks, handwritingScore, isRota, ownsTask, rotaTurnEnds, snapDaysDone, taskDayState, windowOpen, type DayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { weekFor } from "@/lib/allowance";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
 import { SnapCapture } from "@/components/SnapCapture";
@@ -26,7 +26,7 @@ export default async function SnapsPage() {
   const today = todayIn(family.timezone);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
   const [tasks, { data: snapRows }] = await Promise.all([
-    loadSnapTasks(family.id),
+    loadSnapTasks(family.id, family.timezone),
     supabase.from("snaps").select("id, task_code, kind, path, taken_on, status, ai_verdict, ai_note, ai_detail, review_note, created_at").eq("student_id", profile.id).gte("taken_on", shiftDate(today, -60)).order("created_at"),
   ]);
   type Row = SnapLite & { id: string; kind: string; path: string; ai_note: string | null; ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null; review_note: string | null; created_at: string };
@@ -41,8 +41,17 @@ export default async function SnapsPage() {
   const week = weekFor(today, family.allowance_pay_weekday ?? 5);
   const weekDays: string[] = [];
   for (let d = week.start; d <= today; d = shiftDate(d, 1)) weekDays.push(d);
-  const mine = tasks.filter((t) => t.enabled && (t.student_id === null || t.student_id === profile.id));
-  const meter = mine.map((t) => ({ t, ...snapDaysDone(t, snaps, weekDays) })).filter((m) => m.due > 0);
+  const mine = tasks.filter((t) => t.enabled && (isRota(t) ? (t.rota_student_ids ?? []).includes(profile.id) : t.student_id === null || t.student_id === profile.id));
+  const meter = mine.map((t) => ({ t, ...snapDaysDone(t, snaps, weekDays, profile.id) })).filter((m) => m.due > 0);
+  // A chore shared with a brother: who has it now, and when it comes back.
+  const shared = mine.filter((t) => isRota(t));
+  const { data: kidRows } = await supabase.from("profiles").select("id, full_name").eq("family_id", family.id).eq("role", "student");
+  const firstName = (id: string) => ((kidRows ?? []).find((k) => k.id === id)?.full_name ?? "").split(" ")[0] || "your brother";
+  const rotaLines = shared.map((t: SnapTask) => {
+    const ends = rotaTurnEnds(t, today)!;
+    const mineNow = ownsTask(t, profile.id, today);
+    return { id: t.id, emoji: t.emoji, label: t.label, mineNow, lastDay: ends.lastDay, next: ends.next === profile.id ? "you" : firstName(ends.next) };
+  });
   const weekDue = meter.reduce((s, m) => s + m.due, 0);
   const weekDone = meter.reduce((s, m) => s + m.done, 0);
   const openNow = dailyTasks.filter((t) => windowOpen(t, hhmm) && ["due", "rejected"].includes(taskDayState(t, snaps, today, hhmm)));
@@ -72,6 +81,21 @@ export default async function SnapsPage() {
             {meter.map((m) => <span key={m.t.id} className={`chip ${m.done >= m.due ? "text-good" : ""}`}>{m.t.emoji} {m.done}/{m.due}</span>)}
           </div>
           <p className="text-xs muted">{family.snap_ai_check === false ? "A parent or your rater checks each picture and ticks it." : "The coach has a first look in seconds; a parent gives the final tick."} Every due day you snap keeps the allowance meter full.</p>
+        </section>
+      )}
+
+      {rotaLines.length > 0 && (
+        <section className="space-y-2">
+          {rotaLines.map((r) => (
+            <div key={r.id} className={`card !py-3 flex items-center gap-3 ${r.mineNow ? "border-2 border-accent" : ""}`}>
+              <span className="text-3xl">{r.emoji}</span>
+              <div className="flex-1 min-w-0">
+                <div className="font-bold">{r.label}</div>
+                <div className="text-xs muted">{r.mineNow ? `Your turn until ${prettyDate(r.lastDay)}, then ${r.next}.` : `Not your turn — ${r.next === "you" ? "back to you" : r.next} after ${prettyDate(r.lastDay)}.`}</div>
+              </div>
+              <span className="text-xs">{r.mineNow ? "🔁 yours" : "🔁 resting"}</span>
+            </div>
+          ))}
         </section>
       )}
 

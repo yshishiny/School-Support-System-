@@ -2,10 +2,10 @@ import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
-import { SNAP_TEMPLATES, type HandwritingAnalysis, type SnapTask } from "@/lib/snaps";
+import { SNAP_TEMPLATES, isRota, rotaTurn, rotaTurnEnds, type HandwritingAnalysis, type SnapTask } from "@/lib/snaps";
 import { WEEKDAYS } from "@/lib/custody";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
-import { addSnapTaskAction, deleteSnapTaskAction, setScreenLimitAction, setSnapAiCheckAction, updateSnapTaskAction } from "@/lib/actions/snaps";
+import { addSnapTaskAction, deleteSnapTaskAction, setScreenLimitAction, setSnapAiCheckAction, setSnapRotaAction, updateSnapTaskAction } from "@/lib/actions/snaps";
 import { SnapReview } from "@/components/SnapReview";
 import { Tabs } from "@/components/Tabs";
 import type { Profile } from "@/lib/types";
@@ -27,7 +27,7 @@ export default async function ParentSnapsPage() {
   const today = todayIn(family.timezone);
   const [{ data: kids }, tasks, { data: snapRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
-    loadSnapTasks(family.id),
+    loadSnapTasks(family.id, family.timezone),
     supabase.from("snaps").select("id, student_id, task_code, kind, path, taken_on, status, ai_verdict, ai_score, ai_note, ai_detail, review_note, created_at").eq("family_id", family.id).gte("taken_on", shiftDate(today, -14)).order("created_at", { ascending: false }).limit(120),
   ]);
   const students = (kids ?? []) as Profile[];
@@ -139,7 +139,7 @@ export default async function ParentSnapsPage() {
                     <input type="checkbox" name="enabled" defaultChecked={t.enabled} />
                     <span className="text-lg">{t.emoji}</span>
                     <input name="label" className="input !py-1 flex-1" defaultValue={t.label} />
-                    <span className="text-xs muted">{t.student_id ? nameOf(t.student_id) : "both"}</span>
+                    <span className="text-xs muted">{isRota(t) ? `🔁 ${nameOf(rotaTurn(t, today) ?? "")}` : t.student_id ? nameOf(t.student_id) : "both"}</span>
                     <input name="weight" type="number" min={0} max={50} className="input !py-1 w-16 text-center" defaultValue={t.weight} title="Weight in the allowance score" />
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -149,6 +149,22 @@ export default async function ParentSnapsPage() {
                     <input name="window_end" type="time" className="input !py-0.5 !px-1 w-24" defaultValue={t.window_end?.slice(0, 5) ?? ""} />
                     <button className="btn-ghost btn-sm">Save</button>
                   </div>
+                </form>
+                <form action={setSnapRotaAction} className="flex flex-wrap items-center gap-2 pt-1 text-xs">
+                  <input type="hidden" name="id" value={t.id} />
+                  <span className="muted">take turns:</span>
+                  {students.map((s2) => (
+                    <label key={s2.id} className="flex items-center gap-1">
+                      <input type="checkbox" name={`kid_${s2.id}`} defaultChecked={(t.rota_student_ids ?? []).includes(s2.id)} />
+                      {s2.full_name.split(" ")[0]}
+                    </label>
+                  ))}
+                  <select name="period" className="input !py-0.5 !px-1 text-xs" defaultValue={t.rota_period ?? "week"}>
+                    <option value="week">every week</option>
+                    <option value="day">every day</option>
+                  </select>
+                  <button className="btn-ghost btn-sm">Set rota</button>
+                  {isRota(t) && (() => { const e = rotaTurnEnds(t, today); return <span className="muted">{nameOf(rotaTurn(t, today) ?? "")} until {prettyDate(e!.lastDay)}, then {nameOf(e!.next)}</span>; })()}
                 </form>
                 <form action={deleteSnapTaskAction.bind(null, t.id)} className="text-right"><button className="text-[11px] muted">delete</button></form>
               </li>

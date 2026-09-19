@@ -4,6 +4,7 @@ import { weekFor } from "@/lib/allowance";
 import { openCompensation } from "@/lib/compensation/run";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { PRAYERS, PRAYER_POINTS, pastPrayerPoints, prayerLogDate, prayerPoints, prayerState, prayerWindows, schoolSpan, windowAtSchool, type PastClaim, type PrayerName } from "@/lib/prayers";
@@ -95,7 +96,8 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
   const { error: pErr } = await admin.from("points_ledger").insert({ student_id: profile.id, delta, reason, ref_type: "prayer", ref_id: row.id });
   if (!pErr) earned = delta;
   // A prayer reported later counts for the allowance once it is balanced: two ayahs read, one question right.
-  if (claim !== "missed") await openCompensation(profile.id, family.id, "prayer", `prayer:${date}:${prayer}`, `${prayer[0].toUpperCase() + prayer.slice(1)} on ${date}, reported later`);
+  // Built after the answer goes back, because it fetches the verses and the child should not watch a dead button.
+  if (claim !== "missed") after(() => openCompensation(profile.id, family.id, "prayer", `prayer:${date}:${prayer}`, `${prayer[0].toUpperCase() + prayer.slice(1)} on ${date}, reported later`));
   ["/today", "/parent", "/me", "/allowance"].forEach((p) => revalidatePath(p));
   return { status: status as "on_time" | "late", earned };
 }

@@ -2,6 +2,14 @@
 
 All later changes are tuning on top of the V1.0 baseline and carry 1.x numbers.
 
+## 1.15.0 — Prayers you can claim on a phone, and a chore the brothers share (19 September 2026)
+
+- **The prayer panel was being cut off.** It opened as a dropdown anchored inside the home header, and that header clips whatever overflows it, so on a phone most of the list — the later prayers, their buttons and the whole "yesterday" section — was drawn outside the card and never reached the screen. It is now a full-width sheet that rises from the bottom above everything else, scrolls on its own, and closes on the backdrop, the Escape key or a button.
+- **Buttons big enough for a thumb.** Each prayer is its own row: a full-width "I prayed it ✓" while the window is open, three equal buttons (On time · Late · Missed) once it has closed, all at least forty-four pixels tall. The same three on the allowance page were a wrapping row of tiny chips and are now an even grid.
+- **The window opens by itself.** Whether a prayer could be claimed was decided when the page was rendered and never revisited, so a phone left open since the morning kept showing a countdown long after the prayer had come in. Each row now works it out from the current time.
+- **The tap saves first.** Claiming waited on the phone's location, and a late claim waited on the make-up reading being built, so the button sat dead for seconds. The prayer is saved and answered first; the rest follows in the background.
+- **A chore two children share.** Cleaning the cat litter is a photo task that belongs to one brother at a time — Omar this week, Youssef the next. Whose turn it is comes from the day the rota started, so it never drifts. It pays into the allowance like any other KPI, and only on the days that were actually his turn. Any chore can be shared: under Snaps → Tasks, tick the children and choose every week or every day.
+
 ## 1.14.0 — Morning routine, wake-up call, screen time (17 September 2026)
 
 - **Morning routine** on the kids' Today, on school days before the first lesson: Fajr, bed made (snap), sandwich ready (snap, the night before or in the morning), bag packed (snap; the AI reads the book labels against the next day's timetable), then "I'm ready, leaving on time" (+3). All done before the first lesson = **Morning champion +10** and a ping to the parents. In the evening the card shows "tonight, for tomorrow": sandwich and bag.

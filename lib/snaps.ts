@@ -21,7 +21,13 @@ export interface SnapTask {
   window_end: string | null;
   weight: number;
   enabled: boolean;
+  /** A chore two children share in turns: the members, how long a turn lasts, and the day the first turn began. */
+  rota_student_ids?: string[] | null;
+  rota_period?: RotaPeriod | null;
+  rota_since?: string | null;
 }
+
+export type RotaPeriod = "day" | "week";
 
 export interface SnapLite {
   task_code: string;
@@ -54,6 +60,7 @@ export const SNAP_TEMPLATES: SnapTemplate[] = [
   { code: "handwriting", kind: "handwriting", label: "Handwriting sample", emoji: "✍️", prompt: "Four to six handwritten lines in English or Arabic, on lined paper, photographed straight on.", days: [5], window_start: null, window_end: null, weight: 5, hint: "Once a week. The coach gives feedback and a line to practise." },
   { code: "sandwich", kind: "photo", label: "Sandwich ready for school", emoji: "🥪", prompt: "A prepared sandwich or lunch, wrapped or in a lunch box, ready to take to school.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The night before or in the morning. Part of the morning routine." },
   { code: "bag", kind: "bag", label: "Bag packed for tomorrow", emoji: "🎒", prompt: "An open school bag with the books and notebooks for the next school day visible.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The AI reads the book labels it can see and compares with the next day's timetable." },
+  { code: "petwaste", kind: "photo", label: "Cat litter cleaned", emoji: "🐾", prompt: "A cat litter tray that has just been cleaned: the litter raked flat and free of clumps, no waste in or beside the tray, and the tied waste bag in the bin. No cat needs to be in the picture.", days: ALL_DAYS, window_start: "16:00", window_end: "22:00", weight: 10, hint: "Whoever's turn it is this week. One picture of the clean tray and the tied bag." },
   { code: "screentime", kind: "screentime", label: "Screen time screenshot", emoji: "⏱️", prompt: "A screenshot of today's Digital Wellbeing (Android) or Screen Time (iPhone) summary: total time and the top apps.", days: ALL_DAYS, window_start: "19:00", window_end: "23:59", weight: 10, hint: "Every evening. The AI reads the total; over the family limit it becomes a question, not a punishment." },
 ];
 
@@ -61,10 +68,52 @@ export function templateByCode(code: string): SnapTemplate | undefined {
   return SNAP_TEMPLATES.find((t) => t.code === code);
 }
 
-/** Tasks due for a student on a date (family-wide tasks and the ones assigned to him). */
+function daysApart(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000);
+}
+
+export function isRota(t: Pick<SnapTask, "rota_student_ids" | "rota_since">): boolean {
+  return !!t.rota_since && (t.rota_student_ids?.length ?? 0) >= 2;
+}
+
+/**
+ * Whose turn a shared chore is on a date. Worked out from the start date alone, so the app, the cron and an
+ * older copy of the app all reach the same answer without a pointer that could drift.
+ */
+export function rotaTurn(t: Pick<SnapTask, "rota_student_ids" | "rota_period" | "rota_since">, date: string): string | null {
+  if (!isRota(t)) return null;
+  const ids = t.rota_student_ids!;
+  const span = t.rota_period === "day" ? 1 : 7;
+  const turns = Math.floor(daysApart(t.rota_since!, date) / span);
+  return ids[((turns % ids.length) + ids.length) % ids.length];
+}
+
+/** The day the current turn ends, and who has it next: what the child is told on his turn. */
+export function rotaTurnEnds(t: Pick<SnapTask, "rota_student_ids" | "rota_period" | "rota_since">, date: string): { lastDay: string; next: string } | null {
+  if (!isRota(t)) return null;
+  const span = t.rota_period === "day" ? 1 : 7;
+  const turns = Math.floor(daysApart(t.rota_since!, date) / span);
+  const startOfTurn = Date.parse(`${t.rota_since!}T00:00:00Z`) + turns * span * 86400000;
+  const lastDay = new Date(startOfTurn + (span - 1) * 86400000).toISOString().slice(0, 10);
+  const ids = t.rota_student_ids!;
+  return { lastDay, next: ids[(((turns + 1) % ids.length) + ids.length) % ids.length] };
+}
+
+/** True when this child carries the task on this date: his own task, a family task, or his turn on a rota. */
+export function ownsTask(t: SnapTask, studentId: string, date: string): boolean {
+  if (isRota(t)) return rotaTurn(t, date) === studentId;
+  return t.student_id === null || t.student_id === studentId;
+}
+
+/** Tasks due for a student on a date (family-wide tasks, his own, and the shared chores on his turn). */
 export function dueSnapTasks(date: string, tasks: SnapTask[], studentId: string): SnapTask[] {
   const wd = weekdayOf(date);
-  return tasks.filter((t) => t.enabled && (t.student_id === null || t.student_id === studentId) && t.days.includes(wd));
+  return tasks.filter((t) => t.enabled && ownsTask(t, studentId, date) && t.days.includes(wd));
+}
+
+/** The dates in a range on which this child owes this task: his turn days that are also due weekdays. */
+export function taskDueDates(t: SnapTask, studentId: string, dates: string[]): string[] {
+  return dates.filter((d) => t.days.includes(weekdayOf(d)) && ownsTask(t, studentId, d));
 }
 
 /** A snap counts as done when approved, or still pending but the AI found it plausible (benefit of the doubt until reviewed). */
@@ -98,8 +147,8 @@ export function taskDayState(task: SnapTask, snaps: SnapLite[], date: string, hh
 }
 
 /** Days in [start..lastDay] on which the task was due and a counting snap exists. */
-export function snapDaysDone(task: SnapTask, snaps: SnapLite[], days: string[]): { due: number; done: number } {
-  const dueDays = days.filter((d) => task.days.includes(weekdayOf(d)));
+export function snapDaysDone(task: SnapTask, snaps: SnapLite[], days: string[], studentId?: string): { due: number; done: number } {
+  const dueDays = studentId ? taskDueDates(task, studentId, days) : days.filter((d) => task.days.includes(weekdayOf(d)));
   const done = dueDays.filter((d) => snaps.some((s) => s.task_code === task.code && s.taken_on === d && snapCounts(s))).length;
   return { due: dueDays.length, done };
 }

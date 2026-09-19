@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { createPortal } from "react-dom";
 import { logPastPrayerAction, logPrayerAction } from "@/lib/actions/prayers";
 import { getPosition } from "@/lib/geo-client";
 import { recordPositionAction } from "@/lib/actions/location";
@@ -10,6 +11,8 @@ export interface PrayerRow {
   prayer: PrayerName;
   time: string; // HH:mm local
   startMs: number;
+  /** When the window closes: after this, praying counts as late. */
+  endMs: number;
   state: PrayerState;
   logged: PrayerStatus | null;
   enteredLate?: boolean;
@@ -22,51 +25,152 @@ function countdown(ms: number): string {
   return `in ${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-/** Small pill, top-right: previous prayer status and the next one, tap to expand. */
+/**
+ * The window a row is in *now*, not when the page was rendered: the page is left open for hours on a phone, and a
+ * server-rendered state would leave the child looking at a countdown long after the prayer had come in.
+ */
+function stateNow(r: PrayerRow, now: number): PrayerState {
+  if (!r.endMs) return r.state;
+  if (now < r.startMs) return "not_yet";
+  if (now < r.endMs) return "open";
+  return "late_only";
+}
+
+/** Small pill, top-right: previous prayer status and the next one, tap to open the sheet. */
 export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yesterdayDate = "" }: { rows: PrayerRow[]; onTimeCount: number; yesterday?: PrayerRow[]; today?: string; yesterdayDate?: string }) {
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => { setMounted(true); }, []);
   useEffect(() => {
-    const t = setInterval(() => setNow(Date.now()), 30000);
+    const t = setInterval(() => setNow(Date.now()), 20000);
     return () => clearInterval(t);
   }, []);
+  // While the sheet is up it owns the screen: the page behind it must not scroll under the child's finger.
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") setOpen(false); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [open]);
 
-  const current = rows.find((r) => r.state === "open");
+  const current = rows.find((r) => stateNow(r, now) === "open");
   const prev = [...rows].reverse().find((r) => r.startMs <= now);
   const next = rows.find((r) => r.startMs > now);
   const due = current && !current.logged ? current : null;
 
   const logPast = (prayer: PrayerName, date: string, claim: PastClaim) => {
     setMsg(null);
+    setBusy(`${date}:${prayer}:${claim}`);
     start(async () => {
-      const res = await logPastPrayerAction(prayer, date, claim);
-      setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+      try {
+        const res = await logPastPrayerAction(prayer, date, claim);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+      } catch {
+        setMsg("That did not save. Check the connection and try again.");
+      } finally {
+        setBusy(null);
+      }
     });
   };
-  const PastButtons = ({ prayer, date }: { prayer: PrayerName; date: string }) => (
-    <span className="inline-flex gap-1">
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="chip !py-0.5 text-[11px]" title="I prayed it on time (e.g. at school)">On time</button>
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="chip !py-0.5 text-[11px]">Late</button>
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="chip !py-0.5 text-[11px]">Missed</button>
-    </span>
-  );
   const log = (prayer: PrayerName) => {
     setMsg(null);
     start(async () => {
-      const pos = await getPosition(5000);
-      const res = await logPrayerAction(prayer);
-      if (!("error" in res && res.error)) void recordPositionAction("prayer", pos);
-      setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
+      try {
+        // The prayer is saved first: asking the phone for its position can sit behind a permission prompt for
+        // seconds, and a tap that does nothing for that long reads as broken.
+        const res = await logPrayerAction(prayer);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
+        if (!res.error) void getPosition(5000).then((pos) => recordPositionAction("prayer", pos)).catch(() => null);
+      } catch {
+        setMsg("That did not save. Check the connection and try again.");
+      }
     });
   };
 
+  // Plain functions, not components declared in the body: a component defined here is a new type on every render,
+  // so React would throw the rows away and rebuild them on each clock tick — and a button replaced between a
+  // finger going down and coming up never fires its tap.
+  const pastButtons = (prayer: PrayerName, date: string) => {
+    const label = (claim: PastClaim, text: string) => (busy === `${date}:${prayer}:${claim}` ? "…" : text);
+    return (
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="btn-ghost min-h-11 !px-1 text-xs" title="I prayed it on time (for example at school)">{label("on_time", "On time")}</button>
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="btn-ghost min-h-11 !px-1 text-xs">{label("late", "Late")}</button>
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="btn-ghost min-h-11 !px-1 text-xs !text-bad">{label("missed", "Missed")}</button>
+      </div>
+    );
+  };
+
+  const row = (r: PrayerRow, date: string, key: string) => {
+    const state = stateNow(r, now);
+    return (
+      <div key={key} className="rounded-xl bg-panel-2/60 px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold">{PRAYER_LABEL[r.prayer]}</span>
+          <span className="muted text-sm tabular-nums">{r.time}</span>
+          <span className="flex-1 text-right text-sm">
+            {r.logged === "on_time" && <span className="text-good">✓ on time{r.enteredLate ? " (later)" : ""}</span>}
+            {r.logged === "late" && <span className="text-warn">✓ late</span>}
+            {r.logged === "missed" && <span className="text-bad">✗ missed</span>}
+            {!r.logged && state === "not_yet" && <span className="muted">{countdown(r.startMs - now)}</span>}
+          </span>
+        </div>
+        {!r.logged && state === "open" && (
+          <button type="button" disabled={pending} onClick={() => log(r.prayer)} className="btn-primary mt-2 w-full min-h-12">{pending ? "…" : "I prayed it ✓"}</button>
+        )}
+        {!r.logged && state === "late_only" && pastButtons(r.prayer, date)}
+      </div>
+    );
+  };
+
+  const missedYesterday = yesterday.filter((r) => !r.logged);
+
+  const sheet = (
+    <div className="fixed inset-0 z-[120]" role="dialog" aria-modal="true" aria-label="Prayers">
+      <button type="button" aria-label="Close" className="absolute inset-0 w-full bg-black/60 backdrop-blur-[2px]" onClick={() => setOpen(false)} />
+      <div className="absolute inset-x-0 bottom-0 mx-auto w-full max-w-md sm:inset-0 sm:m-auto sm:h-fit sm:max-h-[85vh] sm:rounded-3xl">
+        <div className="flex max-h-[88svh] flex-col rounded-t-3xl border border-line bg-panel shadow-2xl sm:max-h-[85vh] sm:rounded-3xl">
+          <div className="shrink-0 px-4 pt-3">
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line sm:hidden" />
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🕌</span>
+              <div className="flex-1">
+                <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>Prayers</div>
+                <div className="text-xs muted">{onTimeCount}/5 on time today · +3 · +1 late · +10 all five</div>
+              </div>
+              <button type="button" onClick={() => setOpen(false)} className="btn-ghost btn-sm min-h-10 px-3" aria-label="Close">✕</button>
+            </div>
+          </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-3">
+            {rows.map((r) => row(r, today, r.prayer))}
+            {missedYesterday.length > 0 && (
+              <div className="space-y-2 pt-2">
+                <div className="text-xs muted">Yesterday · say it honestly</div>
+                {missedYesterday.map((r) => row({ ...r, state: "late_only", endMs: 0 }, yesterdayDate, `y-${r.prayer}`))}
+              </div>
+            )}
+            <p className="text-[11px] muted">Missed the moment? On time at school +3 · on time elsewhere +2 · late +1 · missed but honest +1.</p>
+          </div>
+          {msg && <div className="shrink-0 border-t border-line px-4 py-2 text-sm">{msg}</div>}
+          <div className="shrink-0 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2">
+            <button type="button" onClick={() => setOpen(false)} className="btn-ghost w-full min-h-11">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative">
+    <>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => setOpen(true)}
         className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs whitespace-nowrap ${due ? "border-accent bg-accent/15 pulse" : "border-line bg-panel-2"}`}
         title="Prayers"
       >
@@ -84,44 +188,8 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
           </>
         )}
       </button>
-
-      {open && (
-        <div className="absolute right-0 z-30 mt-2 w-72 card shadow-2xl space-y-1">
-          <div className="flex items-center justify-between text-xs muted mb-1">
-            <span>{onTimeCount}/5 on time today</span>
-            <span>+3 · +1 late · +10 all five</span>
-          </div>
-          {rows.map((r) => (
-            <div key={r.prayer} className="flex items-center gap-2 py-1 text-sm">
-              <span className="w-16 font-medium">{PRAYER_LABEL[r.prayer]}</span>
-              <span className="muted w-11">{r.time}</span>
-              <span className="flex-1 text-right">
-                {r.logged === "on_time" && <span className="text-good">✓ on time{r.enteredLate ? " (later)" : ""}</span>}
-                {r.logged === "late" && <span className="text-warn">✓ late</span>}
-                {r.logged === "missed" && <span className="text-bad">✗ missed</span>}
-                {!r.logged && r.state === "not_yet" && <span className="muted">{countdown(r.startMs - now)}</span>}
-                {!r.logged && r.state === "open" && (
-                  <button type="button" disabled={pending} onClick={() => log(r.prayer)} className="btn-sm btn-primary">Prayed ✓</button>
-                )}
-                {!r.logged && r.state === "late_only" && <PastButtons prayer={r.prayer} date={today} />}
-              </span>
-            </div>
-          ))}
-          {yesterday.some((r) => !r.logged) && (
-            <div className="pt-1 border-t border-line">
-              <div className="text-xs muted mb-1">Yesterday · say it honestly</div>
-              {yesterday.filter((r) => !r.logged).map((r) => (
-                <div key={r.prayer} className="flex items-center gap-2 py-1 text-sm">
-                  <span className="w-16 font-medium">{PRAYER_LABEL[r.prayer]}</span>
-                  <span className="flex-1 text-right"><PastButtons prayer={r.prayer} date={yesterdayDate} /></span>
-                </div>
-              ))}
-            </div>
-          )}
-          <p className="text-[11px] muted pt-1">Missed the moment? On time at school +3 · on time elsewhere +2 · late +1 · missed but honest +1.</p>
-          {msg && <p className="text-xs muted pt-1">{msg}</p>}
-        </div>
-      )}
-    </div>
+      {/* A portal, because the pill sits inside cards that clip their overflow: anchored here the panel was cut off. */}
+      {open && mounted && createPortal(sheet, document.body)}
+    </>
   );
 }
