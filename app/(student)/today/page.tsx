@@ -62,7 +62,7 @@ export default async function TodayPage() {
   const [hero, allowance, snapTasks, { data: snapRows }] = await Promise.all([
     heroChoices(profile),
     family.allowance_enabled ? allowanceWeekStatus(profile.id, family).catch(() => null) : Promise.resolve(null),
-    loadSnapTasks(family.id),
+    loadSnapTasks(family.id, family.timezone),
     supabase.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).eq("taken_on", today).order("created_at"),
   ]);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");

@@ -9,7 +9,8 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { formatInTimeZone } from "date-fns-tz";
 import { checkSnap } from "@/lib/ai/check-snap";
-import { SNAP_TEMPLATES, handwritingScore, templateByCode, type SnapKind, type SnapTask } from "@/lib/snaps";
+import { SNAP_TEMPLATES, handwritingScore, ownsTask, rotaTurn, templateByCode, type SnapKind, type SnapTask } from "@/lib/snaps";
+import { weekFor } from "@/lib/allowance";
 import { SNAP_BUCKET } from "@/lib/snaps/server";
 
 const STUDENT_PATHS = ["/snaps", "/today"];
@@ -35,8 +36,8 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
   const { data: task } = await admin.from("snap_tasks").select("*").eq("id", taskId).eq("family_id", family.id).eq("enabled", true).maybeSingle();
   if (!task) return { error: "This task is not active any more." };
   const t = task as SnapTask;
-  if (t.student_id && t.student_id !== profile.id) return { error: "Not your task." };
   const today = todayIn(family.timezone);
+  if (!ownsTask(t, profile.id, today)) return { error: "Not your turn for this one today." };
 
   // Same picture sent before (by this child): refuse, so an old photo cannot be reused.
   if (sha256) {
@@ -179,6 +180,31 @@ export async function updateSnapTaskAction(formData: FormData): Promise<void> {
     })
     .eq("id", id)
     .eq("family_id", family.id);
+  [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+}
+
+/**
+ * Turns a task into a shared chore two or more children take in turns, or back into a plain one.
+ * The turn is worked out from the start date, so it never drifts and both the app and the cron agree.
+ */
+export async function setSnapRotaAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const id = String(formData.get("id") ?? "");
+  const period = String(formData.get("period") ?? "week") === "day" ? "day" : "week";
+  const supabase = await createClient();
+  const { data: kids } = await supabase.from("profiles").select("id").eq("family_id", family.id).eq("role", "student");
+  const ids = (kids ?? []).map((k) => k.id as string).filter((k) => formData.get(`kid_${k}`) === "on");
+  if (ids.length < 2) {
+    await supabase.from("snap_tasks").update({ rota_student_ids: null, rota_period: null, rota_since: null }).eq("id", id).eq("family_id", family.id);
+    [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
+    return;
+  }
+  const today = todayIn(family.timezone);
+  const { data: current } = await supabase.from("snap_tasks").select("rota_since, rota_period, rota_student_ids").eq("id", id).eq("family_id", family.id).maybeSingle();
+  const same = (current?.rota_student_ids as string[] | null)?.join(",") === ids.join(",") && current?.rota_period === period;
+  // Keep the existing cycle when only the weights changed; a new line-up starts its first turn today.
+  const since = same && current?.rota_since ? (current.rota_since as string) : period === "week" ? weekFor(today, family.allowance_pay_weekday ?? 5).start : today;
+  await supabase.from("snap_tasks").update({ rota_student_ids: ids, rota_period: period, rota_since: since, student_id: rotaTurn({ rota_student_ids: ids, rota_period: period, rota_since: since }, today) }).eq("id", id).eq("family_id", family.id);
   [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
 }
 

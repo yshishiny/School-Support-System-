@@ -101,7 +101,7 @@ export default async function ParentHome() {
   const unread = await unreadCount(profile.id).catch(() => 0);
   const followups = await loadFollowups(ids, shiftDate(today, -13)).catch(() => []);
   const [snapTasks, { data: todaySnapRows }] = await Promise.all([
-    loadSnapTasks(family.id).catch(() => []),
+    loadSnapTasks(family.id, family.timezone).catch(() => []),
     supabase.from("snaps").select("student_id, task_code, taken_on, status, ai_verdict").eq("family_id", family.id).eq("taken_on", today),
   ]);
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");

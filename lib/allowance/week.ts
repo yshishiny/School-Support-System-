@@ -2,7 +2,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { amountFor, mergeKpis, scoreWeek, weekFor, type KpiOverride, type WeekResult } from "@/lib/allowance";
 import { dueInstruments, type CheckHistoryRow } from "@/lib/wellbeing";
 import { shiftDate, todayIn } from "@/lib/dates";
-import { snapCounts, type SnapLite, type SnapTask } from "@/lib/snaps";
+import { isRota, snapCounts, taskDueDates, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { compensatedRefs } from "@/lib/compensation";
 import { materialsKpi, materialStages, nextStage } from "@/lib/materials/study";
@@ -21,8 +21,16 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
   const admin = createAdminClient();
   const today = todayIn(family.timezone);
   const { start, end } = weekFor(anchorDate ?? today, family.allowance_pay_weekday);
-  const { data: taskRows } = await admin.from("snap_tasks").select("*").eq("family_id", family.id).or(`student_id.is.null,student_id.eq.${studentId}`);
-  const snapTasks = (taskRows ?? []) as SnapTask[];
+  // Every family task, because a shared chore belongs to both children even in the weeks it is not their turn.
+  const { data: taskRows } = await admin.from("snap_tasks").select("*").eq("family_id", family.id);
+  const allTasks = (taskRows ?? []) as SnapTask[];
+  const weekDates: string[] = [];
+  for (let d = start; d <= end; d = shiftDate(d, 1)) weekDates.push(d);
+  const snapTasks = allTasks
+    .filter((t) => (isRota(t) ? (t.rota_student_ids ?? []).includes(studentId) : t.student_id === null || t.student_id === studentId))
+    .map((t) => (isRota(t)
+      ? { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind, rota: true, dates: taskDueDates(t, studentId, weekDates) }
+      : { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind }));
   const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks);
   const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }, { data: snapRows }] = await Promise.all([
     admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", start).lte("tick_date", end),

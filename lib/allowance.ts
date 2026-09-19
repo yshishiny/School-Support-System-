@@ -14,6 +14,7 @@ export interface KpiDef {
   enabled: boolean;
   hint: string;
   days?: number[]; // snap tasks: weekdays the task is due
+  dates?: string[]; // snap tasks on a shared rota: the exact dates this child owes, instead of weekdays
 }
 
 export const DEFAULT_KPIS: KpiDef[] = [
@@ -34,7 +35,7 @@ export const DEFAULT_KPIS: KpiDef[] = [
 export type KpiOverride = { code: string; weight?: number; enabled?: boolean };
 
 /** Snap tasks become KPIs too (code "snap:<task code>"), so "show your win" pays into the same score. */
-export interface SnapKpiInput { code: string; label: string; emoji: string; weight: number; enabled: boolean; days: number[]; kind: string }
+export interface SnapKpiInput { code: string; label: string; emoji: string; weight: number; enabled: boolean; days: number[]; kind: string; dates?: string[]; rota?: boolean }
 
 export function mergeKpis(overrides: KpiOverride[] | null | undefined, snapTasks: SnapKpiInput[] = []): KpiDef[] {
   const map = new Map((overrides ?? []).map((o) => [o.code, o]));
@@ -42,7 +43,7 @@ export function mergeKpis(overrides: KpiOverride[] | null | undefined, snapTasks
     const o = map.get(k.code);
     return o ? { ...k, weight: o.weight ?? k.weight, enabled: o.enabled ?? k.enabled } : k;
   });
-  const snaps = snapTasks.map<KpiDef>((t) => ({ code: `snap:${t.code}`, label: `Snap: ${t.label}`, emoji: t.emoji, source: "snap", weight: t.weight, enabled: t.enabled, days: t.days, hint: t.kind === "handwriting" ? "One sample on its day." : "A picture on each due day; the AI screens, you approve." }));
+  const snaps = snapTasks.map<KpiDef>((t) => ({ code: `snap:${t.code}`, label: `Snap: ${t.label}`, emoji: t.emoji, source: "snap", weight: t.weight, enabled: t.enabled, days: t.days, dates: t.dates, hint: t.rota ? "Shared chore: it only counts on the days it is his turn." : t.kind === "handwriting" ? "One sample on its day." : "A picture on each due day; the AI screens, you approve." }));
   return [...base, ...snaps];
 }
 
@@ -188,9 +189,11 @@ export function scoreWeek(i: WeekInput): WeekResult {
       detail = st === "done" ? "done" : st === "ready" ? "ready, not attempted yet" : st === "expired" ? "not attempted before the week closed" : st === "failed" ? "could not be prepared (does not count)" : "none this week";
       if (st === "ready") hintByCode.set(k.code, "Do the weekly checkpoint (20 min, one attempt)");
     } else if (k.source === "snap") {
-      const dueDays = days.filter((d) => (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d)));
+      // A shared chore names the exact dates this child owes (his turn); everything else goes by weekday.
+      const owes = (d: string) => (k.dates ? k.dates.includes(d) : (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d)));
+      const dueDays = days.filter(owes);
       const doneDays = (i.snapDays?.[k.code] ?? []).filter((d) => dueDays.includes(d)).length;
-      const remainingDue = Array.from({ length: remaining }, (_, n) => shiftDate(lastDay, n + 1)).filter((d) => (k.days ?? [0, 1, 2, 3, 4, 5, 6]).includes(weekdayOf(d))).length;
+      const remainingDue = Array.from({ length: remaining }, (_, n) => shiftDate(lastDay, n + 1)).filter(owes).length;
       if (dueDays.length === 0) {
         fraction = 1;
         maxFraction = 1;

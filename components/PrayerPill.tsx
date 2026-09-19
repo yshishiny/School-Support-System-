@@ -41,6 +41,7 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
   const [open, setOpen] = useState(false);
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [mounted, setMounted] = useState(false);
   useEffect(() => { setMounted(true); }, []);
@@ -65,34 +66,51 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
 
   const logPast = (prayer: PrayerName, date: string, claim: PastClaim) => {
     setMsg(null);
+    setBusy(`${date}:${prayer}:${claim}`);
     start(async () => {
-      const res = await logPastPrayerAction(prayer, date, claim);
-      setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+      try {
+        const res = await logPastPrayerAction(prayer, date, claim);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+      } catch {
+        setMsg("That did not save. Check the connection and try again.");
+      } finally {
+        setBusy(null);
+      }
     });
   };
   const log = (prayer: PrayerName) => {
     setMsg(null);
     start(async () => {
-      // The prayer is saved first: asking the phone for its position can sit behind a permission prompt for seconds,
-      // and a tap that does nothing for that long reads as broken.
-      const res = await logPrayerAction(prayer);
-      setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
-      if (!res.error) void getPosition(5000).then((pos) => recordPositionAction("prayer", pos)).catch(() => null);
+      try {
+        // The prayer is saved first: asking the phone for its position can sit behind a permission prompt for
+        // seconds, and a tap that does nothing for that long reads as broken.
+        const res = await logPrayerAction(prayer);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${res.status === "on_time" ? "on time" : "late"} · +${res.earned}`);
+        if (!res.error) void getPosition(5000).then((pos) => recordPositionAction("prayer", pos)).catch(() => null);
+      } catch {
+        setMsg("That did not save. Check the connection and try again.");
+      }
     });
   };
 
-  const PastButtons = ({ prayer, date }: { prayer: PrayerName; date: string }) => (
-    <div className="grid grid-cols-3 gap-1.5">
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="btn-ghost min-h-11 !px-1 text-xs" title="I prayed it on time (for example at school)">On time</button>
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="btn-ghost min-h-11 !px-1 text-xs">Late</button>
-      <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="btn-ghost min-h-11 !px-1 text-xs !text-bad">Missed</button>
-    </div>
-  );
+  // Plain functions, not components declared in the body: a component defined here is a new type on every render,
+  // so React would throw the rows away and rebuild them on each clock tick — and a button replaced between a
+  // finger going down and coming up never fires its tap.
+  const pastButtons = (prayer: PrayerName, date: string) => {
+    const label = (claim: PastClaim, text: string) => (busy === `${date}:${prayer}:${claim}` ? "…" : text);
+    return (
+      <div className="mt-2 grid grid-cols-3 gap-1.5">
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="btn-ghost min-h-11 !px-1 text-xs" title="I prayed it on time (for example at school)">{label("on_time", "On time")}</button>
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="btn-ghost min-h-11 !px-1 text-xs">{label("late", "Late")}</button>
+        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="btn-ghost min-h-11 !px-1 text-xs !text-bad">{label("missed", "Missed")}</button>
+      </div>
+    );
+  };
 
-  const Row = ({ r, date }: { r: PrayerRow; date: string }) => {
+  const row = (r: PrayerRow, date: string, key: string) => {
     const state = stateNow(r, now);
     return (
-      <div className="rounded-xl bg-panel-2/60 px-3 py-2.5">
+      <div key={key} className="rounded-xl bg-panel-2/60 px-3 py-2.5">
         <div className="flex items-center gap-2">
           <span className="font-semibold">{PRAYER_LABEL[r.prayer]}</span>
           <span className="muted text-sm tabular-nums">{r.time}</span>
@@ -106,7 +124,7 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
         {!r.logged && state === "open" && (
           <button type="button" disabled={pending} onClick={() => log(r.prayer)} className="btn-primary mt-2 w-full min-h-12">{pending ? "…" : "I prayed it ✓"}</button>
         )}
-        {!r.logged && state === "late_only" && <div className="mt-2"><PastButtons prayer={r.prayer} date={date} /></div>}
+        {!r.logged && state === "late_only" && pastButtons(r.prayer, date)}
       </div>
     );
   };
@@ -130,11 +148,11 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
             </div>
           </div>
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain px-4 py-3">
-            {rows.map((r) => <Row key={r.prayer} r={r} date={today} />)}
+            {rows.map((r) => row(r, today, r.prayer))}
             {missedYesterday.length > 0 && (
               <div className="space-y-2 pt-2">
                 <div className="text-xs muted">Yesterday · say it honestly</div>
-                {missedYesterday.map((r) => <Row key={`y-${r.prayer}`} r={{ ...r, state: "late_only", endMs: 0 }} date={yesterdayDate} />)}
+                {missedYesterday.map((r) => row({ ...r, state: "late_only", endMs: 0 }, yesterdayDate, `y-${r.prayer}`))}
               </div>
             )}
             <p className="text-[11px] muted">Missed the moment? On time at school +3 · on time elsewhere +2 · late +1 · missed but honest +1.</p>

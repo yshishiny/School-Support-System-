@@ -7,7 +7,7 @@ import { snapshotAttention } from "@/lib/coach/signals-run";
 import { closeAllowanceWeek } from "@/lib/allowance/week";
 import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
-import { pruneOldSnaps } from "@/lib/snaps/server";
+import { loadSnapTasks, pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
@@ -129,6 +129,14 @@ export async function GET(request: Request) {
     } catch (err) {
       results.materials = [`retry error: ${err instanceof Error ? err.message : String(err)}`];
     }
+  }
+  // Shared chores: hand the turn to the next child when a turn ends, so every version of the app sees the same owner.
+  try {
+    const { data: fams } = await admin.from("families").select("id, timezone");
+    for (const f of fams ?? []) await loadSnapTasks(f.id as string, (f.timezone as string) ?? "Africa/Cairo");
+    results.rota = ["synced"];
+  } catch (err) {
+    results.rota = [`rota error: ${err instanceof Error ? err.message : String(err)}`];
   }
   // Snap pictures: 30-day retention (handwriting samples a year).
   try {

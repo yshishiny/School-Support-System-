@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-beta.9 — The cats' tray, taken in turns (19 September 2026, `v2` branch)
+
+- **A chore two children share.** Cleaning the cat litter is now a photo task like the bed or the desk, and it belongs to one brother at a time: Omar this week, Youssef the next, and so on. Whose turn it is is worked out from the day the rota started, so it never drifts and every part of the app agrees. The child on duty sees "your turn until Friday, then Youssef"; the other sees when it comes back to him.
+- **It pays into the allowance like everything else.** The chore is a KPI, and it only counts on the days it is actually his turn — a brother is never marked down for a week that was not his.
+- **Proof by picture.** A photo of the cleaned tray and the tied bag, screened by the AI and ticked by a parent, exactly like the other snaps. Evenings, four until ten.
+- **Any chore can be shared.** Under Snaps → Tasks, tick the children who take turns and choose every week or every day. The turn is also written onto the task itself, so the stable site reads the same owner.
+- Fixed: claiming a late prayer felt dead. The answer now comes straight back and the make-up reading is built afterwards, instead of the child waiting on it; the button says so while it saves, and a failure is shown rather than swallowed.
+
 ## 2.0.0-beta.8 — Prayers you can actually claim on a phone (19 September 2026, `v2` branch)
 
 - **The prayer panel was being cut off.** It opened as a small anchored dropdown inside the home header, and that header clips whatever overflows it. On a phone the header ends about a hundred pixels down, so most of the list — the later prayers, their buttons and the whole "yesterday" section — was drawn outside the card and never reached the screen. The panel is now a full-width sheet that rises from the bottom of the screen above everything else, scrolls on its own, and is closed by the backdrop, the Escape key or a Close button.

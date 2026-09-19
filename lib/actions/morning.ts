@@ -20,7 +20,7 @@ export async function morningReadyAction(): Promise<{ error?: string; earned?: n
   const [{ data: tt }, { data: off }, tasks, { data: snaps }, { data: prayers }, { data: log }] = await Promise.all([
     admin.from("timetable_entries").select("weekday, subject_name, start_time, end_time").eq("student_id", profile.id),
     admin.from("school_days_off").select("day, label").eq("family_id", family.id).eq("day", today),
-    loadSnapTasks(family.id),
+    loadSnapTasks(family.id, family.timezone),
     admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", profile.id).in("taken_on", [today, new Date(Date.parse(today + "T00:00:00Z") - 86400000).toISOString().slice(0, 10)]),
     admin.from("prayer_logs").select("prayer, status").eq("student_id", profile.id).eq("log_date", today).eq("prayer", "fajr"),
     admin.from("morning_log").select("id, ready_at, champion_at").eq("student_id", profile.id).eq("day", today).maybeSingle(),
