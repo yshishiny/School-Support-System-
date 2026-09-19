@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { creditWallet } from "./wallet";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pingParents } from "@/lib/notify";
@@ -46,10 +47,15 @@ export async function tickKpiAction(studentId: string, code: string, value: bool
 }
 
 export async function markAllowancePaidAction(weekId: string): Promise<void> {
-  const { family } = await requireParent();
+  const { profile, family } = await requireParent();
   const supabase = await createClient();
+  const { data: week } = await supabase.from("allowance_weeks").select("id, student_id, amount, week_start, week_end").eq("id", weekId).eq("family_id", family.id).maybeSingle();
   await supabase.from("allowance_weeks").update({ paid_at: new Date().toISOString() }).eq("id", weekId).eq("family_id", family.id);
-  PATHS.forEach((p) => revalidatePath(p));
+  // The week's money goes into his wallet, held until it is actually handed over.
+  if (week?.amount) {
+    await creditWallet({ studentId: week.student_id as string, familyId: family.id, amount: Number(week.amount), label: `Allowance week ${week.week_start}`, on: week.week_end as string, refType: "allowance_week", refId: week.id as string, by: profile.id }).catch(() => null);
+  }
+  [...PATHS, "/wallet"].forEach((p) => revalidatePath(p));
 }
 
 export async function assignConsequenceAction(formData: FormData): Promise<void> {

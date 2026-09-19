@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.0.0-beta.13 — A wallet for each child (19 September 2026, `v2` branch)
+
+- **Two balances, not one.** Money a child earns — a paid allowance week, a reward that pays cash — goes into his wallet and is *kept for him*. When you hand the notes over you say so, and that amount moves out of what you hold and becomes *money in his pocket*. What he then spends comes off the pocket. The two always add up to what he owns, which is a balance sheet he can see rather than a lesson he is told.
+- **He writes down what he spent.** Amount, what it was, which kind of thing and the day, in four taps. The month then shows what came in, what went out, and where it went, ranked, with the biggest single thing named.
+- **A first budget.** Whatever is in his pocket is split on screen into sixty to spend, thirty to put away and ten to give, with what the saved part becomes if he keeps it.
+- **For the parent**, a Wallets tab under Allowance: what each child is held, what he has in his pocket, what he has spent, and one line to record a hand-over or to add money for Eid or a job.
+- Nothing is credited twice: a week or a reward keyed to its own record can be marked paid again with no effect on the balance.
+
 ## 2.0.0-beta.12 — A new look for V2, and the cats fed as well as cleaned (19 September 2026, `v2` branch)
 
 - **The beta is redrawn.** A near-black ground with a warm glow instead of flat navy; surfaces that sit above it on real layered shadows with a hairline of light along the top edge rather than a heavy outline; one champagne-gold accent with an ice-blue second; and controls with a physical edge — a lit top, a dark lip underneath, and a press that moves. Headings are tighter with a metal rule under the page title, inputs are sunken, the bottom bar reads as one machined strip.

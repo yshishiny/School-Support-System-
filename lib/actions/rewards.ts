@@ -1,6 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { creditWallet } from "./wallet";
+import { todayIn } from "@/lib/dates";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -63,11 +65,11 @@ export async function redeemRewardAction(_prev: { error?: string; ok?: string } 
 }
 
 export async function decideRedemptionAction(formData: FormData) {
-  await requireParent();
+  const { profile: parent, family } = await requireParent();
   const supabase = await createClient();
   const id = String(formData.get("id"));
   const decision = String(formData.get("decision")); // approved | rejected | delivered
-  const { data: r } = await supabase.from("redemptions").select("*, rewards(title)").eq("id", id).single();
+  const { data: r } = await supabase.from("redemptions").select("*, rewards(title, cash_amount_egp)").eq("id", id).single();
   if (!r) return;
   await supabase.from("redemptions").update({ status: decision, decided_at: new Date().toISOString() }).eq("id", id);
   if (decision === "approved" && r.status === "pending") {
@@ -79,10 +81,16 @@ export async function decideRedemptionAction(formData: FormData) {
       ref_type: "redemption",
       ref_id: id,
     });
+    // A reward that pays money goes into his wallet, held until it is handed over.
+    const rw = (r as { rewards?: { title?: string; cash_amount_egp?: number | null } }).rewards;
+    if (rw?.cash_amount_egp) {
+      await creditWallet({ studentId: r.student_id as string, familyId: family.id, amount: Number(rw.cash_amount_egp), label: `Reward: ${rw.title ?? "reward"}`, on: todayIn(family.timezone), refType: "reward", refId: id, by: parent.id }).catch(() => null);
+    }
   }
   revalidatePath("/parent/rewards");
   revalidatePath("/parent");
   revalidatePath("/rewards");
+  revalidatePath("/wallet");
 }
 
 export async function adjustPointsAction(formData: FormData) {

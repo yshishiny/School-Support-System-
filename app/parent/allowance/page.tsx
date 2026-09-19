@@ -9,6 +9,9 @@ import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { assignConsequenceAction, closeConsequenceAction, markAllowancePaidAction, saveAllowanceSettingsAction } from "@/lib/actions/allowance";
 import { AllowanceMeter } from "@/components/AllowanceMeter";
 import { prettyDate, todayIn } from "@/lib/dates";
+import { ParentWalletForms } from "@/components/WalletForms";
+import { loadWallet } from "@/lib/actions/wallet";
+import { balances } from "@/lib/wallet";
 import type { Consequence, Profile } from "@/lib/types";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -24,6 +27,7 @@ export default async function AllowancePage() {
   ]);
   const students = (kids ?? []) as Profile[];
   const statuses = await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family)));
+  const wallets = await Promise.all(students.map(async (s) => ({ id: s.id, name: s.full_name.split(" ")[0], b: balances(await loadWallet(s.id)) })));
   const kpis = mergeKpis(family.allowance_kpis);
   const enabledPractices = PRACTICES.filter((p) => family.practices_enabled.includes(p.code));
   const open = (cons ?? []) as Consequence[];
@@ -45,6 +49,26 @@ export default async function AllowancePage() {
           { id: "kids", label: "This week", emoji: "💵", content: (<>
       <SideTabs storageKey="allowance-kids" tabs={students.map((s, i) => ({ id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(i), sub: `${statuses[i].amount} EGP · ${statuses[i].score}`, content: <AllowanceMeter status={statuses[i]} /> }))} />
           </>) },
+          { id: "wallets", label: "Wallets", emoji: "👛", content: (
+      <section className="card space-y-4">
+        <div>
+          <h2 className="h2">What each of them is owed</h2>
+          <p className="text-xs muted">A paid allowance week and a cash reward land here and stay held until you hand the money over. Say when you do, and his wallet shows it as taken on that day — so he learns a balance that has two sides.</p>
+        </div>
+        {wallets.map((w) => (
+          <div key={w.id} className="tile space-y-2">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+              <span className="font-bold">{w.name}</span>
+              <span>held <b className="text-good">{w.b.withDad} EGP</b></span>
+              <span className="muted">in his pocket {w.b.inPocket}</span>
+              <span className="muted">spent {w.b.spent}</span>
+              <span className="muted">owns {w.b.net}</span>
+            </div>
+            <ParentWalletForms studentId={w.id} name={w.name} today={today} />
+          </div>
+        ))}
+      </section>
+          ) },
           { id: "history", label: "History", emoji: "🗓️", badge: (weeks ?? []).filter((w) => !w.paid_at && w.claimed_at).length || null, content: (<>
       <section className="card space-y-3">
         <h2 className="h2">History</h2>
