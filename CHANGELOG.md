@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.11 — The lesson laid out for a phone (19 September 2026, `v2` branch)
+
+- **The board is the lesson.** On a phone held upright the stage used to give the board 42% of the screen and the rest to a teacher two centimetres tall, leaving a third of the display empty. The board now fills the screen and the teacher stands in front of it, which is what the ⛶ button already did; a tablet or a laptop keeps the two-panel stage.
+- **An empty board now teaches.** Beats with no diagram showed a green rectangle and the word "Listen…" while the words scrolled in a card at the bottom. The board carries the spoken line itself, large and lighting up word by word, and the card below shrinks away, so the screen says one thing instead of two.
+- **Controls you can hit.** The seven buttons were bare icons on a thin strip; they are now forty-eight pixels tall with a word under each (Play, Next, Ask, Notes, Board, Voice), and the cryptic "0%" is a progress bar across the bottom.
+
 ## 2.0.0-beta.10 — The beta looks like the beta (19 September 2026, `v2` branch)
 
 - **Its own icon.** The beta draws its app icon instead of loading a stored one: an orange tile with a test tube, against the live site's purple tile with books. On a phone's home screen the two are told apart at a glance, and the beta installs as its own app ("Portal Beta") rather than replacing the real one.

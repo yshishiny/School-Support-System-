@@ -25,10 +25,10 @@ const ADVANCE_MS = 1300;
 const NO_CLOUD: CloudVoice[] = [];
 const HOOK_RECAP = ["hook", "recap"];
 
-function Caption({ text, wordIndex, rtl }: { text: string; wordIndex: number; rtl: boolean }) {
+function Caption({ text, wordIndex, rtl, size = "small" }: { text: string; wordIndex: number; rtl: boolean; size?: "small" | "board" }) {
   const words = useMemo(() => wordsOf(text), [text]);
   return (
-    <p className={`text-[clamp(.95rem,2.3vw,1.3rem)] leading-relaxed font-semibold text-white/85 ${rtl ? "font-arabic text-right" : ""}`} dir={rtl ? "rtl" : undefined}>
+    <p className={`${size === "board" ? "text-[clamp(1.15rem,4.4vw,1.9rem)] leading-snug font-bold text-[#f3eddb]" : "text-[clamp(.95rem,2.3vw,1.3rem)] leading-relaxed font-semibold text-white/85"} ${rtl ? "font-arabic text-right" : ""}`} dir={rtl ? "rtl" : undefined}>
       {words.map((w, k) => <span key={k} className={`caption-word ${k < wordIndex ? "said" : k === wordIndex ? "now" : ""}`}>{w} </span>)}
     </p>
   );
@@ -79,14 +79,23 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const [answer, setAnswer] = useState<string | null>(null);
   const [pad, setPad] = useState(false);
   const [layout, setLayout] = useState<"stage" | "board">("stage");
-  useEffect(() => { try { const l = localStorage.getItem("teach:layout"); if (l === "board") setLayout("board"); } catch { /* ignore */ } }, []);
+  // A tall phone has no room for a stage beside the board: there the board fills the screen and the teacher
+  // stands in front of it, which is also what the ⛶ button gives. Anything wider keeps the two-panel stage.
+  const phoneDefault = () => (typeof window !== "undefined" && window.innerWidth < 820 && window.innerHeight > window.innerWidth ? "board" : "stage");
+  useEffect(() => {
+    try {
+      const l = localStorage.getItem("teach:layout");
+      setLayout(l === "board" || l === "stage" ? l : phoneDefault());
+    } catch { setLayout(phoneDefault()); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const setLayoutKeep = (l: "stage" | "board") => { setLayout(l); try { localStorage.setItem("teach:layout", l); } catch { /* ignore */ } };
   // The phone's own picture-in-picture takes the presenter out of the page: give the board the room.
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
     const enter = () => setLayout("board");
-    const leave = () => { try { setLayout(localStorage.getItem("teach:layout") === "board" ? "board" : "stage"); } catch { setLayout("stage"); } };
+    const leave = () => { try { const l = localStorage.getItem("teach:layout"); setLayout(l === "board" || l === "stage" ? l : phoneDefault()); } catch { setLayout(phoneDefault()); } };
     v.addEventListener("enterpictureinpicture", enter); v.addEventListener("leavepictureinpicture", leave);
     return () => { v.removeEventListener("enterpictureinpicture", enter); v.removeEventListener("leavepictureinpicture", leave); };
   }, []);
@@ -273,6 +282,10 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     </>
   );
 
+  // With no diagram for this beat the board would be a blank green rectangle: it carries the spoken words instead,
+  // and the caption card below shrinks to the sound note, so the screen says one thing rather than two.
+  const boardWrites = phase === "lesson" && beat?.kind !== "check" && !beat?.show;
+
   const overlay = (
     <>
       <Confetti burst={burst} />
@@ -314,19 +327,39 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
             {msg && <p className="text-xs text-bad">{msg}</p>}
           </div>
         )}
-        <div className="rounded-2xl bg-black/55 backdrop-blur px-3 py-2 min-h-[3.4rem] max-h-[19vh] overflow-auto">
-          {line ? <Caption text={line} wordIndex={speech.speaking || speech.paused ? speech.wordIndex : 9999} rtl={rtl} /> : <p className="text-sm text-white/60">{rtl ? "…" : "…"}</p>}
-          {speech.blocked ? <p className="text-[11px] text-[#ffd166] mt-1">{rtl ? "اضغط ▶ لتسمع المعلم." : "Tap ▶ to hear the teacher."}</p> : !speech.available && <p className="text-[11px] text-[#ffd166] mt-1">{rtl ? "لا يوجد صوت في هذا المتصفح، اقرأ النص." : "No voice on this browser: read along."}</p>}
-        </div>
-        <div className="stage-controls flex items-center justify-between gap-1 rounded-2xl bg-black/55 backdrop-blur px-1.5 py-1 text-white" dir={rtl ? "rtl" : undefined}>
-          <button type="button" className="flex-1 rounded-xl px-2 text-lg disabled:opacity-30" disabled={phase !== "lesson" || i === 0} onClick={() => goTo(i - 1)} aria-label="Back">⏮</button>
-          <button type="button" className="flex-1 rounded-xl px-2 text-lg" onClick={togglePlay} aria-label="Play or pause">{speech.speaking && !speech.paused ? "⏸" : "▶"}</button>
-          <button type="button" className="flex-1 rounded-xl px-2 text-lg disabled:opacity-30" disabled={phase === "outro" || (phase === "lesson" && beat?.kind === "check" && !checkDone)} onClick={() => (phase === "intro" ? goTo(0) : goTo(i + 1))} aria-label="Next">⏭</button>
-          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${hand ? "bg-accent/60" : ""}`} onClick={raiseHand} aria-label="Raise your hand">✋</button>
-          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${pad ? "bg-accent/60" : ""}`} onClick={() => setPad((p) => !p)} aria-label="Scratchpad">✏️</button>
-          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${layout === "board" ? "bg-accent/60" : ""}`} onClick={() => setLayoutKeep(layout === "board" ? "stage" : "board")} aria-label="Board size" title={rtl ? "سبورة كبيرة والمعلم في الزاوية" : "Big board, teacher in the corner"}>⛶</button>
-          <button type="button" className={`flex-1 rounded-xl px-2 text-lg ${voiceOpen ? "bg-accent/60" : ""}`} onClick={() => { cancelAdvance(); speech.stop(); setVoiceOpen((v) => !v); }} aria-label="Teacher's voice">🔊</button>
-          <span className="px-2 text-[11px] font-bold text-white/70 tabular-nums">{progress}%</span>
+        {(!boardWrites || speech.blocked || !speech.available) && (
+          <div className="rounded-2xl bg-black/55 backdrop-blur px-3 py-2 max-h-[19vh] overflow-auto">
+            {!boardWrites && (line ? <Caption text={line} wordIndex={speech.speaking || speech.paused ? speech.wordIndex : 9999} rtl={rtl} /> : <p className="text-sm text-white/60">…</p>)}
+            {speech.blocked ? <p className="text-[11px] text-[#ffd166]">{rtl ? "اضغط ▶ لتسمع المعلم." : "Tap ▶ to hear the teacher."}</p> : !speech.available && <p className="text-[11px] text-[#ffd166]">{rtl ? "لا يوجد صوت في هذا المتصفح، اقرأ النص." : "No voice on this browser: read along."}</p>}
+          </div>
+        )}
+        <div className="stage-controls rounded-2xl bg-black/60 backdrop-blur px-1.5 pt-1 pb-1.5 text-white" dir={rtl ? "rtl" : undefined}>
+          <div className="flex items-stretch justify-between gap-0.5">
+            {([
+              { key: "back", icon: "⏮", label: rtl ? "السابق" : "Back", disabled: phase !== "lesson" || i === 0, on: false, act: () => goTo(i - 1) },
+              { key: "play", icon: speech.speaking && !speech.paused ? "⏸" : "▶", label: speech.speaking && !speech.paused ? (rtl ? "إيقاف" : "Pause") : (rtl ? "تشغيل" : "Play"), disabled: false, on: false, act: togglePlay },
+              { key: "next", icon: "⏭", label: rtl ? "التالي" : "Next", disabled: phase === "outro" || (phase === "lesson" && beat?.kind === "check" && !checkDone), on: false, act: () => (phase === "intro" ? goTo(0) : goTo(i + 1)) },
+              { key: "hand", icon: "✋", label: rtl ? "اسأل" : "Ask", disabled: false, on: hand, act: raiseHand },
+              { key: "pad", icon: "✏️", label: rtl ? "مسودة" : "Notes", disabled: false, on: pad, act: () => setPad((x) => !x) },
+              { key: "layout", icon: "⛶", label: rtl ? "السبورة" : "Board", disabled: false, on: layout === "board", act: () => setLayoutKeep(layout === "board" ? "stage" : "board") },
+              { key: "voice", icon: "🔊", label: rtl ? "الصوت" : "Voice", disabled: false, on: voiceOpen, act: () => { cancelAdvance(); speech.stop(); setVoiceOpen((v) => !v); } },
+            ] as const).map((b2) => (
+              <button
+                key={b2.key}
+                type="button"
+                disabled={b2.disabled}
+                onClick={b2.act}
+                aria-label={b2.label}
+                className={`flex min-h-12 flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-0.5 leading-none transition disabled:opacity-30 ${b2.on ? "bg-accent/60" : "active:bg-white/10"}`}
+              >
+                <span className="text-lg">{b2.icon}</span>
+                <span className="text-[9px] font-semibold text-white/75">{b2.label}</span>
+              </button>
+            ))}
+          </div>
+          <div className="mt-1 h-1 rounded-full bg-white/15" aria-label={`${progress}%`}>
+            <div className="h-full rounded-full bg-[#ffd166] transition-[width] duration-500" style={{ width: `${progress}%` }} />
+          </div>
         </div>
       </div>
     </>
@@ -336,10 +369,20 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     <Classroom scene={c.rig.scene} camera={camera} overlay={overlay}>
       <div className={`absolute inset-0 grid gap-2 px-3 pt-[calc(max(.5rem,env(safe-area-inset-top))+3.4rem)] pb-[calc(max(.5rem,env(safe-area-inset-bottom))+10rem)] landscape:pb-[calc(max(.5rem,env(safe-area-inset-bottom))+8.5rem)] ${layout === "board" ? "grid-rows-1 grid-cols-1" : "grid-rows-[42%_1fr] landscape:grid-rows-1 landscape:grid-cols-[32%_1fr]"}`}>
         <div className="relative min-h-0 order-1 landscape:order-2">
-          <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} step={step} rtl={rtl} title={script.title} kindLabel={label} image={phase === "lesson" && beat?.kind !== "check" ? beat?.image ?? null : null}>{boardBody}</Board>
+          <Board
+            show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null}
+            idle={boardWrites}
+            idleNode={boardWrites && line ? <Caption text={line} wordIndex={speech.speaking || speech.paused ? speech.wordIndex : 9999} rtl={rtl} size="board" /> : null}
+            revealed={revealed}
+            step={step}
+            rtl={rtl}
+            title={script.title}
+            kindLabel={label}
+            image={phase === "lesson" && beat?.kind !== "check" ? beat?.image ?? null : null}
+          >{boardBody}</Board>
           <Scratchpad open={pad} onClose={() => setPad(false)} />
         </div>
-        <div className={layout === "board" ? "absolute z-10 start-4 bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+10.5rem)] landscape:bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+9rem)] h-[26%] landscape:h-[38%] flex items-end" : "relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]"}>
+        <div className={layout === "board" ? "absolute z-10 start-4 bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+11.5rem)] landscape:bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+9.5rem)] h-[24%] landscape:h-[38%] flex items-end" : "relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]"}>
           {!useVideo && (
             <div className={`h-full ${walking ? "t-enter" : ""}`}>
               <Teacher c={c} gesture={gesture} mood={mood} viseme={speech.speaking && !speech.paused ? speech.viseme : "rest"} walking={walking} className="!h-full !w-auto max-w-full drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" />
