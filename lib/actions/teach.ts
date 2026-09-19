@@ -8,7 +8,7 @@ import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
-import { generateLessonScript, SCRIPT_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
+import { generateLessonScript, SCRIPT_VERSION, VISUALS_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
 import { answerInLesson } from "@/lib/ai/lesson-answer";
 import { enrichBeats } from "@/lib/teach/enrich";
 import { learnerPromptLine } from "@/lib/learner";
@@ -73,7 +73,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     const beats = await enrichBeats(body.beats, { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language }).catch(() => body.beats);
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: SCRIPT_VERSION })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: VISUALS_VERSION })
       .select("id")
       .single();
     if (error || !row) return { error: error?.message ?? "Could not save the lesson." };
@@ -87,7 +87,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     const sid = scriptId;
     if (voice) after(async () => {
       const { data } = await admin.from("lesson_scripts").select("script, title").eq("id", sid).maybeSingle();
-      const beats = ((data?.script as { beats?: { kind: string; say: string }[] } | null)?.beats ?? []).map((b) => ({ kind: b.kind, say: b.say }));
+      const beats = ((data?.script as { beats?: { kind: string; say: string; check?: { explanation?: string | null; hint?: string | null } | null }[] } | null)?.beats ?? []).map((b) => ({ kind: b.kind, say: b.say, check: b.check ?? null }));
       await renderScript({ characterId: character.id, voice, beats, title: data?.title ?? "", language });
     });
   }

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { CLOUD_VOICES, defaultCloudVoice } from "@/lib/tts";
-import { closingLine, greetingLine } from "@/lib/teach/lines";
+import { closingLine, correctLine, greetingLine, hintLine, revealLine } from "@/lib/teach/lines";
 import { spokenText } from "@/lib/teach/spoken";
 
 /**
@@ -210,12 +210,19 @@ export async function clipStats(): Promise<{ done: number; pending: number; fail
 }
 
 /** Starts the script's video lines rendering, in order, so the clips are ready by the time the child reaches them. */
-export async function renderScript(o: { characterId: string; voice: string; beats: { kind: string; say: string }[]; title: string; language: "en" | "ar" }): Promise<void> {
+export async function renderScript(o: { characterId: string; voice: string; beats: { kind: string; say: string; check?: { explanation?: string | null; hint?: string | null } | null }[]; title: string; language: "en" | "ar" }): Promise<void> {
   const kinds = videoKinds(await videoMode());
   const c = CHARACTERS.find((x) => x.id === o.characterId);
+  // The teacher's answers to a check are known in advance too, so they get a clip and never fall back to a still photo.
+  const feedback = c ? o.beats.flatMap((b) => [
+    b.check?.explanation ? { kind: b.kind, say: correctLine(c, o.language, b.check.explanation) } : null,
+    b.check?.hint ? { kind: b.kind, say: hintLine(c, o.language, b.check.hint) } : null,
+    b.check?.hint && b.check?.explanation ? { kind: b.kind, say: revealLine(b.check.explanation, b.check.hint) } : null,
+  ].filter((x): x is { kind: string; say: string } => !!x)) : [];
   const lines = [
     ...(c ? [{ kind: "hook", say: greetingLine(c, o.language, o.title) }] : []),
     ...o.beats,
+    ...feedback,
     { kind: "recap", say: closingLine(o.language) },
   ];
   for (const b of lines) {

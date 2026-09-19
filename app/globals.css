@@ -120,8 +120,16 @@ body {
 .scene .scene-hidden { opacity: 0; }
 .scene .scene-now { animation: scene-pop .6s cubic-bezier(.2,.9,.3,1.3) both; filter: drop-shadow(0 0 6px rgba(58,134,255,.9)); }
 @keyframes scene-pop { from { opacity: 0; transform: translateY(10px) scale(.94); transform-origin: center; } 60% { opacity: 1; transform: translateY(-2px) scale(1.02); } to { opacity: 1; transform: none; } }
-.scene-pointer { position: absolute; transform: translate(-50%, -110%); font-size: 2rem; line-height: 1; filter: drop-shadow(0 4px 6px rgba(0,0,0,.35)); animation: scene-bounce .9s ease-in-out infinite; pointer-events: none; transition: left .45s cubic-bezier(.2,.9,.3,1.1), top .45s cubic-bezier(.2,.9,.3,1.1); }
-@keyframes scene-bounce { 0%, 100% { transform: translate(-50%, -110%); } 50% { transform: translate(-50%, -135%); } }
+/* A presenter's laser: a ring frames the part being explained and a red dot pulses on it, instead of a cartoon hand. */
+.scene-ring { position: absolute; border-radius: 14px; border: 3px solid rgba(230,57,70,.85); box-shadow: 0 0 0 4px rgba(230,57,70,.14), 0 6px 18px rgba(0,0,0,.18); pointer-events: none; animation: scene-ring-in .5s cubic-bezier(.2,.9,.3,1.3) both, scene-ring-pulse 1.8s ease-in-out .5s infinite; transition: left .45s cubic-bezier(.2,.9,.3,1.1), top .45s cubic-bezier(.2,.9,.3,1.1), width .45s ease, height .45s ease; }
+@keyframes scene-ring-in { from { opacity: 0; transform: scale(1.12); } to { opacity: 1; transform: none; } }
+@keyframes scene-ring-pulse { 0%, 100% { box-shadow: 0 0 0 4px rgba(230,57,70,.14), 0 6px 18px rgba(0,0,0,.18); } 50% { box-shadow: 0 0 0 9px rgba(230,57,70,.08), 0 6px 18px rgba(0,0,0,.18); } }
+.scene-laser { position: absolute; width: 0; height: 0; pointer-events: none; transition: left .45s cubic-bezier(.2,.9,.3,1.1), top .45s cubic-bezier(.2,.9,.3,1.1); }
+.scene-laser i { position: absolute; left: 50%; top: 50%; border-radius: 999px; transform: translate(-50%, -50%); }
+.scene-laser-dot { width: 14px; height: 14px; background: radial-gradient(circle at 35% 30%, #fff 0 18%, #ff5a67 30%, #d11f2d 100%); box-shadow: 0 0 10px 3px rgba(230,57,70,.65); }
+.scene-laser-ripple { width: 14px; height: 14px; border: 2px solid rgba(230,57,70,.7); animation: scene-laser-ripple 1.5s ease-out infinite; }
+@keyframes scene-laser-ripple { from { width: 14px; height: 14px; opacity: .8; } to { width: 54px; height: 54px; opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .scene-ring, .scene-laser-ripple { animation: none; } }
 .caption-word { transition: color .12s, background .12s; border-radius: .35rem; padding: 0 .1em; }
 .caption-word.said { color: #fff; }
 .caption-word.now { background: color-mix(in srgb, var(--stage-glow, #7c5cff) 45%, transparent); color: #fff; }
@@ -139,7 +147,15 @@ body {
 .speaking-bars i { display: block; width: 3px; height: 6px; border-radius: 2px; background: #fff; animation: speak-bar .7s ease-in-out infinite alternate; }
 .speaking-bars i:nth-child(2) { animation-delay: .15s; } .speaking-bars i:nth-child(3) { animation-delay: .3s; } .speaking-bars i:nth-child(4) { animation-delay: .45s; }
 @keyframes speak-bar { from { height: 4px; } to { height: 14px; } }
-@media (prefers-reduced-motion: reduce) { .stage-camera, .board-line, .board-chalk, .board-draw, .choice-card, .t-enter, .title-card, .confetti { animation: none !important; transition: none !important; stroke-dashoffset: 0; opacity: 1; } }
+/* A still photo of a presenter looks frozen: the frame breathes between lines and moves while a line is only audio. */
+.presenter-frame video { will-change: transform; transform-origin: 50% 40%; }
+.presenter-still video { animation: presenter-breathe 7s ease-in-out infinite; }
+.presenter-talking video { animation: presenter-talk .62s ease-in-out infinite alternate; }
+.presenter-talking { box-shadow: 0 0 0 0 rgba(124,92,255,0); animation: presenter-glow 1.6s ease-in-out infinite; border-radius: 1.4rem; }
+@keyframes presenter-breathe { 0%, 100% { transform: scale(1) translateY(0); } 50% { transform: scale(1.014) translateY(-.4%); } }
+@keyframes presenter-talk { from { transform: scale(1.004) translateY(0) rotate(-.15deg); } to { transform: scale(1.022) translateY(-.8%) rotate(.25deg); } }
+@keyframes presenter-glow { 0%, 100% { box-shadow: 0 0 22px 2px rgba(124,92,255,.25); } 50% { box-shadow: 0 0 34px 8px rgba(124,92,255,.45); } }
+@media (prefers-reduced-motion: reduce) { .presenter-still video, .presenter-talking video, .presenter-talking, .stage-camera, .board-line, .board-chalk, .board-draw, .choice-card, .t-enter, .title-card, .confetti { animation: none !important; transition: none !important; stroke-dashoffset: 0; opacity: 1; } }
 [dir="rtl"] .prose-lesson, [lang="ar"] .prose-lesson, .font-arabic { font-family: var(--font-arabic); }
 
 @keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-accent) 60%, transparent); } 100% { box-shadow: 0 0 0 10px transparent; } }

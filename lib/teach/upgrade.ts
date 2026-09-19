@@ -5,7 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { effortFor, modelFor } from "@/lib/ai/models";
 import { illustrateScene } from "@/lib/ai/illustrate";
 import { findPhoto } from "@/lib/photos";
-import { SCRIPT_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
+import { VISUALS_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
 import type { StoredBeat } from "./enrich";
 
 type Beat = LessonScript["beats"][number];
@@ -39,9 +39,9 @@ export async function upgradeScriptVisuals(scriptId: string): Promise<void> {
   const admin = createAdminClient();
   const { data: row } = await admin.from("lesson_scripts").select("id, title, language, script, visuals_version, topic_id, material_id, topics(subject, name)").eq("id", scriptId).maybeSingle();
   const r = row as unknown as { id: string; title: string; language: string; script: { beats: Beat[]; quiz: unknown }; visuals_version: number | null; topics: { subject: string; name: string } | null } | null;
-  if (!r || (r.visuals_version ?? 0) >= SCRIPT_VERSION) return;
+  if (!r || (r.visuals_version ?? 0) >= VISUALS_VERSION) return;
   // Claim it so two opens do not both pay for the same drawings (0 = in progress).
-  const { data: claimed } = await admin.from("lesson_scripts").update({ visuals_version: 0 }).eq("id", scriptId).is("visuals_version", null).select("id");
+  const { data: claimed } = await admin.from("lesson_scripts").update({ visuals_version: 0 }).eq("id", scriptId).or(`visuals_version.is.null,and(visuals_version.gt.0,visuals_version.lt.${VISUALS_VERSION})`).select("id");
   if (!claimed?.length) return;
   const language = r.language === "ar" ? "ar" : "en";
   const subject = r.topics?.subject ?? "School";
@@ -60,7 +60,7 @@ export async function upgradeScriptVisuals(scriptId: string): Promise<void> {
       const show = drawn ? { type: "scene" as const, content: drawn.svg, cues: drawn.cues, brief } : b.show ?? null;
       return { ...b, show, photo: photoPhrase, image: image ?? (b as StoredBeat).image ?? null };
     }));
-    await admin.from("lesson_scripts").update({ script: { beats, quiz: r.script.quiz }, visuals_version: SCRIPT_VERSION }).eq("id", scriptId);
+    await admin.from("lesson_scripts").update({ script: { beats, quiz: r.script.quiz }, visuals_version: VISUALS_VERSION }).eq("id", scriptId);
   } catch {
     await admin.from("lesson_scripts").update({ visuals_version: null }).eq("id", scriptId);
   }

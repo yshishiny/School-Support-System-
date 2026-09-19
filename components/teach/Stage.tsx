@@ -16,7 +16,7 @@ import type { LessonScript } from "@/lib/ai/lesson-script";
 import type { CloudVoice } from "@/lib/tts";
 import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, sceneStep, wordsOf, boardLines, type Camera, type Gesture, type Mood } from "@/lib/teach/performance";
 import { runAction } from "@/lib/client-action";
-import { closingLine, greetingLine } from "@/lib/teach/lines";
+import { closingLine, correctLine, greetingLine, hintLine, revealLine } from "@/lib/teach/lines";
 
 type Beat = LessonScript["beats"][number] & { image?: { url: string; credit?: string | null; license?: string | null } | null };
 type Phase = "intro" | "lesson" | "outro";
@@ -54,7 +54,13 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   // Ask about every line once at the start: rendered clips play whatever the mode, and the allowed kinds start rendering.
   const greeting = greetingLine(c, language, script.title);
   const closing = closingLine(language);
-  useEffect(() => { if (useVideo) clips.prime([{ text: greeting, kind: "hook" }, ...beats.map((b) => ({ text: b.say, kind: b.kind })), { text: closing, kind: "recap" }]); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // The answers to a check are known from the script too, so they are asked for as well and the presenter keeps talking.
+  const feedback = beats.flatMap((b) => b.check ? [
+    { text: correctLine(c, language, b.check.explanation), kind: b.kind },
+    { text: hintLine(c, language, b.check.hint), kind: b.kind },
+    { text: revealLine(b.check.explanation, b.check.hint), kind: b.kind },
+  ] : []);
+  useEffect(() => { if (useVideo) clips.prime([{ text: greeting, kind: "hook" }, ...beats.map((b) => ({ text: b.say, kind: b.kind })), ...feedback, { text: closing, kind: "recap" }]); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useVideo, speech.voiceId]);
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
@@ -167,15 +173,18 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     if (correct) {
       correctCount.current += 1;
       setCheckDone(true); setGestureOverride("celebrate"); setMoodOverride("happy"); setBurst((b) => b + 1);
-      speak(`${rtl ? c.lines.correct_ar : c.lines.correct} ${beat.check.explanation}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(i); });
+      const line = correctLine(c, language, beat.check.explanation);
+      speak(line, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(i); }, useVideo ? clips.get(line) : null);
       if (!demo) void recordBeatAction(sessionId, i, { correct: true, attempts: n });
     } else if (n >= 2) {
       setCheckDone(true); setGestureOverride("explain"); setMoodOverride("encourage");
-      speak(`${beat.check.hint} ${beat.check.explanation}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(i); });
+      const line = revealLine(beat.check.explanation, beat.check.hint);
+      speak(line, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(i); }, useVideo ? clips.get(line) : null);
       if (!demo) void recordBeatAction(sessionId, i, { correct: false, attempts: n });
     } else {
       setGestureOverride("oops"); setMoodOverride("sad");
-      speak(`${rtl ? c.lines.wrong_ar : c.lines.wrong} ${beat.check.hint}`, () => { setGestureOverride("think"); setMoodOverride("think"); });
+      const line = hintLine(c, language, beat.check.hint);
+      speak(line, () => { setGestureOverride("think"); setMoodOverride("think"); }, useVideo ? clips.get(line) : null);
     }
   }
 
@@ -336,7 +345,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
               <Teacher c={c} gesture={gesture} mood={mood} viseme={speech.speaking && !speech.paused ? speech.viseme : "rest"} walking={walking} className="!h-full !w-auto max-w-full drop-shadow-[0_10px_18px_rgba(0,0,0,.35)]" />
             </div>
           )}
-          <div className={`presenter-frame relative h-full aspect-[3/4] max-w-full flex items-end justify-center ${useVideo ? "" : "absolute inset-0 opacity-0 pointer-events-none"}`}>
+          <div className={`presenter-frame relative h-full aspect-[3/4] max-w-full flex items-end justify-center ${useVideo ? "" : "absolute inset-0 opacity-0 pointer-events-none"} ${useVideo && !speech.videoPlaying ? (speech.speaking && !speech.paused ? "presenter-talking" : "presenter-still") : ""}`}>
             <video ref={videoRef} playsInline preload="auto" poster={presenterUrl ?? undefined} className="h-full w-full rounded-[1.4rem] object-cover shadow-[0_18px_40px_rgba(0,0,0,.4)] ring-4 ring-white/15 bg-black/20" />
             {useVideo && speech.speaking && !speech.paused && !speech.videoPlaying && <span className="speaking-bars" aria-hidden><i /><i /><i /><i /></span>}
           </div>

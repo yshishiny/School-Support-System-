@@ -7,6 +7,8 @@ import type { Character } from "@/lib/characters";
 
 /** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2, spoken-word rules and tashkeel in 3). */
 export const SCRIPT_VERSION = 4;
+/** Pictures older than this are redrawn in the background, the words untouched (5: exact geometry and graphs). */
+export const VISUALS_VERSION = 5;
 
 const CueSchema = z.object({
   phrase: z.string().describe("2-6 words copied verbatim from this beat's 'say'; when the teacher reaches them, the step appears"),

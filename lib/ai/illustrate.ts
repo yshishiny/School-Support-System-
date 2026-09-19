@@ -3,20 +3,29 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { effortFor, modelFor } from "./models";
 import { sanitizeSvg } from "@/lib/svg";
+import { GeometrySchema, GraphSchema, renderGeometry, renderGraph } from "@/lib/teach/geometry";
 
 /**
  * The illustrator: draws one lesson scene from the writer's brief, to a fixed professional style, as a layered SVG
  * whose steps appear on the teacher's cues. Runs once per scene when a script is written; the drawing is cached with it.
  */
 const OutSchema = z.object({
-  svg: z.string().describe("The complete <svg> element, at most 7000 characters"),
-  cues: z.array(z.object({ phrase: z.string(), step: z.number().int().min(1).max(8) })).describe("One per data-step group, in order; phrase copied verbatim from the spoken line"),
+  mode: z.enum(["geometry", "graph", "svg"]).describe("geometry for any construction of points, lines, angles, triangles, polygons and circles; graph for axes-and-data plots; svg for everything else"),
+  geometry: GeometrySchema.nullable().describe("Required when mode is geometry, else null. The app draws it with exact maths."),
+  graph: GraphSchema.nullable().describe("Required when mode is graph, else null. The app draws the axes, grid and data."),
+  svg: z.string().describe("Required when mode is svg (the complete <svg> element, at most 7000 characters); empty string otherwise"),
+  cues: z.array(z.object({ phrase: z.string(), step: z.number().int().min(1).max(8) })).describe("One per step, in order; phrase copied verbatim from the spoken line"),
 });
-export type Illustration = z.infer<typeof OutSchema>;
+export type Illustration = { svg: string; cues: { phrase: string; step: number }[] };
 
 const SYSTEM = `You are a professional educational illustrator. You draw ONE scene for a spoken school lesson as a clean, layered SVG that is built up step by step while a teacher speaks. Children aged 11-15 watch it on a phone or laptop.
 
-CANVAS: <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" font-family="Nunito, Arial, sans-serif">. Background: a soft panel (rect 0 0 640 360, fill #f7f9fc) plus, where it helps, a faint grid or ground line. Nothing outside the canvas.
+HOW TO DRAW: choose ONE mode.
+- mode "geometry" — ALWAYS for anything built from points, straight lines, rays, segments, angles, transversals, triangles, quadrilaterals, polygons, circles, tangents, radii, coordinates of points. Never hand-draw these: you cannot place an arc on a ray or make two lines meet exactly. Instead fill "geometry": name every point with its canvas coordinates (x 0-640, y 0-360, y downwards; keep 60px clear of the edges), then the lines. A line is either from/to two points, or from one point with parallel_to / perpendicular_to another line's id (leave "to" null) — that is how you get truly parallel lines and true right angles. Where two lines cross, add an "intersections" entry and use its id as a vertex afterwards; never guess the crossing point yourself. Angles are {at, from, to}: the arc is drawn on the two real rays, so it always touches the lines; set right:true for a right angle. Equal sides get "ticks", equal angles share a colour. Conclusions go in "notes". Every element carries its step number (1..6). Leave "svg" as "" .
+- mode "graph" — for axes-and-data pictures (distance-time, temperature, bar charts, a plotted function sampled as points). Fill "graph"; the app draws axes, arrowheads, ticks, units, grid, the series and the marked points with dashed guides. Leave "svg" as "".
+- mode "svg" — everything else (solids, cutaways, organs, apparatus, maps, timelines, processes, scenes). Then draw the SVG yourself to the rules below, and leave geometry and graph null.
+
+CANVAS (mode svg): <svg viewBox="0 0 640 360" xmlns="http://www.w3.org/2000/svg" font-family="Nunito, Arial, sans-serif">. Background: a soft panel (rect 0 0 640 360, fill #f7f9fc) plus, where it helps, a faint grid or ground line. Nothing outside the canvas.
 
 STYLE (textbook illustration, not a sketch):
 - Objects have a fill, a 3px darker outline of the same hue, and depth from a subtle linear gradient (<defs><linearGradient>) or a soft shadow (<filter id="s"><feDropShadow dx="0" dy="3" stdDeviation="3" flood-opacity=".25"/></filter>).
@@ -36,7 +45,7 @@ STYLE (textbook illustration, not a sketch):
 - Content must be faithful to the subject: correct geometry (parallel lines truly parallel, right angles square, proportions plausible), correct biology/physics/geography, correct Arabic labels for Arabic lessons (the digits as in Egyptian textbooks). Never invent facts beyond the brief.
 - No scripts, no external images, no foreignObject, no animation elements. At most 7000 characters.
 
-CUES: for each step, copy 2-6 consecutive words exactly as they appear in the spoken line (same language, same letters) at which that step should appear. If the spoken line does not name a step, choose the nearest words that lead into it.`;
+CUES: for each step (in every mode), copy 2-6 consecutive words exactly as they appear in the spoken line (same language, same letters) at which that step should appear. If the spoken line does not name a step, choose the nearest words that lead into it.`;
 
 export async function illustrateScene(o: { subject: string; topic: string; language: "en" | "ar"; say: string; brief: string; existingCues?: { phrase: string; step: number }[] | null }): Promise<Illustration | null> {
   const client = new Anthropic();
@@ -57,7 +66,12 @@ export async function illustrateScene(o: { subject: string; topic: string; langu
     if (res.stop_reason === "refusal") return null;
     const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
     const out = OutSchema.parse(JSON.parse(text));
-    const svg = sanitizeSvg(out.svg);
+    // Constructions and graphs are drawn from their description by exact maths, so angles sit on their rays and
+    // lines meet where they truly cross; only free illustrations come through as model-written SVG.
+    const drawn = out.mode === "geometry" && out.geometry ? renderGeometry(out.geometry)
+      : out.mode === "graph" && out.graph ? renderGraph(out.graph)
+      : out.svg;
+    const svg = sanitizeSvg(drawn);
     if (!svg || !/data-step=/.test(svg)) return null;
     return { svg, cues: out.cues };
   } catch {

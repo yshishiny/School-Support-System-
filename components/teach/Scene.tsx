@@ -39,7 +39,7 @@ function guardText(root: HTMLElement) {
  */
 export function Scene({ svg, step }: { svg: string; step: number }) {
   const ref = useRef<HTMLDivElement>(null);
-  const [pointer, setPointer] = useState<{ x: number; y: number } | null>(null);
+  const [focus, setFocus] = useState<{ x: number; y: number; w: number; h: number } | null>(null);
   // A stable object: React re-sets innerHTML on a new {__html} instance, which would wipe the step classes on every re-render.
   const html = useMemo(() => ({ __html: svg }), [svg]);
 
@@ -60,9 +60,14 @@ export function Scene({ svg, step }: { svg: string; step: number }) {
       if (target) {
         const r = (target as Element).getBoundingClientRect();
         const c = root.getBoundingClientRect();
-        if (r.width || r.height) { setPointer({ x: r.left + r.width / 2 - c.left, y: r.top - c.top }); return; }
+        // A padded box in container coordinates: the ring frames it, the laser sits on its top-left shoulder.
+        if (r.width || r.height) {
+          const pad = 10;
+          setFocus({ x: r.left - c.left - pad, y: r.top - c.top - pad, w: r.width + pad * 2, h: r.height + pad * 2 });
+          return;
+        }
       }
-      setPointer(null);
+      setFocus(null);
     };
     place();
     const t = window.setTimeout(place, 350);
@@ -73,7 +78,15 @@ export function Scene({ svg, step }: { svg: string; step: number }) {
   return (
     <div ref={ref} className="scene relative rounded-xl bg-white/95 p-2 shadow-[0_10px_30px_rgba(0,0,0,.25)] [&>div>svg]:w-full [&>div>svg]:h-auto [&>div>svg]:max-h-[42vh]">
       <div dangerouslySetInnerHTML={html} />
-      {pointer && <span className="scene-pointer" style={{ left: pointer.x, top: pointer.y }} aria-hidden>👇</span>}
+      {focus && (
+        <>
+          <span className="scene-ring" style={{ left: focus.x, top: focus.y, width: focus.w, height: focus.h }} aria-hidden />
+          <span className="scene-laser" style={{ left: focus.x + focus.w / 2, top: focus.y }} aria-hidden>
+            <i className="scene-laser-ripple" />
+            <i className="scene-laser-dot" />
+          </span>
+        </>
+      )}
     </div>
   );
 }

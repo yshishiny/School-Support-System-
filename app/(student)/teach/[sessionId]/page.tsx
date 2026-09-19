@@ -7,7 +7,7 @@ import type { LessonScript } from "@/lib/ai/lesson-script";
 import { cloudVoiceList } from "@/lib/tts";
 import { presenterGenders, presenterUrls, videoEnabled, videoKinds, videoMode } from "@/lib/video";
 import { after } from "next/server";
-import { SCRIPT_VERSION } from "@/lib/ai/lesson-script";
+import { VISUALS_VERSION } from "@/lib/ai/lesson-script";
 import { upgradeScriptVisuals } from "@/lib/teach/upgrade";
 
 /** The lesson on the full-screen stage; the child's progress in the session decides where it resumes. */
@@ -20,9 +20,9 @@ export default async function LessonPage({ params }: { params: Promise<{ session
   if (!row?.lesson_scripts) notFound();
   if (row.finished_at && row.quiz_id) redirect(`/quiz/${row.quiz_id}`);
   const s = row.lesson_scripts;
-  // An older lesson: better pictures are prepared in the background, words and clips untouched.
-  const upgrading = (s.visuals_version ?? 0) < SCRIPT_VERSION && (s.version ?? 1) < SCRIPT_VERSION;
-  if (upgrading && s.visuals_version == null && process.env.ANTHROPIC_API_KEY) after(() => upgradeScriptVisuals(s.id));
+  // An older lesson: better pictures are prepared in the background, words and clips untouched (0 = already running).
+  const upgrading = (s.visuals_version ?? 0) < VISUALS_VERSION;
+  if (upgrading && s.visuals_version !== 0 && process.env.ANTHROPIC_API_KEY) after(() => upgradeScriptVisuals(s.id));
   const language = s.language === "ar" ? "ar" : "en";
   const kinds = videoKinds(await videoMode());
   const character = characterById(row.character_id);

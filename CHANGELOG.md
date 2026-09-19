@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.7 — Exact geometry, a laser pointer, a presenter who keeps talking (19 September 2026, `v2` branch)
+
+- **Geometry is drawn by maths, not by hand.** Constructions (points, lines, rays, segments, angles, transversals, triangles, polygons, circles) and coordinate graphs are no longer drawn by the model as raw SVG. The illustrator now describes the figure — "a line through P parallel to l₁", "the angle at X from B to T", "where these two lines cross" — and the app computes it: parallels are truly parallel, right angles are square, lines meet exactly at their intersection, and every angle arc sits on its two real rays. Graphs get their axes, arrowheads, ticks, units, grid, series and marked points from the data, with labels kept inside the plot.
+- **A laser pointer instead of the emoji hand.** The part the teacher is explaining is framed by a pulsing ring with a presenter's red laser dot and ripple on it, moving smoothly from step to step.
+- **The presenter no longer freezes.** The answers to every check (the praise, the hint, the reveal) are rendered as clips along with the script, so the human presenter keeps speaking through the whole lesson. When a line is still audio-only, the frame breathes and moves with a soft glow instead of showing a frozen photo.
+- Pictures version 5: lessons drawn before this are redrawn in the background on their next open, the words and the presenter clips untouched.
+
 ## 2.0.0-beta.6 — Professional illustrations, real photographs, a steady presenter (19 September 2026, `v2` branch)
 
 - **An illustrator redraws every scene.** The lesson writer now hands each scene to a dedicated illustrator pass on the strongest model, with a textbook style guide: layered objects with depth, a fixed palette, thick outlines, arrowheads and angle arcs, dark labels with a white halo, and spacing rules (no label on top of another, later steps in free space). Drawn once per topic and kept with the script.
