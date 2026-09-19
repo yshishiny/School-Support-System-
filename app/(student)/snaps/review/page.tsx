@@ -20,6 +20,7 @@ type Row = {
   id: string; student_id: string; task_code: string; kind: string; path: string; taken_on: string;
   status: "pending" | "approved" | "rejected"; ai_verdict: string | null; ai_score: number | null; ai_note: string | null;
   ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null; created_at: string; reviewed_by: string | null;
+  rater_verdict: "approved" | "rejected" | null; rater_id: string | null; rater_note: string | null;
 };
 
 /**
@@ -38,7 +39,7 @@ export default async function RaterSnapsPage() {
     loadSnapTasks(family.id, family.timezone),
     admin
       .from("snaps")
-      .select("id, student_id, task_code, kind, path, taken_on, status, ai_verdict, ai_score, ai_note, ai_detail, created_at, reviewed_by")
+      .select("id, student_id, task_code, kind, path, taken_on, status, ai_verdict, ai_score, ai_note, ai_detail, created_at, reviewed_by, rater_verdict, rater_id, rater_note")
       .eq("family_id", family.id)
       .neq("student_id", profile.id)
       .gte("taken_on", shiftDate(today, -7))
@@ -48,9 +49,12 @@ export default async function RaterSnapsPage() {
 
   const siblings = (kids ?? []) as { id: string; full_name: string; avatar_emoji: string }[];
   const snaps = (rows ?? []) as Row[];
-  const pending = snaps.filter((s) => s.status === "pending");
+  const waiting = snaps.filter((s) => s.status === "pending");
+  // The ones she has not looked at yet come first; the ones she has sit below, waiting on a parent.
+  const pending = waiting.filter((s) => !s.rater_verdict);
+  const said = waiting.filter((s) => !!s.rater_verdict);
   const decided = snaps.filter((s) => s.status !== "pending").slice(0, 12);
-  const urls = await signSnapUrls([...pending, ...decided].map((s) => ({ id: s.id, path: s.path })));
+  const urls = await signSnapUrls([...waiting, ...decided].map((s) => ({ id: s.id, path: s.path })));
   const nameOf = (id: string) => siblings.find((s) => s.id === id)?.full_name.split(" ")[0] ?? "someone";
   const taskOf = (code: string) => tasks.find((t) => t.code === code) ?? SNAP_TEMPLATES.find((t) => t.code === code);
 
@@ -60,7 +64,7 @@ export default async function RaterSnapsPage() {
         <span className="text-3xl">🧐</span>
         <div className="flex-1 min-w-0">
           <h1 className="h1">Check their snaps</h1>
-          <p className="text-xs muted">Your brothers&apos; pictures. Approve it and the points go through; send it back and say why.</p>
+          <p className="text-xs muted">Your brothers&apos; pictures. Say whether each one is done; your dad confirms it and the points follow.</p>
         </div>
         <Link href="/snaps" className="btn-ghost btn-sm">Mine</Link>
       </header>
@@ -95,6 +99,20 @@ export default async function RaterSnapsPage() {
         );
       })}
 
+      {said.length > 0 && (
+        <section className="card !py-3 space-y-2">
+          <h2 className="h2">Waiting for your dad · {said.length}</h2>
+          {said.map((s) => (
+            <div key={s.id} className="flex items-center gap-2 text-sm">
+              <span>{s.rater_verdict === "approved" ? "👍" : "👎"}</span>
+              <span className="flex-1 min-w-0 truncate">{nameOf(s.student_id)} · {taskOf(s.task_code)?.label ?? s.task_code}</span>
+              <span className="text-[11px] muted">you said {s.rater_verdict === "approved" ? "done" : "not done"}</span>
+            </div>
+          ))}
+          <p className="text-[11px] muted">He sees your name on each one. Nothing is paid until he agrees.</p>
+        </section>
+      )}
+
       {decided.length > 0 && (
         <details className="card !py-3">
           <summary className="cursor-pointer font-bold" style={{ fontFamily: "var(--font-display)" }}>Already decided · {decided.length}</summary>
@@ -109,7 +127,7 @@ export default async function RaterSnapsPage() {
         </details>
       )}
 
-      <p className="text-[11px] muted px-1">Your own pictures never appear here. A parent sees every decision and can change it.</p>
+      <p className="text-[11px] muted px-1">Your own pictures never appear here, and your answer is a recommendation: your dad makes the final call and the points move then.</p>
     </main>
   );
 }

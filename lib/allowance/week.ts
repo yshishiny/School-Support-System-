@@ -40,7 +40,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     admin.from("checkins").select("checkin_date, entered_late").eq("student_id", studentId).gte("checkin_date", start).lte("checkin_date", end),
     admin.from("quizzes").select("scheduled_for, attempts(submitted_at)").eq("student_id", studentId).not("scheduled_for", "is", null).gte("scheduled_for", start).lte("scheduled_for", today < end ? today : end),
     admin.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", studentId).gte("taken_on", shiftDate(start, -60)).order("taken_on", { ascending: false }),
-    admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
+    admin.from("snaps").select("task_code, taken_on, status, ai_verdict, rater_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
   ]);
   const lastDay = today < end ? today : end;
   const [{ data: ttRows }, { data: logRows }, { data: offRows }] = await Promise.all([

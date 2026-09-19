@@ -27,9 +27,9 @@ export default async function SnapsPage() {
   const hhmm = formatInTimeZone(new Date(), family.timezone, "HH:mm");
   const [tasks, { data: snapRows }] = await Promise.all([
     loadSnapTasks(family.id, family.timezone),
-    supabase.from("snaps").select("id, task_code, kind, path, taken_on, status, ai_verdict, ai_note, ai_detail, review_note, created_at").eq("student_id", profile.id).gte("taken_on", shiftDate(today, -60)).order("created_at"),
+    supabase.from("snaps").select("id, task_code, kind, path, taken_on, status, ai_verdict, ai_note, ai_detail, review_note, created_at, rater_verdict, rater_note").eq("student_id", profile.id).gte("taken_on", shiftDate(today, -60)).order("created_at"),
   ]);
-  type Row = SnapLite & { id: string; kind: string; path: string; ai_note: string | null; ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null; review_note: string | null; created_at: string };
+  type Row = SnapLite & { id: string; kind: string; path: string; ai_note: string | null; ai_detail: (Partial<HandwritingAnalysis> & { score?: number }) | null; review_note: string | null; created_at: string; rater_note?: string | null };
   const snaps = (snapRows ?? []) as Row[];
   const due = dueSnapTasks(today, tasks, profile.id);
   const dailyTasks = due.filter((t) => t.kind !== "handwriting");
@@ -128,7 +128,8 @@ export default async function SnapsPage() {
                 <span className="text-3xl">{t.emoji}</span>
                 <div className="flex-1 min-w-0">
                   <div className="font-bold">{t.label}</div>
-                  <div className={`text-xs ${line.tone}`}>{line.text}{t.window_start && t.window_end ? ` · ${t.window_start.slice(0, 5)}–${t.window_end.slice(0, 5)}` : ""}</div>
+                  <div className={`text-xs ${line.tone}`}>{latest?.status === "pending" && latest.rater_verdict ? (latest.rater_verdict === "approved" ? "Your sister says it is done · waiting for Dad" : "Your sister sent it back") : line.text}{t.window_start && t.window_end ? ` · ${t.window_start.slice(0, 5)}–${t.window_end.slice(0, 5)}` : ""}</div>
+                  {latest?.status === "pending" && latest.rater_verdict === "rejected" && latest.rater_note && <div className="text-xs text-warn">She said: {latest.rater_note}</div>}
                   {latest?.review_note && <div className="text-xs text-warn">Parent: {latest.review_note}</div>}
                 </div>
                 {open || state === "rejected" ? (

@@ -34,6 +34,8 @@ export interface SnapLite {
   taken_on: string;
   status: SnapStatus;
   ai_verdict: SnapVerdict | null;
+  /** What an older sibling recommended while it waits for a parent. */
+  rater_verdict?: "approved" | "rejected" | null;
 }
 
 export interface SnapTemplate {
@@ -118,10 +120,14 @@ export function taskDueDates(t: SnapTask, studentId: string, dates: string[]): s
   return dates.filter((d) => t.days.includes(weekdayOf(d)) && ownsTask(t, studentId, d));
 }
 
-/** A snap counts as done when approved, or still pending but the AI found it plausible (benefit of the doubt until reviewed). */
-export function snapCounts(s: Pick<SnapLite, "status" | "ai_verdict">): boolean {
+/**
+ * A snap counts as done when a parent approved it, or while it waits if someone who looked at it thought it was
+ * fine. A sister's opinion outranks the AI's, in both directions; points still wait for the parent.
+ */
+export function snapCounts(s: Pick<SnapLite, "status" | "ai_verdict" | "rater_verdict">): boolean {
   if (s.status === "approved") return true;
   if (s.status === "rejected") return false;
+  if (s.rater_verdict) return s.rater_verdict === "approved";
   return s.ai_verdict === "looks_good";
 }
 
