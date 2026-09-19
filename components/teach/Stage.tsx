@@ -254,6 +254,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
             {beats.map((b, k) => { const bl = beatLabel(b.kind); return <button key={k} type="button" title={bl.label} onClick={() => goTo(k)} className={`h-2.5 flex-1 max-w-8 rounded-full transition ${k < i || phase === "outro" ? "bg-[#ffd166]" : k === i && phase === "lesson" ? "bg-white scale-y-150" : "bg-white/30"}`} aria-label={`${bl.label} ${k + 1}`} />; })}
           </div>
         </div>
+        {video && !demo && phase === "lesson" && speech.speaking && !speech.videoPlaying && <span className="shrink-0 rounded-full bg-black/40 px-2 py-1 text-[10px] font-bold text-white/80 backdrop-blur" title={rtl ? "يُجهَّز الفيديو لهذا الدرس" : "The video for this lesson is being prepared"}>🎬 {rtl ? "يُجهَّز" : "preparing"}</span>}
         <button type="button" onClick={() => setAuto((a) => !a)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold backdrop-blur ${auto ? "bg-good/80 text-white" : "bg-black/40 text-white/80"}`}>{auto ? (rtl ? "تلقائي" : "Auto ▶") : (rtl ? "يدوي" : "Manual")}</button>
       </header>
 

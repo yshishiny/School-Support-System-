@@ -4,7 +4,16 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
-import { PRESENTER_BUCKET } from "@/lib/video";
+import { PRESENTER_BUCKET, syncPendingClips } from "@/lib/video";
+
+/** Asks the video service about every clip still rendering and stores the finished ones. */
+export async function syncClipsAction(): Promise<{ error?: string; summary?: string }> {
+  await requireAdmin();
+  if (!process.env.DID_API_KEY) return { error: "DID_API_KEY is not set." };
+  const r = await syncPendingClips(40);
+  revalidatePath("/parent/admin");
+  return { summary: `Checked ${r.checked}: ${r.done} ready, ${r.pending} still rendering, ${r.failed} failed${r.errors.length ? ` — ${r.errors.join(" · ")}` : ""}.` };
+}
 
 /** A presenter photo for a character: a clear, front-facing face on a plain background works best. */
 export async function uploadPresenterAction(characterId: string, form: FormData): Promise<{ error?: string; ok?: boolean }> {

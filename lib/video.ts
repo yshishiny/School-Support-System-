@@ -101,28 +101,13 @@ export async function requestClip(o: { characterId: string; voice: string; text:
     if (data?.signedUrl) return { status: "done", url: data.signedUrl, seconds: row.seconds == null ? null : Number(row.seconds) };
   }
   if (row?.status === "pending" && row.talk_id) {
-    try {
-      const t = await pollTalk(row.talk_id);
-      if (t.status === "done" && t.result_url) {
-        const file = await fetch(t.result_url);
-        if (!file.ok) throw new Error("Could not download the clip.");
-        const bytes = Buffer.from(await file.arrayBuffer());
-        const path = `${o.characterId}/${id}.mp4`;
-        const { error } = await admin.storage.from(VIDEO_BUCKET).upload(path, bytes, { contentType: "video/mp4", upsert: true });
-        if (error) throw new Error(error.message);
-        await admin.from("lesson_videos").update({ status: "done", path, seconds: t.duration ?? null, done_at: new Date().toISOString() }).eq("id", id);
-        const { data } = await admin.storage.from(VIDEO_BUCKET).createSignedUrl(path, 3600);
-        if (data?.signedUrl) return { status: "done", url: data.signedUrl, seconds: t.duration ?? null };
-        return { status: "pending" };
-      }
-      if (t.status === "error" || t.status === "rejected") {
-        await admin.from("lesson_videos").update({ status: "error", error: t.error?.description ?? t.status }).eq("id", id);
-        return { status: "error", reason: t.error?.description ?? t.status };
-      }
+    const r = await finalizeTalk({ id, characterId: o.characterId, talkId: row.talk_id });
+    if (r.status === "done") {
+      const { data } = await admin.storage.from(VIDEO_BUCKET).createSignedUrl(r.path, 3600);
+      if (data?.signedUrl) return { status: "done", url: data.signedUrl, seconds: r.seconds };
       return { status: "pending" };
-    } catch (err) {
-      return { status: "error", reason: err instanceof Error ? err.message : "poll failed" };
     }
+    return r;
   }
   if (row?.status === "error") {
     // A failed render is retried once a day, not on every play.
@@ -141,6 +126,58 @@ export async function requestClip(o: { characterId: string; voice: string; text:
     await admin.from("lesson_videos").upsert({ id, character_id: o.characterId, voice: o.voice, status: "error", error: reason, created_at: new Date().toISOString() });
     return { status: "error", reason };
   }
+}
+
+/** Asks D-ID about one pending render; stores the clip when it is done, the reason when it failed. */
+async function finalizeTalk(o: { id: string; characterId: string; talkId: string }): Promise<{ status: "done"; path: string; seconds: number | null } | { status: "pending" } | { status: "error"; reason: string }> {
+  const admin = createAdminClient();
+  try {
+    const t = await pollTalk(o.talkId);
+    if (t.status === "done" && t.result_url) {
+      const file = await fetch(t.result_url);
+      if (!file.ok) throw new Error("Could not download the clip.");
+      const bytes = Buffer.from(await file.arrayBuffer());
+      const path = `${o.characterId}/${o.id}.mp4`;
+      const { error } = await admin.storage.from(VIDEO_BUCKET).upload(path, bytes, { contentType: "video/mp4", upsert: true });
+      if (error) throw new Error(error.message);
+      await admin.from("lesson_videos").update({ status: "done", path, seconds: t.duration ?? null, done_at: new Date().toISOString() }).eq("id", o.id);
+      return { status: "done", path, seconds: t.duration ?? null };
+    }
+    if (t.status === "error" || t.status === "rejected") {
+      const reason = t.error?.description ?? t.status;
+      await admin.from("lesson_videos").update({ status: "error", error: reason }).eq("id", o.id);
+      return { status: "error", reason };
+    }
+    return { status: "pending" };
+  } catch (err) {
+    return { status: "error", reason: err instanceof Error ? err.message : "poll failed" };
+  }
+}
+
+/** Checks on renders still marked pending (oldest first) and stores what finished. For the admin button and jobs. */
+export async function syncPendingClips(limit = 30): Promise<{ checked: number; done: number; pending: number; failed: number; errors: string[] }> {
+  const admin = createAdminClient();
+  const { data: rows } = await admin.from("lesson_videos").select("id, character_id, talk_id").eq("status", "pending").not("talk_id", "is", null).order("created_at").limit(limit);
+  const out = { checked: 0, done: 0, pending: 0, failed: 0, errors: [] as string[] };
+  for (const r of rows ?? []) {
+    out.checked += 1;
+    const res = await finalizeTalk({ id: r.id, characterId: r.character_id, talkId: r.talk_id as string });
+    if (res.status === "done") out.done += 1;
+    else if (res.status === "pending") out.pending += 1;
+    else { out.failed += 1; if (out.errors.length < 3 && !out.errors.includes(res.reason)) out.errors.push(res.reason); }
+  }
+  return out;
+}
+
+/** Counts by status plus the latest failure reasons, for the admin page. */
+export async function clipStats(): Promise<{ done: number; pending: number; failed: number; errors: string[] }> {
+  const admin = createAdminClient();
+  const [{ data: rows }, { data: errs }] = await Promise.all([
+    admin.from("lesson_videos").select("status"),
+    admin.from("lesson_videos").select("error").eq("status", "error").order("created_at", { ascending: false }).limit(3),
+  ]);
+  const n = (s: string) => (rows ?? []).filter((r) => r.status === s).length;
+  return { done: n("done"), pending: n("pending"), failed: n("error"), errors: [...new Set((errs ?? []).map((e) => e.error).filter((x): x is string => !!x))] };
 }
 
 /** Starts every line of a script rendering, in order, so the clips are ready by the time the child reaches them. */

@@ -2,21 +2,29 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearPresenterAction, setVideoCapAction, uploadPresenterAction } from "@/lib/actions/ops-video";
+import { clearPresenterAction, setVideoCapAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
 import { CHARACTERS } from "@/lib/characters";
 import { runAction } from "@/lib/client-action";
 
 /** Admin → Teachers: the presenter photo per character and the monthly clip cap. */
-export function VideoPresenters({ enabled, presenters, cap, used }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number }) {
+export function VideoPresenters({ enabled, presenters, cap, used, stats }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] } }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
+  const [sync, setSync] = useState<string | null>(null);
   return (
     <div className="space-y-3">
       <section className="card space-y-2">
         <h2 className="h2">🎬 Teachers on video</h2>
         <p className="text-xs muted">Each scripted line becomes a short clip of a human presenter speaking with the premium voice (D-ID). Clips are rendered once per line and kept; while a clip renders, the animated teacher speaks the line. Needs <code>DID_API_KEY</code> in Vercel and the premium voices (Azure) switched on.</p>
         <div className="text-sm">{enabled ? "🟢 On" : "⚪ Off · DID_API_KEY not set"} · {used} clip{used === 1 ? "" : "s"} this month of {cap}</div>
+        <div className="text-sm flex flex-wrap items-center gap-2">
+          <span className="chip">✅ {stats.done} ready</span><span className="chip">⏳ {stats.pending} rendering</span><span className="chip">❌ {stats.failed} failed</span>
+          <button type="button" className="btn-ghost btn-sm" disabled={pending || !enabled} onClick={() => start(async () => { setSync(null); const r = await runAction(() => syncClipsAction(), setSync); if (r?.error) setSync(r.error); else if (r?.summary) setSync(r.summary); router.refresh(); })}>{pending ? "Checking…" : "Check renders now"}</button>
+        </div>
+        {sync && <p className="text-xs">{sync}</p>}
+        {stats.errors.length > 0 && <p className="text-xs text-bad">Latest failures: {stats.errors.join(" · ")}</p>}
+        <p className="text-xs muted">Clips finish 1–3 minutes after a lesson starts; the app checks while a lesson is open, and this button checks at any time.</p>
         <form className="flex items-center gap-2" onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { const r = await runAction(() => setVideoCapAction(f), setMsg); if (r?.error) setMsg(r.error); else setMsg("Saved."); router.refresh(); }); }}>
           <label className="label !mb-0">Monthly cap</label>
           <input name="cap" type="number" min={0} defaultValue={cap} className="input !w-28" />
