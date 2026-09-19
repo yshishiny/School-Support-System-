@@ -56,6 +56,7 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats, mode, g
       <section className="card space-y-3">
         <h2 className="h2">Presenter photos</h2>
         <p className="text-xs muted">A clear, front-facing face on a plain background, shoulders visible, no glasses glare. Until a photo is chosen the service's sample face is used. Use faces you have the right to use (D-ID Studio offers licensed AI faces).</p>
+        <p className="text-xs muted"><b>Accepted:</b> JPG, PNG, WebP or a phone photo of any size — the page shrinks it to 1200 px (about 300 KB) before sending, so a 10 MB camera photo is fine. If the browser cannot read the file (some HEIC photos), you get a message with the size and what to do.</p>
         <div className="grid gap-3 sm:grid-cols-2">
           {CHARACTERS.map((c) => {
             const p = presenters[c.id];
@@ -70,7 +71,7 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats, mode, g
                     <span className="muted">Voice:</span>
                     {(["f", "m"] as const).map((g) => { const on = (genders[c.id] ?? (c.voice.preferFemale ? "f" : "m")) === g; return <button key={g} type="button" disabled={pending} className={`chip !px-2.5 !py-0.5 ${on ? "chip-on" : ""}`} onClick={() => start(async () => { await setPresenterGenderAction(c.id, g); router.refresh(); })}>{g === "f" ? "♀ woman" : "♂ man"}</button>; })}
                   </div>
-                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { setMsg(null); const raw = f.get("photo"); if (raw instanceof File && raw.size > 0) { const small = await shrinkPhoto(raw).catch(() => null); if (small) f.set("photo", small); } const r = await runAction(() => uploadPresenterAction(c.id, f), setMsg); if (r?.error) setMsg(`${c.name}: ${r.error}`); else setMsg(`${c.name}: photo saved. New clips will use it.`); router.refresh(); }); }} className="flex flex-wrap items-center gap-1.5">
+                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { setMsg(null); const raw = f.get("photo"); if (raw instanceof File && raw.size > 0) { const small = await shrinkPhoto(raw).catch(() => null); if (small) f.set("photo", small); else if (raw.size > 5 * 1048576) { setMsg(`${c.name}: this photo is ${(raw.size / 1048576).toFixed(1)} MB and the browser could not shrink it (probably HEIC). Export it as JPG or PNG, or pick another photo.`); return; } } const r = await runAction(() => uploadPresenterAction(c.id, f), setMsg); if (r?.error) setMsg(`${c.name}: ${r.error}`); else setMsg(`${c.name}: photo saved. New clips will use it.`); router.refresh(); }); }} className="flex flex-wrap items-center gap-1.5">
                     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs max-w-[11rem]" />
                     <button className="btn-primary btn-sm" disabled={pending}>Upload</button>
                     {p?.custom && <button type="button" className="btn-ghost btn-sm" disabled={pending} onClick={() => start(async () => { await clearPresenterAction(c.id); router.refresh(); })}>Remove</button>}

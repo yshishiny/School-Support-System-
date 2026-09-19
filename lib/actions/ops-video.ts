@@ -21,7 +21,8 @@ export async function uploadPresenterAction(characterId: string, form: FormData)
   const c = characterById(characterId);
   const file = form.get("photo");
   if (!(file instanceof File) || file.size === 0) return { error: "Choose a photo first." };
-  if (file.size > 5 * 1024 * 1024) return { error: "Photo too large (5 MB max)." };
+  if (file.size > 5 * 1024 * 1024) return { error: `Photo is ${(file.size / 1048576).toFixed(1)} MB; the limit is 5 MB. The page shrinks photos before sending, so this one could not be read by the browser: try a JPG or PNG export of it.` };
+  if (!/^image\/(jpeg|png|webp)$/.test(file.type)) return { error: `Photo type "${file.type || "unknown"}" is not accepted: use JPG, PNG or WebP.` };
   const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
   const path = `${c.id}-${Date.now()}.${ext}`;
   const admin = createAdminClient();
