@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.0-beta.14 — Money owed shows up as money owed (19 September 2026, `v2` branch)
+
+- **A week that closes with money in it credits the wallet at once**, instead of waiting to be marked paid. What a child has earned and not been given is now visible to both of you the moment the week ends.
+- **Marking a week paid records the hand-over**, so the held balance drops by exactly that amount and his pocket rises by it. Tapping paid twice cannot take the money twice.
+- **The health panel no longer calls the beta broken.** Its nightly jobs are switched off on purpose, because the live site runs them against the same database; a missing cron secret here is the intended state and now reads that way.
+
 ## 2.0.0-beta.13 — A wallet for each child (19 September 2026, `v2` branch)
 
 - **Two balances, not one.** Money a child earns — a paid allowance week, a reward that pays cash — goes into his wallet and is *kept for him*. When you hand the notes over you say so, and that amount moves out of what you hold and becomes *money in his pocket*. What he then spends comes off the pocket. The two always add up to what he owns, which is a balance sheet he can see rather than a lesson he is told.

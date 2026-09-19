@@ -41,6 +41,18 @@ export async function creditWallet(o: { studentId: string; familyId: string; amo
     );
 }
 
+/** A hand-over recorded once, keyed to what caused it, so marking a week paid twice cannot take the money twice. */
+export async function withdrawFromWallet(o: { studentId: string; familyId: string; amount: number; label: string; on: string; refType: string; refId: string; by?: string | null }): Promise<void> {
+  if (!(o.amount > 0)) return;
+  const admin = createAdminClient();
+  await admin
+    .from("wallet_entries")
+    .upsert(
+      { student_id: o.studentId, family_id: o.familyId, kind: "withdraw", amount_egp: o.amount, label: o.label.slice(0, 80), occurred_on: o.on, ref_type: o.refType, ref_id: o.refId, created_by: o.by ?? null },
+      { onConflict: "student_id,ref_type,ref_id", ignoreDuplicates: true },
+    );
+}
+
 /** The father hands cash over: it leaves the held balance and becomes money in the child's pocket. */
 export async function handOverAction(formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { profile, family } = await requireParent();

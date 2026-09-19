@@ -12,7 +12,11 @@ export async function configChecks(): Promise<Check[]> {
   return [
     { name: "App version", tone: "muted", value: `${APP_VERSION} · build ${buildId()}` },
     { name: "Anthropic API key", tone: has("ANTHROPIC_API_KEY") ? "good" : "bad", value: has("ANTHROPIC_API_KEY") ? `set · tier ${aiTier()}` : "missing" },
-    { name: "Cron secret", tone: has("CRON_SECRET") ? "good" : "bad", value: has("CRON_SECRET") ? "set" : "missing: nightly jobs refused" },
+    // The beta shares the live database and keeps its own jobs off on purpose, so a missing secret there is the
+    // intended state, not a fault: the live site runs the nightly work for both.
+    process.env.CRON_DISABLED === "1"
+      ? { name: "Cron secret", tone: "good" as const, value: "not needed: this site's jobs are off, the live site runs them" }
+      : { name: "Cron secret", tone: has("CRON_SECRET") ? ("good" as const) : ("bad" as const), value: has("CRON_SECRET") ? "set" : "missing: nightly jobs refused" },
     { name: "Telegram bot", tone: has("TELEGRAM_BOT_TOKEN") ? "good" : "warn", value: has("TELEGRAM_BOT_TOKEN") ? "set" : "not set: reports by inbox and push only" },
     { name: "Browser push (VAPID)", tone: has("VAPID_PRIVATE_KEY") && has("NEXT_PUBLIC_VAPID_PUBLIC_KEY") ? "good" : "warn", value: has("VAPID_PRIVATE_KEY") ? "set" : "not set: no browser notifications" },
     { name: "YouTube API key", tone: has("YOUTUBE_API_KEY") ? "good" : "muted", value: has("YOUTUBE_API_KEY") ? "set: videos embed" : "not set: search links" },

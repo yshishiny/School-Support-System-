@@ -5,6 +5,7 @@ import { shiftDate, todayIn } from "@/lib/dates";
 import { isRota, snapCounts, taskDueDates, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { compensatedRefs } from "@/lib/compensation";
+import { creditWallet } from "@/lib/actions/wallet";
 import { materialsKpi, materialStages, nextStage } from "@/lib/materials/study";
 import type { Family } from "@/lib/types";
 
@@ -126,6 +127,11 @@ export async function closeAllowanceWeek(studentId: string, family: Pick<Family,
     .insert({ student_id: studentId, family_id: family.id, week_start: status.start, week_end: status.end, score: status.score, band: status.band, amount: status.amount, breakdown: status.results })
     .select("*")
     .single();
+  // The moment a week closes with money in it, that money is owed: it goes into his wallet as held, and stays
+  // held until a parent records handing the notes over.
+  if (data && status.amount > 0) {
+    await creditWallet({ studentId, familyId: family.id, amount: status.amount, label: `Allowance week ${status.start}`, on: status.end, refType: "allowance_week", refId: data.id as string }).catch(() => null);
+  }
   // Discipline rule: a week that closes with classes never logged gets the automatic practice (no way to skip it).
   const gap = status.results.find((r) => r.code === "classlog");
   if (gap && gap.fraction < 1) {

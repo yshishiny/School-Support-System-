@@ -1,6 +1,6 @@
 /** The product identity shown under More → About and in the daily report footer. Bump on every release. */
 export const APP_NAME = "Study Portal";
-export const APP_VERSION = "2.0.0-beta.13";
+export const APP_VERSION = "2.0.0-beta.14";
 export const APP_BASELINE = "V2 beta · a wallet for each child · carries everything up to 1.15.0";
 export const APP_OWNER = "Yasser Elshishiny";
 export const APP_TRADEMARK = "Betna Group";
