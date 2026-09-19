@@ -4,7 +4,7 @@
  * "best" runs everything on Opus. Judgement-heavy jobs (coach report, clinician summary, confidential chat)
  * stay on Opus in every tier.
  */
-export type AiJob = "lesson" | "lesson-qa" | "vocalize" | "quiz" | "worksheet" | "explain" | "snap" | "lesson-guess" | "read-material" | "extract" | "risk" | "archive" | "coach-chat" | "coach-report" | "clinician";
+export type AiJob = "lesson" | "illustrate" | "lesson-qa" | "vocalize" | "quiz" | "worksheet" | "explain" | "snap" | "lesson-guess" | "read-material" | "extract" | "risk" | "archive" | "coach-chat" | "coach-report" | "clinician";
 
 const HAIKU = "claude-haiku-4-5";
 const SONNET = "claude-sonnet-5";
@@ -22,6 +22,8 @@ const ROUTINE: AiJob[] = ["lesson-qa", "vocalize", "quiz", "worksheet", "explain
 export function modelFor(job: AiJob): string {
   // Lesson scripts are written once and reused: Sonnet in saver and balanced, Opus in best.
   if (job === "lesson") return aiTier() === "best" ? OPUS : SONNET;
+  // Scene drawings are made once per topic and carry the lesson: always the strongest model.
+  if (job === "illustrate") return OPUS;
   if (!ROUTINE.includes(job)) return OPUS;
   const tier = aiTier();
   if (tier === "best") return job === "risk" ? SONNET : OPUS;

@@ -6,7 +6,7 @@ import { normaliseQuestions } from "./generate-quiz";
 import type { Character } from "@/lib/characters";
 
 /** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2, spoken-word rules and tashkeel in 3). */
-export const SCRIPT_VERSION = 3;
+export const SCRIPT_VERSION = 4;
 
 const CueSchema = z.object({
   phrase: z.string().describe("2-6 words copied verbatim from this beat's 'say'; when the teacher reaches them, the step appears"),
@@ -16,6 +16,7 @@ const ShowSchema = z.object({
   type: z.enum(["text", "steps", "formula", "table", "svg", "scene"]).describe("text: 1-3 short lines · steps: numbered lines separated by newlines · formula: one formula in unicode · table: rows as 'a | b | c' lines · svg: a small static <svg> (max 600 chars) · scene: a large illustrated diagram built step by step as the teacher speaks (see rules)"),
   content: z.string(),
   cues: z.array(CueSchema).nullable().describe("Only for type 'scene': one cue per step, in order. Null otherwise."),
+  brief: z.string().nullable().describe("Only for type 'scene': a precise brief for the illustrator, 60-150 words: the objects and their arrangement, then what each step adds and its label, in the order the teacher names them. Null otherwise."),
 });
 const CheckSchema = z.object({
   question: z.string(),
@@ -31,6 +32,7 @@ const BeatSchema = z.object({
   check: CheckSchema.nullable().describe("Only for kind 'check'"),
   gesture: z.enum(["idle", "wave", "explain", "point", "write", "think", "celebrate", "listen", "oops", "bow"]).nullable().describe("How the animated teacher moves during this beat: wave (greeting), explain (open hands), point (at the board), write (on the board), think (hand on chin, for checks), celebrate (arms up, recap), bow (thanks). Null lets the stage decide."),
   mood: z.enum(["neutral", "happy", "think", "surprised", "encourage", "sad"]).nullable().describe("The teacher's face during this beat. Null lets the stage decide."),
+  photo: z.string().nullable().describe("A 2-5 word English search phrase for a real photograph of the thing this beat talks about (e.g. 'plant cell micrograph', 'Giza pyramids', 'railway tracks parallel', 'volcano eruption'), for beats where a real object or place exists; null for abstract content such as a rule or a formula."),
 });
 const QuizItem = z.object({
   prompt: z.string(),
@@ -62,6 +64,7 @@ Rules:
   · cues: for every step, the exact 2-6 words from "say" (copied verbatim, same language) at which that step should appear. Say the name of the thing as you draw it, so the words and the picture meet.
   · Angles: draw the arc; equal angles get the same colour. Graphs: label axes and units. Processes: arrows in the direction of flow. Arabic scenes: Arabic labels, digits as in Egyptian textbooks.
 - Use "svg" only for a tiny static icon, "steps" for procedures, "formula" for one formula, "table" for comparisons.
+- Every scene also carries a "brief" for the professional illustrator who redraws it: name the objects, their arrangement on the canvas, and each step with its label, in spoken order. Every beat about a real object or place carries a "photo" search phrase so a real photograph appears behind the board.
 - Checks test the idea just taught. Hints do not give the answer away.
 - The teacher is animated: give each beat a gesture and a mood that fit (wave for the hook, point or write when the board carries content, think for checks, celebrate for the recap; surprised for a twist, encourage after a hard idea).
 - The final quiz has exactly 3 questions on the whole lesson; prefix each skill_tag with the subject name and a colon.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0-beta.6 — Professional illustrations, real photographs, a steady presenter (19 September 2026, `v2` branch)
+
+- **An illustrator redraws every scene.** The lesson writer now hands each scene to a dedicated illustrator pass on the strongest model, with a textbook style guide: layered objects with depth, a fixed palette, thick outlines, arrowheads and angle arcs, dark labels with a white halo, and spacing rules (no label on top of another, later steps in free space). Drawn once per topic and kept with the script.
+- **Real photographs behind the board.** Beats about a real object or place carry a search phrase; a free-licensed photograph is found on Wikimedia Commons (credited in the corner), shown behind the board with a slow documentary drift. Cached per phrase.
+- **Readability guard on the board.** Any light or white label is forced to dark ink with a halo at render time, and overlapping labels are nudged apart. Steps arrive with a small motion instead of a plain fade.
+- **The presenter stays on screen.** With video on, the human presenter no longer flips to the cartoon for audio-only lines (check feedback, hints, answers): the photo shows before the first clip, the last frame between clips, with a speaking indicator. The cartoon appears only when video is switched off.
+- **Board-focus layout** (⛶): the board takes the whole screen and the teacher becomes a small picture-in-picture window; the phone's own picture-in-picture triggers it too. Remembered per device.
+- **Voices read correctly.** Symbols and notation become spoken words in both languages before any voice hears a line; scripts write numbers and maths as words; Arabic lines are fully vowelled (new scripts by the writer, older lines by a cached tashkeel pass), and neural voices keep their natural pitch.
+- **Presenter photos from a phone.** Photos are shrunk to a 1200 px JPEG in the browser before upload (phone photos of 5–10 MB or HEIC used to be refused). Each presenter has a voice gender switch.
+- **Errors from both sites.** Every logged error carries the site (live or beta) and version; the Errors tab shows counts per site and a badge per error.
+- Script version 4: lessons written before this are rewritten on their next start.
+
 ## 2.0.0-beta.5 — Illustrated lessons (19 September 2026, `v2` branch)
 
 - **Scenes: the lesson drawn in front of the child.** Explain and example beats now carry a large labelled diagram of the very thing being taught (the parallel lines and the transversal with the angle arcs, the cell and its membrane, the graph with its axes), built up in 3–6 steps. Each step appears exactly when the teacher says its phrase, the newest element glows and a pointer sits over it, so the child looks where the teacher is talking. Arabic scenes carry Arabic labels. No per-play cost: scenes are part of the script.

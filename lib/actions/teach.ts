@@ -10,6 +10,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
 import { generateLessonScript, SCRIPT_VERSION, type LessonScript } from "@/lib/ai/lesson-script";
 import { answerInLesson } from "@/lib/ai/lesson-answer";
+import { enrichBeats } from "@/lib/teach/enrich";
 import { learnerPromptLine } from "@/lib/learner";
 import { classifyRisk } from "@/lib/ai/coach-chat";
 import type { Topic } from "@/lib/types";
@@ -69,9 +70,10 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
       return { error: err instanceof Error ? err.message : "Could not write the lesson." };
     }
     const { model, ...body } = script;
+    const beats = await enrichBeats(body.beats, { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language }).catch(() => body.beats);
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION })
       .select("id")
       .single();
     if (error || !row) return { error: error?.message ?? "Could not save the lesson." };

@@ -6,6 +6,18 @@ import { clearPresenterAction, retryFailedClipsAction, setPresenterGenderAction,
 import { CHARACTERS } from "@/lib/characters";
 import { runAction } from "@/lib/client-action";
 
+/** Phone photos are 5-10 MB and sometimes HEIC: shrink to a 1200 px JPEG in the browser before sending. */
+async function shrinkPhoto(file: File): Promise<File> {
+  const bmp = await createImageBitmap(file);
+  const scale = Math.min(1, 1200 / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale);
+  canvas.getContext("2d")!.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const blob = await new Promise<Blob | null>((r) => canvas.toBlob(r, "image/jpeg", 0.9));
+  if (!blob) throw new Error("no blob");
+  return new File([blob], "photo.jpg", { type: "image/jpeg" });
+}
+
 /** Admin → Teachers: the presenter photo per character and the monthly clip cap. */
 export function VideoPresenters({ enabled, presenters, cap, used, stats, mode, genders }: { enabled: boolean; presenters: Record<string, { url: string; custom: boolean }>; cap: number; used: number; stats: { done: number; pending: number; failed: number; errors: string[] }; mode: "hook_recap" | "all"; genders: Record<string, "m" | "f" | null> }) {
   const router = useRouter();
@@ -58,7 +70,7 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats, mode, g
                     <span className="muted">Voice:</span>
                     {(["f", "m"] as const).map((g) => { const on = (genders[c.id] ?? (c.voice.preferFemale ? "f" : "m")) === g; return <button key={g} type="button" disabled={pending} className={`chip !px-2.5 !py-0.5 ${on ? "chip-on" : ""}`} onClick={() => start(async () => { await setPresenterGenderAction(c.id, g); router.refresh(); })}>{g === "f" ? "♀ woman" : "♂ man"}</button>; })}
                   </div>
-                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { setMsg(null); const r = await runAction(() => uploadPresenterAction(c.id, f), setMsg); if (r?.error) setMsg(r.error); router.refresh(); }); }} className="flex flex-wrap items-center gap-1.5">
+                  <form onSubmit={(e) => { e.preventDefault(); const f = new FormData(e.currentTarget); start(async () => { setMsg(null); const raw = f.get("photo"); if (raw instanceof File && raw.size > 0) { const small = await shrinkPhoto(raw).catch(() => null); if (small) f.set("photo", small); } const r = await runAction(() => uploadPresenterAction(c.id, f), setMsg); if (r?.error) setMsg(`${c.name}: ${r.error}`); else setMsg(`${c.name}: photo saved. New clips will use it.`); router.refresh(); }); }} className="flex flex-wrap items-center gap-1.5">
                     <input name="photo" type="file" accept="image/jpeg,image/png,image/webp" className="text-xs max-w-[11rem]" />
                     <button className="btn-primary btn-sm" disabled={pending}>Upload</button>
                     {p?.custom && <button type="button" className="btn-ghost btn-sm" disabled={pending} onClick={() => start(async () => { await clearPresenterAction(c.id); router.refresh(); })}>Remove</button>}

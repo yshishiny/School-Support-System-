@@ -18,7 +18,7 @@ import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, sceneStep, word
 import { runAction } from "@/lib/client-action";
 import { closingLine, greetingLine } from "@/lib/teach/lines";
 
-type Beat = LessonScript["beats"][number];
+type Beat = LessonScript["beats"][number] & { image?: { url: string; credit?: string | null; license?: string | null } | null };
 type Phase = "intro" | "lesson" | "outro";
 
 const ADVANCE_MS = 1300;
@@ -326,7 +326,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
     <Classroom scene={c.rig.scene} camera={camera} overlay={overlay}>
       <div className={`absolute inset-0 grid gap-2 px-3 pt-[calc(max(.5rem,env(safe-area-inset-top))+3.4rem)] pb-[calc(max(.5rem,env(safe-area-inset-bottom))+10rem)] landscape:pb-[calc(max(.5rem,env(safe-area-inset-bottom))+8.5rem)] ${layout === "board" ? "grid-rows-1 grid-cols-1" : "grid-rows-[42%_1fr] landscape:grid-rows-1 landscape:grid-cols-[32%_1fr]"}`}>
         <div className="relative min-h-0 order-1 landscape:order-2">
-          <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} step={step} rtl={rtl} title={script.title} kindLabel={label}>{boardBody}</Board>
+          <Board show={phase === "lesson" && beat?.kind !== "check" ? beat?.show ?? null : null} idle={phase === "lesson" && beat?.kind !== "check" && !beat?.show} revealed={revealed} step={step} rtl={rtl} title={script.title} kindLabel={label} image={phase === "lesson" && beat?.kind !== "check" ? beat?.image ?? null : null}>{boardBody}</Board>
           <Scratchpad open={pad} onClose={() => setPad(false)} />
         </div>
         <div className={layout === "board" ? "absolute z-10 start-4 bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+10.5rem)] landscape:bottom-[calc(max(.5rem,env(safe-area-inset-bottom))+9rem)] h-[26%] landscape:h-[38%] flex items-end" : "relative min-h-0 order-2 landscape:order-1 flex items-end justify-center landscape:justify-start landscape:ps-[4%]"}>

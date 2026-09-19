@@ -59,6 +59,9 @@ export default async function AdminPage() {
   ];
   const byArea = new Map<string, number>();
   openErrors.forEach((e) => byArea.set(e.area, (byArea.get(e.area) ?? 0) + 1));
+  const siteOf = (e: { meta: unknown }) => { const m = e.meta as { site?: string; version?: string } | null; return m?.site ? `${m.site === "main" ? "live" : m.site}${m.version ? ` ${m.version}` : ""}` : null; };
+  const bySite = new Map<string, number>();
+  openErrors.forEach((e) => { const k = siteOf(e) ?? "untagged"; bySite.set(k, (bySite.get(k) ?? 0) + 1); });
 
   return (
     <main className="space-y-4">
@@ -80,15 +83,17 @@ export default async function AdminPage() {
           { id: "errors", label: "Errors", emoji: "🐞", badge: openErrors.length || null, content: (
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
+                {[...bySite.entries()].map(([a, n]) => <span key={`s-${a}`} className="chip chip-on">🌐 {a} · {n}</span>)}
                 {[...byArea.entries()].map(([a, n]) => <span key={a} className="chip">{a} · {n}</span>)}
                 {openErrors.length > 0 && <form action={resolveErrorsAction.bind(null, null)} className="ml-auto"><button className="btn-ghost btn-sm">Mark all resolved</button></form>}
               </div>
-              {errors.length === 0 && <p className="card muted text-sm">No errors recorded. Every caught failure (file reading, snap check, AI calls, nightly jobs, browser crashes) lands here, and you get one inbox note per area per hour.</p>}
+              {errors.length === 0 && <p className="card muted text-sm">No errors recorded. Every caught failure (file reading, snap check, AI calls, nightly jobs, browser crashes) from both sites, live and beta, lands here, and you get one inbox note per area per hour.</p>}
               {errors.map((e) => (
                 <details key={e.id} className={`card !py-2 text-sm ${e.resolved_at ? "opacity-60" : ""}`}>
                   <summary className="cursor-pointer flex flex-wrap items-center gap-2">
                     <span>{e.resolved_at ? "✅" : "🔴"}</span>
                     <b>{e.area}</b>
+                    {siteOf(e) && <span className="badge !py-0 !px-2 text-[10px]">{siteOf(e)}</span>}
                     <span className="flex-1 min-w-0 truncate">{e.message}</span>
                     <span className="text-xs muted">{e.profiles?.full_name ? `${e.profiles.full_name.split(" ")[0]} · ` : ""}{when(e.created_at)}</span>
                   </summary>

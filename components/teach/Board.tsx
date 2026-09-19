@@ -30,11 +30,19 @@ function DrawnSvg({ svg }: { svg: string }) {
  * The classroom board. Content appears as the teacher speaks: lines are revealed up to `revealed`,
  * formulas are chalked in, tables fill row by row, diagrams draw themselves.
  */
-export function Board({ show, revealed, step = 99, rtl, title, kindLabel, idle = false, children }: { show: BoardShow | null; revealed: number; /** For scenes: the highest step spoken so far. */ step?: number; rtl: boolean; title: string; kindLabel: string; /** Nothing to show for this beat: a quiet "listen" note instead of an empty board. */ idle?: boolean; children?: React.ReactNode }) {
+export function Board({ show, revealed, step = 99, rtl, title, kindLabel, idle = false, image = null, children }: { show: BoardShow | null; revealed: number; /** For scenes: the highest step spoken so far. */ step?: number; rtl: boolean; title: string; kindLabel: string; /** Nothing to show for this beat: a quiet "listen" note instead of an empty board. */ idle?: boolean; /** A real photograph behind the board content, with its credit. */ image?: { url: string; credit?: string | null; license?: string | null } | null; children?: React.ReactNode }) {
   const lines = show ? boardLines(show) : [];
   const n = Math.min(lines.length, Math.max(0, revealed));
   return (
     <div className="board relative h-full w-full rounded-[1.4rem] overflow-hidden" dir={rtl ? "rtl" : undefined}>
+      {image && (
+        <div className="absolute inset-0 overflow-hidden rounded-[1.4rem]" aria-hidden>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img key={image.url} src={image.url} alt="" className="kenburns h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-black/45 to-black/75" />
+          <div className="absolute bottom-3 end-3 text-[9px] text-white/60 max-w-[60%] truncate">{[image.credit, image.license].filter(Boolean).join(" · ") || "Wikimedia Commons"}</div>
+        </div>
+      )}
       <div className="board-frame absolute inset-0 pointer-events-none" />
       <div className="absolute top-2 inset-x-4 flex items-center justify-between text-[11px] uppercase tracking-wider text-[#d9d2b8]/70 font-bold" style={{ fontFamily: "var(--font-display)" }}>
         <span className="truncate">{title}</span>
