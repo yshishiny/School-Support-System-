@@ -4,8 +4,14 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addToInbox } from "@/lib/inbox";
+import { APP_VERSION } from "@/lib/version";
 
 export interface ErrorContext { familyId?: string | null; userId?: string | null; meta?: Record<string, unknown> }
+
+/** Which deployment reported it: the two sites (main = live, v2 = beta) share this log. */
+export function siteTag(): { site: string; version: string } {
+  return { site: process.env.VERCEL_GIT_COMMIT_REF ?? (process.env.VERCEL ? "vercel" : "local"), version: APP_VERSION };
+}
 
 export async function logError(area: string, err: unknown, ctx: ErrorContext = {}): Promise<void> {
   const message = err instanceof Error ? err.message : String(err);
@@ -13,7 +19,7 @@ export async function logError(area: string, err: unknown, ctx: ErrorContext = {
   console.error(`[${area}]`, message);
   try {
     const admin = createAdminClient();
-    await admin.from("app_errors").insert({ area, message: message.slice(0, 2000), stack: stack?.slice(0, 6000) ?? null, meta: ctx.meta ?? null, family_id: ctx.familyId ?? null, user_id: ctx.userId ?? null });
+    await admin.from("app_errors").insert({ area, message: message.slice(0, 2000), stack: stack?.slice(0, 6000) ?? null, meta: { ...siteTag(), ...(ctx.meta ?? {}) }, family_id: ctx.familyId ?? null, user_id: ctx.userId ?? null });
     // Tell the administrator, at most once an hour per area.
     const { data: admins } = await admin.from("profiles").select("id, family_id").eq("is_admin", true);
     if (!admins?.length) return;
