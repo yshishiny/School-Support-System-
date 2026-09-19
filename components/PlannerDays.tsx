@@ -3,17 +3,52 @@
 import { useState } from "react";
 import type { PlannerDay } from "@/app/(student)/calendar/page";
 
+type Focus = "all" | "classes" | "quizzes" | "due";
+
 /**
  * Two weeks as a strip of days you tap, so the whole plan fits on one screen instead of a page nobody scrolls.
  * A day with nothing in it is still shown, greyed, because "no school today" is an answer too.
  */
 export function PlannerDays({ days }: { days: PlannerDay[] }) {
   const [pick, setPick] = useState(0);
+  const [only, setOnly] = useState<Focus>("all");
   const d = days[pick] ?? days[0];
   const count = (x: PlannerDay) => x.classes.length + x.quizzes.filter((q) => !q.done).length + x.due.length;
+  const week = days.slice(0, 7);
+  const totals = {
+    classes: week.reduce((s, x) => s + x.classes.length, 0),
+    quizzes: week.reduce((s, x) => s + x.quizzes.filter((q) => !q.done).length, 0),
+    due: week.reduce((s, x) => s + x.due.length, 0),
+  };
+  // Tapping a count narrows the week to that one thing; tapping it again gives the whole day back.
+  const toggle = (f: Focus) => setOnly((cur) => (cur === f ? "all" : f));
+  const show = { classes: only === "all" || only === "classes", quizzes: only === "all" || only === "quizzes", due: only === "all" || only === "due" };
 
   return (
     <section className="space-y-2">
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {([
+          { f: "classes" as const, label: "Classes this week", n: totals.classes, tone: "" },
+          { f: "quizzes" as const, label: "Quizzes booked", n: totals.quizzes, tone: "text-accent-2" },
+          { f: "due" as const, label: "Things due", n: totals.due, tone: totals.due ? "text-warn" : "" },
+        ]).map((t) => (
+          <button
+            key={t.f}
+            type="button"
+            onClick={() => toggle(t.f)}
+            aria-pressed={only === t.f}
+            className={`tile !p-2 transition ${only === t.f ? "!border-accent bg-accent/15" : ""}`}
+          >
+            <div className="text-[11px] muted">{t.label}</div>
+            <div className={`text-xl font-bold ${t.tone}`} style={{ fontFamily: "var(--font-display)" }}>{t.n}</div>
+          </button>
+        ))}
+      </div>
+      {only !== "all" && (
+        <button type="button" onClick={() => setOnly("all")} className="w-full text-center text-[11px] underline muted">
+          showing {only === "due" ? "what is due" : only} only · tap to see the whole day
+        </button>
+      )}
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
         {days.map((x, k) => {
           const n = count(x);
@@ -44,14 +79,14 @@ export function PlannerDays({ days }: { days: PlannerDay[] }) {
           <span className="text-xs muted">{d.isToday ? "today" : d.date}</span>
         </div>
 
-        {d.due.length > 0 && (
+        {show.due && d.due.length > 0 && (
           <div className="space-y-1">
             <div className="text-[11px] font-bold uppercase tracking-wider text-warn">Due</div>
             {d.due.map((a) => <div key={a.id} className="text-sm">{a.emoji} {a.title}{a.subject ? <span className="muted"> · {a.subject}</span> : null}</div>)}
           </div>
         )}
 
-        {d.quizzes.length > 0 && (
+        {show.quizzes && d.quizzes.length > 0 && (
           <div className="space-y-1">
             <div className="text-[11px] font-bold uppercase tracking-wider text-accent-2">Quiz booked</div>
             {d.quizzes.map((q) => (
@@ -62,7 +97,7 @@ export function PlannerDays({ days }: { days: PlannerDay[] }) {
           </div>
         )}
 
-        {d.classes.length > 0 ? (
+        {show.classes && d.classes.length > 0 ? (
           <div className="space-y-1">
             <div className="text-[11px] font-bold uppercase tracking-wider muted">Classes</div>
             {d.classes.map((c, k) => (
@@ -74,7 +109,7 @@ export function PlannerDays({ days }: { days: PlannerDay[] }) {
             ))}
           </div>
         ) : (
-          <p className="text-sm muted">No classes on this day.</p>
+          <p className="text-sm muted">{show.classes ? "No classes on this day." : only === "due" ? (d.due.length ? "" : "Nothing due on this day.") : d.quizzes.length ? "" : "No quiz booked on this day."}</p>
         )}
       </div>
     </section>

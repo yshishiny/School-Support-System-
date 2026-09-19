@@ -15,6 +15,28 @@ export interface WalletEntry {
   category: string | null;
   occurred_on: string; // YYYY-MM-DD
   note?: string | null;
+  /** A claim to be paid back for money spent on the family or on school. */
+  claim_status?: ClaimStatus | null;
+  claim_purpose?: ClaimPurpose | null;
+  claim_reason?: string | null;
+  asked_permission?: boolean | null;
+  claim_note?: string | null;
+}
+
+export type ClaimStatus = "none" | "requested" | "approved" | "rejected";
+export type ClaimPurpose = "family" | "school";
+
+export const CLAIM_PURPOSES: { id: ClaimPurpose; label: string; emoji: string; hint: string }[] = [
+  { id: "family", label: "For the family", emoji: "🏠", hint: "Bread, a taxi for your mother, something the house needed." },
+  { id: "school", label: "For school", emoji: "🏫", hint: "A printout, a project material, a trip the school asked for." },
+];
+
+/**
+ * Whether a line of spending may be claimed back at all. Personal spending never can: the rule is that the money
+ * has to have been spent on the family or on school, and it has to be his own recent spending.
+ */
+export function claimable(e: Pick<WalletEntry, "kind" | "claim_status">): boolean {
+  return e.kind === "spend" && (!e.claim_status || e.claim_status === "none" || e.claim_status === "rejected");
 }
 
 export const SPEND_CATEGORIES = [
@@ -105,6 +127,17 @@ export function budgetSplit(amount: number): { spend: number; save: number; give
   const save = Math.round(a * 0.3);
   const give = Math.round(a * 0.1);
   return { spend: a - save - give, save, give };
+}
+
+/** What a child is waiting to be paid back, and what has been agreed. */
+export function claimTotals(entries: WalletEntry[]): { requested: number; approved: number; count: number } {
+  const req = entries.filter((e) => e.claim_status === "requested");
+  const ok = entries.filter((e) => e.claim_status === "approved");
+  return {
+    requested: round2(req.reduce((s, e) => s + Number(e.amount_egp), 0)),
+    approved: round2(ok.reduce((s, e) => s + Number(e.amount_egp), 0)),
+    count: req.length,
+  };
 }
 
 /** How many weeks of the current saving rate a goal still needs. null when nothing is being saved. */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balances, budgetSplit, monthSummary, weeksToGoal, type WalletEntry } from "./wallet";
+import { balances, budgetSplit, claimTotals, claimable, monthSummary, weeksToGoal, type WalletEntry } from "./wallet";
 
 const e = (kind: WalletEntry["kind"], amount: number, occurred_on: string, label = "x", category: string | null = null): WalletEntry =>
   ({ id: `${kind}-${occurred_on}-${amount}`, kind, amount_egp: amount, label, category, occurred_on });
@@ -79,5 +79,32 @@ describe("learning to budget", () => {
     expect(weeksToGoal(1000, 200, 100)).toBe(8);
     expect(weeksToGoal(1000, 1200, 100)).toBe(0);
     expect(weeksToGoal(1000, 0, 0)).toBeNull();
+  });
+});
+
+describe("claiming money back", () => {
+  it("only offers the claim on his own spending, and not twice", () => {
+    expect(claimable({ kind: "spend", claim_status: null })).toBe(true);
+    expect(claimable({ kind: "spend", claim_status: "none" })).toBe(true);
+    expect(claimable({ kind: "spend", claim_status: "rejected" })).toBe(true); // he may ask again with a better reason
+    expect(claimable({ kind: "spend", claim_status: "requested" })).toBe(false);
+    expect(claimable({ kind: "spend", claim_status: "approved" })).toBe(false);
+    expect(claimable({ kind: "earn", claim_status: null })).toBe(false);
+    expect(claimable({ kind: "withdraw", claim_status: null })).toBe(false);
+  });
+
+  it("adds up what is waiting and what was agreed", () => {
+    const es = [
+      { ...e("spend", 60, "2026-09-06", "Bread", "food"), claim_status: "requested" as const },
+      { ...e("spend", 40, "2026-09-07", "Printing", "school"), claim_status: "requested" as const },
+      { ...e("spend", 25, "2026-09-08", "Taxi", "other"), claim_status: "approved" as const },
+      { ...e("spend", 90, "2026-09-09", "Game", "fun"), claim_status: "rejected" as const },
+      e("spend", 15, "2026-09-10", "Sweets", "food"),
+    ];
+    expect(claimTotals(es)).toEqual({ requested: 100, approved: 25, count: 2 });
+  });
+
+  it("a wallet with no claims totals nothing", () => {
+    expect(claimTotals([e("spend", 10, "2026-09-01")])).toEqual({ requested: 0, approved: 0, count: 0 });
   });
 });

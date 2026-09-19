@@ -17,10 +17,11 @@ html[data-site="beta"] {
   --color-bad: #f07a7a;
 
   /* One elevation scale, so every raised thing in the app agrees on where the light comes from. */
-  --v2-lift-1: 0 1px 2px rgba(0, 0, 0, .5), 0 4px 10px rgba(0, 0, 0, .35);
-  --v2-lift-2: 0 2px 4px rgba(0, 0, 0, .5), 0 10px 26px rgba(0, 0, 0, .45), 0 24px 60px rgba(0, 0, 0, .3);
-  --v2-lift-3: 0 3px 6px rgba(0, 0, 0, .55), 0 18px 44px rgba(0, 0, 0, .5), 0 40px 90px rgba(0, 0, 0, .35);
-  --v2-edge: inset 0 1px 0 rgba(255, 255, 255, .09), inset 0 -1px 0 rgba(0, 0, 0, .5);
+  --v2-lift-1: 0 2px 3px rgba(0, 0, 0, .6), 0 6px 14px rgba(0, 0, 0, .45);
+  --v2-lift-2: 0 3px 6px rgba(0, 0, 0, .6), 0 14px 32px rgba(0, 0, 0, .55), 0 30px 70px rgba(0, 0, 0, .4);
+  --v2-lift-3: 0 4px 8px rgba(0, 0, 0, .65), 0 22px 52px rgba(0, 0, 0, .6), 0 48px 110px rgba(0, 0, 0, .45);
+  /* The bevel that makes a surface look machined: a lit top lip, a dark bottom lip, and a hairline all round. */
+  --v2-edge: inset 0 1px 0 rgba(255, 255, 255, .16), inset 0 -2px 0 rgba(0, 0, 0, .55), inset 0 0 0 1px rgba(255, 255, 255, .05);
   --v2-metal: linear-gradient(135deg, #f0d9a4 0%, #d9b061 42%, #b98f45 100%);
 }
 
@@ -35,18 +36,20 @@ html[data-site="beta"] .theme-root::before { opacity: .35; }
 
 /* Surfaces: no heavy outline, a hairline of light along the top edge and a real shadow underneath. */
 html[data-site="beta"] .card {
-  border: 1px solid rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .08);
   border-radius: 1.5rem;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .045) 0%, rgba(255, 255, 255, 0) 38%);
+  background-image:
+    linear-gradient(180deg, rgba(255, 255, 255, .085) 0%, rgba(255, 255, 255, .012) 30%, rgba(0, 0, 0, .14) 100%),
+    radial-gradient(120% 60% at 50% -10%, rgba(217, 176, 97, .10), transparent 70%);
   background-color: var(--color-panel);
   box-shadow: var(--v2-lift-2), var(--v2-edge);
 }
 html[data-site="beta"] .tile {
-  border: 1px solid rgba(255, 255, 255, .06);
+  border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 1.15rem;
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, .05) 0%, rgba(255, 255, 255, 0) 45%);
+  background-image: linear-gradient(180deg, rgba(255, 255, 255, .095) 0%, rgba(255, 255, 255, .01) 42%, rgba(0, 0, 0, .16) 100%);
   background-color: var(--color-panel-2);
-  box-shadow: var(--v2-lift-1), inset 0 1px 0 rgba(255, 255, 255, .07);
+  box-shadow: var(--v2-lift-1), inset 0 1px 0 rgba(255, 255, 255, .14), inset 0 -2px 0 rgba(0, 0, 0, .5);
 }
 html[data-site="beta"] .tile:hover { border-color: rgba(217, 176, 97, .45); transform: translateY(-1px); }
 
@@ -107,13 +110,12 @@ html[data-site="beta"] .input {
 }
 html[data-site="beta"] .input:focus { border-color: rgba(217, 176, 97, .7); box-shadow: inset 0 2px 6px rgba(0, 0, 0, .5), 0 0 0 3px rgba(217, 176, 97, .16); }
 
-/* Headings: a little tighter, with a metal rule under the page title. */
+/* Headings: tighter and brighter, with a metal rule under the page title. Solid ink, never clipped-gradient text:
+   over a photo banner a transparent fill left the words unreadable. */
 html[data-site="beta"] .h1 {
   letter-spacing: -.015em;
-  background: linear-gradient(180deg, #ffffff 30%, #cfd6ea 100%);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: #ffffff;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, .55), 0 2px 12px rgba(0, 0, 0, .45);
 }
 html[data-site="beta"] main > header .h1::after,
 html[data-site="beta"] main > .flex .h1::after {
@@ -150,3 +152,32 @@ html[data-site="beta"] .stage-controls {
   html[data-site="beta"] .chip,
   html[data-site="beta"] .tile { transition: none; transform: none !important; }
 }
+
+/* A number on a tile is the thing you came to read: give it the metal, not the body colour. */
+html[data-site="beta"] .tile .text-xl,
+html[data-site="beta"] .tile .text-lg,
+html[data-site="beta"] .card .text-\[1\.7rem\] {
+  background-image: var(--v2-metal);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: none;
+}
+/* …except where the number already carries a meaning colour. */
+html[data-site="beta"] .tile .text-good,
+html[data-site="beta"] .tile .text-warn,
+html[data-site="beta"] .tile .text-bad,
+html[data-site="beta"] .tile .text-accent-2,
+html[data-site="beta"] .card .text-good,
+html[data-site="beta"] .card .text-warn,
+html[data-site="beta"] .card .text-bad,
+html[data-site="beta"] .card .text-accent-2 {
+  background-image: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: currentColor;
+}
+
+/* A header sitting on a photo banner needs its own footing, not the page's. */
+html[data-site="beta"] .h2 { color: #eef1f8; }
+html[data-site="beta"] .muted { color: var(--color-muted); }

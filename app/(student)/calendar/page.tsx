@@ -62,10 +62,6 @@ export default async function CalendarPage() {
   const overdue = open.filter((a) => a.due_date && a.due_date < today);
   const noDate = open.filter((a) => !a.due_date);
   const later = open.filter((a) => a.due_date && a.due_date > horizon);
-  const thisWeek = days.slice(0, 7);
-  const classCount = thisWeek.reduce((s, d) => s + d.classes.length, 0);
-  const quizCount = thisWeek.reduce((s, d) => s + d.quizzes.filter((q) => !q.done).length, 0);
-  const dueCount = thisWeek.reduce((s, d) => s + d.due.length, 0);
 
   return (
     <main className="space-y-3">
@@ -77,12 +73,6 @@ export default async function CalendarPage() {
         </div>
         <Link href="/today" className="btn-ghost btn-sm">Today</Link>
       </header>
-
-      <section className="grid grid-cols-3 gap-2 text-center">
-        <div className="tile !p-2"><div className="text-[11px] muted">Classes this week</div><div className="text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{classCount}</div></div>
-        <div className="tile !p-2"><div className="text-[11px] muted">Quizzes booked</div><div className="text-xl font-bold text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{quizCount}</div></div>
-        <div className="tile !p-2"><div className="text-[11px] muted">Things due</div><div className={`text-xl font-bold ${dueCount ? "text-warn" : ""}`} style={{ fontFamily: "var(--font-display)" }}>{dueCount}</div></div>
-      </section>
 
       {overdue.length > 0 && (
         <section className="card !py-3 border-2 border-bad/60">

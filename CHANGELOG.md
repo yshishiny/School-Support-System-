@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.18 — Claim it back, and a planner you can filter (19 September 2026, `v2` branch)
+
+- **Money spent on the family or on school can be claimed back.** Next to anything he wrote down, a child can ask to be repaid — but only by saying which it was, why he spent it, and whether he asked permission first. Personal spending cannot be claimed at all, and the form says so. The request sits in your Wallets tab with his reason, whether he asked first marked in green or amber, and one tap to pay it back or turn it down with a word he reads. Approving credits his wallet once, keyed to that line.
+- **A sister's tick now waits for you.** Her approval is recorded as a recommendation with her name and note; the snap stays pending and no points move until you confirm. Your queue puts the ones she has seen first. The child is told "your sister says it is done, waiting for Dad".
+- **The planner's three counts are buttons.** Tap Classes, Quizzes or Things due and the whole two weeks narrows to that one thing; tap again for the full day.
+- **Headings are readable again.** The new skin drew page titles as clipped-gradient text, which over a photo banner left them washed out. They are solid white with a soft shadow now, and the raised surfaces are deeper: a brighter top lip, a darker bottom lip, and numbers on tiles struck in the metal accent.
+
 ## 2.0.0-beta.17 — The sisters can approve their brothers' snaps (19 September 2026, `v2` branch)
 
 - **A rater finally has somewhere to rate.** A parent could already mark a grown child as a rater, and the permission to approve a picture was already written and enforced, but there was no screen showing her anything — so the setting did nothing for photographs. There is now a "Check" page: her brothers' pending snaps, each with the picture, what the task asked for, what the coach thought, and one tap to approve or send back with a reason.

@@ -2,8 +2,8 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { loadWallet } from "@/lib/actions/wallet";
-import { balances, budgetSplit, categoryLabel, monthSummary } from "@/lib/wallet";
-import { SpendForm } from "@/components/WalletForms";
+import { balances, budgetSplit, categoryLabel, claimTotals, claimable, monthSummary } from "@/lib/wallet";
+import { ClaimForm, SpendForm } from "@/components/WalletForms";
 
 const KIND_LINE: Record<string, { sign: string; tone: string; what: string }> = {
   earn: { sign: "+", tone: "text-good", what: "earned" },
@@ -22,6 +22,7 @@ export default async function WalletPage() {
   const m = monthSummary(entries, month);
   const recent = [...entries].reverse().slice(0, 25);
   const split = budgetSplit(b.inPocket);
+  const claims = claimTotals(entries);
 
   return (
     <main className="space-y-4">
@@ -66,7 +67,18 @@ export default async function WalletPage() {
         <h2 className="h2">Write down what you spent</h2>
         <SpendForm today={today} />
         <p className="text-xs muted">Write it down the same day and your month adds up. Nobody can guess where money went a week later.</p>
+        <p className="text-xs muted">Spent it on the family or on school? Find it in the list below and ask to be paid back.</p>
       </section>
+
+      {claims.count > 0 && (
+        <section className="card !py-3">
+          <div className="flex items-baseline justify-between gap-2">
+            <h2 className="h2">Waiting to be paid back</h2>
+            <span className="font-bold text-accent-2">{claims.requested} EGP</span>
+          </div>
+          <p className="text-xs muted">{claims.count} thing{claims.count === 1 ? "" : "s"} your dad has not decided yet.</p>
+        </section>
+      )}
 
       {b.inPocket > 0 && (
         <section className="card space-y-2">
@@ -113,13 +125,19 @@ export default async function WalletPage() {
           const k = KIND_LINE[e.kind] ?? KIND_LINE.spend;
           const cat = e.kind === "spend" ? categoryLabel(e.category) : null;
           return (
-            <div key={e.id} className="flex items-center gap-2 border-b border-line py-1.5 text-sm last:border-0">
-              <span className="text-lg">{cat ? cat.emoji : e.kind === "withdraw" ? "🤝" : "💰"}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{e.label}</div>
-                <div className="text-[11px] muted">{prettyDate(e.occurred_on)} · {k.what}</div>
+            <div key={e.id} className="border-b border-line py-1.5 last:border-0">
+              <div className="flex items-center gap-2 text-sm">
+                <span className="text-lg">{cat ? cat.emoji : e.kind === "withdraw" ? "🤝" : "💰"}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold">{e.label}</div>
+                  <div className="text-[11px] muted">{prettyDate(e.occurred_on)} · {k.what}</div>
+                </div>
+                <span className={`shrink-0 font-bold tabular-nums ${k.tone}`}>{k.sign}{e.amount_egp}</span>
               </div>
-              <span className={`shrink-0 font-bold tabular-nums ${k.tone}`}>{k.sign}{e.amount_egp}</span>
+              {e.claim_status === "requested" && <div className="mt-1 text-[11px] text-accent-2">⏳ Asked to be paid back · waiting for your dad</div>}
+              {e.claim_status === "approved" && <div className="mt-1 text-[11px] text-good">✓ Paid back{e.claim_note ? ` · “${e.claim_note}”` : ""}</div>}
+              {e.claim_status === "rejected" && <div className="mt-1 text-[11px] text-bad">✗ Not paid back{e.claim_note ? ` · “${e.claim_note}”` : ""}</div>}
+              {claimable(e) && <div className="mt-1"><ClaimForm entryId={e.id} label={e.label} amount={e.amount_egp} /></div>}
             </div>
           );
         })}

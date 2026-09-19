@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireParent, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
-import { SPEND_CATEGORIES, type WalletEntry } from "@/lib/wallet";
+import { CLAIM_PURPOSES, SPEND_CATEGORIES, claimable, type WalletEntry } from "@/lib/wallet";
 
 const PATHS = ["/wallet", "/allowance", "/me", "/parent", "/parent/allowance"];
 
@@ -19,7 +19,7 @@ export async function loadWallet(studentId: string): Promise<WalletEntry[]> {
   const admin = createAdminClient();
   const { data } = await admin
     .from("wallet_entries")
-    .select("id, kind, amount_egp, label, category, occurred_on, note")
+    .select("id, kind, amount_egp, label, category, occurred_on, note, claim_status, claim_purpose, claim_reason, asked_permission, claim_note")
     .eq("student_id", studentId)
     .order("occurred_on")
     .order("created_at");
@@ -122,6 +122,59 @@ export async function spendAction(formData: FormData): Promise<{ error?: string;
   if (error) return { error: error.message };
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: `${amount} EGP written down.` };
+}
+
+/**
+ * "Pay me back for this." Only money spent on the family or on school may be claimed, and he has to say what it
+ * was for, why he spent it and whether he asked first. A parent decides; nothing moves until then.
+ */
+export async function claimExpenseAction(formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { profile } = await requireStudent();
+  const id = String(formData.get("id") ?? "");
+  const purpose = CLAIM_PURPOSES.some((p) => p.id === formData.get("purpose")) ? String(formData.get("purpose")) : "";
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 300);
+  const asked = String(formData.get("asked") ?? "");
+  if (!purpose) return { error: "Say whether it was for the family or for school. Anything personal cannot be claimed." };
+  if (reason.length < 10) return { error: "Say in a sentence why you spent it and why it should be paid back." };
+  if (asked !== "yes" && asked !== "no") return { error: "Say whether you asked permission first." };
+  const admin = createAdminClient();
+  const { data: row } = await admin.from("wallet_entries").select("id, kind, student_id, claim_status").eq("id", id).maybeSingle();
+  if (!row || row.student_id !== profile.id) return { error: "That is not your line." };
+  if (!claimable(row as Pick<WalletEntry, "kind" | "claim_status">)) return { error: "That one cannot be claimed." };
+  const { error } = await admin
+    .from("wallet_entries")
+    .update({ claim_status: "requested", claim_purpose: purpose, claim_reason: reason, asked_permission: asked === "yes", claim_decided_by: null, claim_decided_at: null })
+    .eq("id", id);
+  if (error) return { error: error.message };
+  PATHS.forEach((p) => revalidatePath(p));
+  return { ok: asked === "yes" ? "Asked for. Your dad will look at it." : "Asked for. Be honest that you did not ask first; he decides." };
+}
+
+/** The parent decides a claim. Approving pays the amount back into the child's wallet, once. */
+export async function decideClaimAction(formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { profile, family } = await requireParent();
+  const id = String(formData.get("id") ?? "");
+  const decision = String(formData.get("decision") ?? "");
+  if (decision !== "approved" && decision !== "rejected") return { error: "Approve it or turn it down." };
+  const note = String(formData.get("note") ?? "").trim().slice(0, 200) || null;
+  const admin = createAdminClient();
+  const { data: row } = await admin.from("wallet_entries").select("id, student_id, family_id, amount_egp, label, claim_status, occurred_on").eq("id", id).eq("family_id", family.id).maybeSingle();
+  if (!row || row.claim_status !== "requested") return { error: "Nothing to decide on that one." };
+  await admin.from("wallet_entries").update({ claim_status: decision, claim_note: note, claim_decided_by: profile.id, claim_decided_at: new Date().toISOString() }).eq("id", id);
+  if (decision === "approved") {
+    await creditWallet({
+      studentId: row.student_id as string,
+      familyId: family.id,
+      amount: Number(row.amount_egp),
+      label: `Paid back: ${row.label}`,
+      on: todayIn(family.timezone),
+      refType: "expense_claim",
+      refId: row.id as string,
+      by: profile.id,
+    });
+  }
+  PATHS.forEach((p) => revalidatePath(p));
+  return { ok: decision === "approved" ? `${Number(row.amount_egp)} EGP put back.` : "Turned down." };
 }
 
 /** A line entered by mistake. A child may only take back his own spending. */
