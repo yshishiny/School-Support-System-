@@ -84,9 +84,9 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     const voice = videoVoice(character, language);
     const sid = scriptId;
     if (voice) after(async () => {
-      const { data } = await admin.from("lesson_scripts").select("script").eq("id", sid).maybeSingle();
+      const { data } = await admin.from("lesson_scripts").select("script, title").eq("id", sid).maybeSingle();
       const beats = ((data?.script as { beats?: { kind: string; say: string }[] } | null)?.beats ?? []).map((b) => ({ kind: b.kind, say: b.say }));
-      await renderScript({ characterId: character.id, voice, beats });
+      await renderScript({ characterId: character.id, voice, beats, title: data?.title ?? "", language });
     });
   }
   redirect(`/teach/${session.id}`);

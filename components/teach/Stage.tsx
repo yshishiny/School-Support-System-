@@ -16,6 +16,7 @@ import type { LessonScript } from "@/lib/ai/lesson-script";
 import type { CloudVoice } from "@/lib/tts";
 import { beatLabel, cameraFor, gestureFor, moodFor, revealCount, wordsOf, boardLines, type Camera, type Gesture, type Mood } from "@/lib/teach/performance";
 import { runAction } from "@/lib/client-action";
+import { closingLine, greetingLine } from "@/lib/teach/lines";
 
 type Beat = LessonScript["beats"][number];
 type Phase = "intro" | "lesson" | "outro";
@@ -51,7 +52,9 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const clips = useClips({ enabled: useVideo, character: c.id, language, voice: isCloudVoice(speech.voiceId) ? speech.voiceId!.slice("cloud:".length) : null, kinds: videoKinds });
   const warmBeat = (k: number) => { const b = beats[k]; if (b) clips.warm(b.say, b.kind); };
   // Ask about every line once at the start: rendered clips play whatever the mode, and the allowed kinds start rendering.
-  useEffect(() => { if (useVideo) clips.prime(beats.map((b) => ({ text: b.say, kind: b.kind }))); // eslint-disable-next-line react-hooks/exhaustive-deps
+  const greeting = greetingLine(c, language, script.title);
+  const closing = closingLine(language);
+  useEffect(() => { if (useVideo) clips.prime([{ text: greeting, kind: "hook" }, ...beats.map((b) => ({ text: b.say, kind: b.kind })), { text: closing, kind: "recap" }]); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [useVideo, speech.voiceId]);
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
@@ -103,17 +106,18 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   // Intro: walk in, wave, greet, announce the lesson.
   useEffect(() => {
     if (phase !== "intro" || !started) return;
-    const t1 = window.setTimeout(() => {
+    let cancelled = false;
+    const t1 = window.setTimeout(async () => {
       setWalking(false);
       setGestureOverride("wave");
       setMoodOverride("happy");
-      const hello = rtl ? c.lines.hello_ar : c.lines.hello;
-      const today = rtl ? `درس اليوم: ${script.title}.` : `Today's lesson: ${script.title}.`;
-      speak(`${hello} ${today}`, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(-1); });
+      const clip = useVideo ? clips.get(greeting) ?? await clips.wait(greeting, 2000) : null;
+      if (cancelled) return;
+      speak(greeting, () => { setGestureOverride(null); setMoodOverride(null); scheduleAdvance(-1); }, clip);
       if (beats[0]) { speech.prefetch(beats[0].say); warmBeat(0); }
       warmBeat(1);
     }, 1700);
-    return () => window.clearTimeout(t1);
+    return () => { cancelled = true; window.clearTimeout(t1); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, started]);
 
@@ -137,8 +141,9 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   useEffect(() => {
     if (phase !== "outro") return;
     setGestureOverride("celebrate"); setMoodOverride("happy"); setBurst((b) => b + 1);
-    const done = rtl ? "انتهى الدرس! أحسنت. والآن ثلاثة أسئلة سريعة." : "Lesson complete! Well done. Now three quick questions.";
-    speak(done);
+    let cancelled = false;
+    (async () => { const clip = useVideo ? clips.get(closing) ?? await clips.wait(closing, 2000) : null; if (!cancelled) speak(closing, undefined, clip); })();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase]);
 

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { CLOUD_VOICES, defaultCloudVoice } from "@/lib/tts";
+import { closingLine, greetingLine } from "@/lib/teach/lines";
 
 /**
  * Video presenters: each scripted line becomes a short clip of a realistic human presenter, lip-synced to the
@@ -196,9 +197,15 @@ export async function clipStats(): Promise<{ done: number; pending: number; fail
 }
 
 /** Starts the script's video lines rendering, in order, so the clips are ready by the time the child reaches them. */
-export async function renderScript(o: { characterId: string; voice: string; beats: { kind: string; say: string }[] }): Promise<void> {
+export async function renderScript(o: { characterId: string; voice: string; beats: { kind: string; say: string }[]; title: string; language: "en" | "ar" }): Promise<void> {
   const kinds = videoKinds(await videoMode());
-  for (const b of o.beats) {
+  const c = CHARACTERS.find((x) => x.id === o.characterId);
+  const lines = [
+    ...(c ? [{ kind: "hook", say: greetingLine(c, o.language, o.title) }] : []),
+    ...o.beats,
+    { kind: "recap", say: closingLine(o.language) },
+  ];
+  for (const b of lines) {
     if (!kinds.includes(b.kind as BeatKind)) continue;
     try { await requestClip({ characterId: o.characterId, voice: o.voice, text: b.say }); } catch { /* next line */ }
   }
