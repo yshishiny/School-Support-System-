@@ -1,4 +1,7 @@
 import Link from "next/link";
+import { GrantCredits } from "@/components/AccessForms";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { todayIn } from "@/lib/dates";
 import { requireAdmin } from "@/lib/auth";
 import { Tabs } from "@/components/Tabs";
 import { configChecks, databaseChecks, githubCommits, googleStatus, jobChecks, recentErrors, supabaseStatus, vercelDeployments, type Check } from "@/lib/ops/health";
@@ -46,6 +49,24 @@ export default async function AdminPage() {
     googleStatus(),
   ]);
   const sched = await schedulerStatus().catch(() => ({ enabled: false, appUrl: null, lastRun: null, lastOk: null }));
+  // Every family's credit balance and how many children can use the teacher right now.
+  const admin = createAdminClient();
+  const [{ data: famRows }, { data: creditRows }, { data: grantRows }] = await Promise.all([
+    admin.from("families").select("id, name, timezone").order("name"),
+    admin.from("credit_entries").select("family_id, delta"),
+    admin.from("access_grants").select("family_id, student_id, starts_on, ends_on, plan"),
+  ]);
+  type FamRow = { id: string; name: string | null; timezone: string | null };
+  type CreditRow = { family_id: string; delta: number };
+  type GrantRow = { family_id: string; ends_on: string };
+  const fams = (famRows ?? []) as FamRow[];
+  const allFamilies = fams.map((f) => ({ id: f.id, name: f.name ?? "Family" }));
+  const familyCredits = fams.map((f) => {
+    const day = todayIn(f.timezone ?? "Africa/Cairo");
+    const live = ((grantRows ?? []) as GrantRow[]).filter((g) => g.family_id === f.id && g.ends_on >= day).length;
+    const credits = ((creditRows ?? []) as CreditRow[]).filter((c) => c.family_id === f.id).reduce((n, c) => n + Number(c.delta), 0);
+    return { id: f.id, name: f.name ?? "Family", credits, live };
+  });
   const [presenters, cap, used, stats, mode, genders] = await Promise.all([presenterUrls().catch(() => ({})), videoCap().catch(() => 500), videoMonthCount().catch(() => 0), clipStats().catch(() => ({ done: 0, pending: 0, failed: 0, errors: [] as string[] })), videoMode().catch(() => "hook_recap" as const), presenterGenders().catch(() => ({}))]);
   const openErrors = errors.filter((e) => !e.resolved_at);
   const worst = (rows: Check[]) => (rows.some((c) => c.tone === "bad") ? "bad" : rows.some((c) => c.tone === "warn") ? "warn" : "good");
@@ -73,6 +94,27 @@ export default async function AdminPage() {
         storageKey="admin"
         defaultId={openErrors.length ? "errors" : "health"}
         tabs={[
+          { id: "credits", label: "Credits", emoji: "🎟️", content: (
+            <div className="space-y-3">
+              <section className="card space-y-2">
+                <h2 className="h2">Give a family credits</h2>
+                <p className="text-xs muted">The unit everything is sold in: 50 credits to the pound, so a month for one child is 22,500 credits, or 450 EGP. A family you invite pays you back 500 credits when it starts using the app.</p>
+                <GrantCredits families={allFamilies} />
+              </section>
+              <section className="card space-y-2">
+                <h2 className="h2">Where the credits stand</h2>
+                <ul className="divide-y divide-line text-sm">
+                  {familyCredits.map((f) => (
+                    <li key={f.id} className="flex items-center gap-2 py-1.5">
+                      <span className="flex-1 min-w-0 truncate font-semibold">{f.name}</span>
+                      <span className="muted text-xs">{f.live} with access</span>
+                      <span className="font-bold tabular-nums">{f.credits.toLocaleString()}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            </div>
+          ) },
           { id: "health", label: "Health", emoji: overall === "good" && !openErrors.length ? "💚" : "🩺", content: (
             <div className="space-y-3">
               <section className="card"><h2 className="h2 mb-1">At a glance</h2><CheckList rows={summary} /></section>

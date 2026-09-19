@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0-beta.20 — The virtual teacher can be sold (19 September 2026, `v2` branch)
+
+- **Credits are the unit.** Everything — a gift, a purchase, a thank-you for an invitation — is the same currency, at fifty credits to the pound. The two anchors you set fix the rest: 1,500 credits buys one child two days, and a month for one child is 450 EGP.
+- **The price list.** One child for two days (30 EGP), a week (105), or a month (450). The whole house for a month is 1,200, which is less than three children bought separately, and a term for everyone is 4,200, cheaper again by the month. Buying while access is still running queues behind it, so paying early never throws away days.
+- **Two invitations per family.** Each one is a six-character code with no lookalike letters and a link to send. When an invited family starts using the app, 500 credits land in the inviter's balance, about 10 EGP off their next month. Nobody can redeem their own code, use two, or be paid twice.
+- **For the owner**, a Credits tab in Admin: hand any family credits with a reason on the record, and see every family's balance and how many children have access right now.
+- **For a parent**, Teacher access under Learning: the balance, who can use it and until when, the plans, and the invites.
+- **For a child**, one card on the teacher page that stays quiet while access is comfortable and speaks up in the last three days.
+
 ## 2.0.0-beta.19 — Prayer in congregation counts for more (19 September 2026, `v2` branch)
 
 - **The log now knows where he prayed.** Claiming a prayer inside its window offers two buttons: at the mosque, or at home. The mosque is the first and larger of the two, because it is the one worth extra. A prayer already late cannot be claimed as congregation; he had to be there for it.

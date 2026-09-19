@@ -9,6 +9,8 @@ import { Tabs } from "@/components/Tabs";
 import { isArabicSubject, subjectEmoji, subjectLabel } from "@/lib/plan";
 import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { isSchoolStage } from "@/lib/allowance";
+import { loadAccess } from "@/lib/actions/access";
+import { UpgradeCard } from "@/components/UpgradeCard";
 import type { Topic } from "@/lib/types";
 
 export const maxDuration = 300;
@@ -22,6 +24,7 @@ export default async function TeachPage() {
   // A university student or a postgraduate has no school grade, so the family curriculum has nothing for her:
   // her lessons come from the material she uploads.
   const atSchool = isSchoolStage((profile as { stage?: string | null }).stage);
+  const access = await loadAccess(family.id).catch(() => null);
   const [{ data: topics }, { data: logs }, { data: materials }, { data: sessions }] = await Promise.all([
     supabase.from("topics").select("*").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
     supabase.from("lesson_logs").select("subject_name, topic_id, note, log_date").eq("student_id", profile.id).gte("log_date", shiftDate(today, -7)).order("log_date", { ascending: false }),
@@ -66,6 +69,8 @@ export default async function TeachPage() {
           <details className="text-xs mt-1"><summary className="cursor-pointer muted">Change teacher</summary><div className="mt-2"><CharacterPicker current={chosen.id} /></div></details>
         </div>
       </header>
+
+      {access && <UpgradeCard grants={access.grants} studentId={profile.id} today={today} compact />}
 
       {recent.length > 0 && (
         <section className="card space-y-1">
