@@ -39,6 +39,15 @@ export async function clearPresenterAction(characterId: string): Promise<void> {
   revalidatePath("/parent/admin");
 }
 
+/** Forgets failed renders (out of credits, a rejected photo) so the next lesson play asks for them again. */
+export async function retryFailedClipsAction(): Promise<{ summary: string }> {
+  await requireAdmin();
+  const admin = createAdminClient();
+  const { data } = await admin.from("lesson_videos").delete().eq("status", "error").select("id");
+  revalidatePath("/parent/admin");
+  return { summary: `${data?.length ?? 0} failed clip${(data?.length ?? 0) === 1 ? "" : "s"} will be rendered again on the next play.` };
+}
+
 /** The monthly ceiling on new clips (each is one spoken line, about 20-40 seconds). */
 export async function setVideoCapAction(form: FormData): Promise<{ error?: string; ok?: boolean }> {
   await requireAdmin();

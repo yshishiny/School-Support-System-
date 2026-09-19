@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { clearPresenterAction, setVideoCapAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
+import { clearPresenterAction, retryFailedClipsAction, setVideoCapAction, syncClipsAction, uploadPresenterAction } from "@/lib/actions/ops-video";
 import { CHARACTERS } from "@/lib/characters";
 import { runAction } from "@/lib/client-action";
 
@@ -21,6 +21,7 @@ export function VideoPresenters({ enabled, presenters, cap, used, stats }: { ena
         <div className="text-sm flex flex-wrap items-center gap-2">
           <span className="chip">✅ {stats.done} ready</span><span className="chip">⏳ {stats.pending} rendering</span><span className="chip">❌ {stats.failed} failed</span>
           <button type="button" className="btn-ghost btn-sm" disabled={pending || !enabled} onClick={() => start(async () => { setSync(null); const r = await runAction(() => syncClipsAction(), setSync); if (r?.error) setSync(r.error); else if (r?.summary) setSync(r.summary); router.refresh(); })}>{pending ? "Checking…" : "Check renders now"}</button>
+          {stats.failed > 0 && <button type="button" className="btn-ghost btn-sm" disabled={pending} onClick={() => start(async () => { const r = await runAction(() => retryFailedClipsAction(), setSync); if (r?.summary) setSync(r.summary); router.refresh(); })}>Retry failed</button>}
         </div>
         {sync && <p className="text-xs">{sync}</p>}
         {stats.errors.length > 0 && <p className="text-xs text-bad">Latest failures: {stats.errors.join(" · ")}</p>}
