@@ -1,7 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { PlannerDay } from "@/app/(student)/calendar/page";
+
+/** One day of the planner, as the page builds it. */
+export interface PlannerDay {
+  date: string;
+  label: string;
+  short: string;
+  isToday: boolean;
+  classes: { subject: string; start: string; room: string | null }[];
+  quizzes: { id: string; title: string; done: boolean }[];
+  due: { id: string; title: string; kind: string; subject: string | null; emoji: string }[];
+}
 
 type Focus = "all" | "classes" | "quizzes" | "due";
 

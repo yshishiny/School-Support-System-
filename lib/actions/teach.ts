@@ -70,14 +70,27 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
       return { error: err instanceof Error ? err.message : "Could not write the lesson." };
     }
     const { model, ...body } = script;
-    const beats = await enrichBeats(body.beats, { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language }).catch(() => body.beats);
+    // The words are enough to begin. Drawing every scene costs another minute of the strongest model, and the
+    // child would spend it looking at a spinner, so the lesson is saved and opened now and illustrated behind it.
+    // visuals_version 0 means "being drawn": the stage shows "pictures coming" and does not start a second pass.
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: VISUALS_VERSION })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: 0, visuals_started_at: new Date().toISOString() })
       .select("id")
       .single();
     if (error || !row) return { error: error?.message ?? "Could not save the lesson." };
     scriptId = row.id;
+    const newId = row.id as string;
+    const ctx = { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language };
+    after(async () => {
+      try {
+        const beats = await enrichBeats(body.beats, ctx);
+        await admin.from("lesson_scripts").update({ script: { beats, quiz: body.quiz }, visuals_version: VISUALS_VERSION }).eq("id", newId);
+      } catch {
+        // Leave it unclaimed so opening the lesson again picks the drawing up.
+        await admin.from("lesson_scripts").update({ visuals_version: null }).eq("id", newId);
+      }
+    });
   }
   const { data: session, error: sErr } = await admin.from("lesson_sessions").insert({ student_id: profile.id, family_id: family.id, script_id: scriptId, character_id: character.id }).select("id").single();
   if (sErr || !session) return { error: sErr?.message ?? "Could not start the lesson." };

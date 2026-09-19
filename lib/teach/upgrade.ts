@@ -41,7 +41,7 @@ export async function upgradeScriptVisuals(scriptId: string): Promise<void> {
   const r = row as unknown as { id: string; title: string; language: string; script: { beats: Beat[]; quiz: unknown }; visuals_version: number | null; topics: { subject: string; name: string } | null } | null;
   if (!r || (r.visuals_version ?? 0) >= VISUALS_VERSION) return;
   // Claim it so two opens do not both pay for the same drawings (0 = in progress).
-  const { data: claimed } = await admin.from("lesson_scripts").update({ visuals_version: 0 }).eq("id", scriptId).or(`visuals_version.is.null,and(visuals_version.gt.0,visuals_version.lt.${VISUALS_VERSION})`).select("id");
+  const { data: claimed } = await admin.from("lesson_scripts").update({ visuals_version: 0, visuals_started_at: new Date().toISOString() }).eq("id", scriptId).or(`visuals_version.is.null,and(visuals_version.gt.0,visuals_version.lt.${VISUALS_VERSION})`).select("id");
   if (!claimed?.length) return;
   const language = r.language === "ar" ? "ar" : "en";
   const subject = r.topics?.subject ?? "School";

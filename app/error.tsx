@@ -4,16 +4,28 @@ import { useEffect, useState } from "react";
 import { reportClientErrorAction } from "@/lib/actions/ops";
 
 const ONCE = "auto-reloaded-for";
+const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
+
+/** Is the server on a newer build than the one this tab downloaded? Then the fault is the skew, not the page. */
+async function serverBuild(): Promise<string | null> {
+  try {
+    const res = await fetch("/api/build", { cache: "no-store" });
+    const body = (await res.json()) as { id?: unknown };
+    return typeof body.id === "string" ? body.id : null;
+  } catch {
+    return null;
+  }
+}
 
 /**
  * Most failures here are a page that outlived a deployment: refresh it once automatically.
- * A failure that survives a fresh load is a real error and is shown with its message.
+ * A failure that survives a fresh load is a real error and is shown with its message — and reported with both
+ * build stamps, so the next report says plainly whether the page was stale or the code is wrong.
  */
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [real, setReal] = useState(false);
   useEffect(() => {
     const marker = error.digest ?? error.message ?? "x";
-    const stale = /server action|failed to find|chunk|Loading CSS|dynamically imported module|Unexpected token '<'/i.test(error.message ?? "");
     try {
       if (sessionStorage.getItem(ONCE) !== marker) {
         sessionStorage.setItem(ONCE, marker);
@@ -23,9 +35,22 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     } catch {
       /* storage unavailable */
     }
-    setReal(!stale);
+    let dropped = false;
     console.error("[app] error boundary", error);
-    if (!stale) void reportClientErrorAction(error.message ?? "unknown", error.digest ?? null, window.location.pathname).catch(() => null);
+    void (async () => {
+      const byMessage = /server action|failed to find|chunk|Loading CSS|dynamically imported module|Unexpected token '<'/i.test(error.message ?? "");
+      const server = await serverBuild();
+      const skewed = !!server && server !== BUILD;
+      if (dropped) return;
+      const stale = byMessage || skewed;
+      setReal(!stale);
+      if (!stale) {
+        void reportClientErrorAction(error.message ?? "unknown", error.digest ?? null, window.location.pathname, { build: BUILD, server }).catch(() => null);
+      }
+    })();
+    return () => {
+      dropped = true;
+    };
   }, [error]);
 
   return (

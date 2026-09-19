@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0-beta.22 — The lesson opens at once, and no page needs scrolling (19 September 2026, `v2` branch)
+
+- **Tapping a topic no longer costs a minute of waiting.** The teacher used to write the lesson *and* draw every scene before the child saw anything. Now the words are saved and the lesson opens the moment they exist; the drawings and photographs arrive behind it, and the stage says "pictures coming" rather than showing a spinner. A drawing that fails leaves the lesson whole and is retried the next time it is opened.
+- **Lessons are written overnight.** Every night the topics the class actually covered in the last fortnight are written and illustrated in advance, for each child's own teacher, skipping anything already cached. By morning the common ones open instantly. Only topics really logged in class are prepared, so nothing is spent on lessons nobody opens.
+- **A lesson left half-drawn is handed back.** Background work dies with the machine it runs on. Anything claimed more than twenty minutes ago is released each night so it is drawn on the next attempt instead of being stuck for ever.
+- **Four long pages became four short ones.** Allowance, Me, Wallet and Teacher access each used to be a dozen cards down a phone. They now open on what matters — the money, the child, the balance, the credits — with the rest behind tabs that remember where you were: Allowance has *Get it all · Catch up · Extra · Weeks*; Me has *Me · Progress · Family · More*; Wallet has *Spent · This month · Every line*. Links that used to point at a section deep in Allowance now open the right tab.
+- **A page that outlived a deployment can prove it.** Every build is stamped with its commit; when a page hits an error it asks the server which build is answering. If they differ the page reloads itself and nobody is shown a fault. If they match, the error is real and is now reported with both stamps, so the next report says plainly whether the code is wrong. The beta also ships source maps, so a fault names the function instead of saying "u is not a function".
+- Fixed a circular import between the planner page and its day strip.
+
 ## 2.0.0-beta.21 — The ambassador programme (19 September 2026, `v2` branch)
 
 - **The referral is double-sided now.** A family that arrives on an invitation gets a quarter off its first purchase, shown struck through on the price list. The inviter is paid a whole free month — 450 EGP of credits — but only once the newcomer has paid a *second* time. Paying on the second purchase means paying for a family that stayed, not for a signature.

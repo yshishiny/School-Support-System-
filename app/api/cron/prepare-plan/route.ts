@@ -11,6 +11,7 @@ import { loadSnapTasks, pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
+import { releaseStuckVisuals, warmLessonScripts } from "@/lib/teach/warm";
 import { buildMonthlyRevisions } from "@/lib/revision/run";
 import { todayIn } from "@/lib/dates";
 
@@ -144,6 +145,24 @@ export async function GET(request: Request) {
     if (n) results.snaps = [`pruned ${n}`];
   } catch (err) {
     results.snaps = [`prune error: ${err instanceof Error ? err.message : String(err)}`];
+  }
+  // Lessons left half-drawn by a background job that died with its instance: hand them back to be retried.
+  try {
+    const n = await releaseStuckVisuals();
+    if (n) results.visuals = [`released ${n} stuck`];
+  } catch (err) {
+    results.visuals = [`release error: ${err instanceof Error ? err.message : String(err)}`];
+  }
+  // The teacher's own lesson, written and drawn overnight for the topics the class covered, so tapping a
+  // topic in the morning opens it at once instead of waiting a minute for the AI.
+  for (const s of students ?? []) {
+    if (Date.now() - started >= TIME_BUDGET_MS) break;
+    try {
+      const names = await warmLessonScripts(s.id, Math.max(0, TIME_BUDGET_MS - (Date.now() - started)));
+      if (names.length) (results[s.id] ??= []).push(`lessons written: ${names.join("; ")}`);
+    } catch (err) {
+      (results[s.id] ??= []).push(`lesson warm error: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
   console.log("[prepare-plan] cron results", JSON.stringify(results));
   await recordCronRun("prepare-plan", started, results);

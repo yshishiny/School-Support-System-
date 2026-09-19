@@ -5,13 +5,17 @@ import { requireSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { logError } from "@/lib/ops/log";
 
-/** The browser's error boundary reports a real (non-stale-deploy) failure here. */
-export async function reportClientErrorAction(message: string, digest: string | null, path: string): Promise<void> {
+/**
+ * The browser's error boundary reports a real (non-stale-deploy) failure here. `builds` carries the commit the
+ * page was built from and the one answering now: when they match, the fault is genuinely in the code.
+ */
+export async function reportClientErrorAction(message: string, digest: string | null, path: string, builds?: { build: string; server: string | null }): Promise<void> {
+  const extra = { digest, path, ...(builds ?? {}) };
   try {
     const { profile, family } = await requireSession();
-    await logError("client", new Error(message.slice(0, 500)), { familyId: family.id, userId: profile.id, meta: { digest, path } });
+    await logError("client", new Error(message.slice(0, 500)), { familyId: family.id, userId: profile.id, meta: extra });
   } catch {
-    await logError("client", new Error(message.slice(0, 500)), { meta: { digest, path, anonymous: true } });
+    await logError("client", new Error(message.slice(0, 500)), { meta: { ...extra, anonymous: true } });
   }
 }
 

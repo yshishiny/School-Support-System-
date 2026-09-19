@@ -21,6 +21,7 @@ import { BannerAdjuster } from "@/components/BannerAdjuster";
 import { heroChoices, signHeroUrls, type HeroImage } from "@/lib/hero";
 import type { Checkin } from "@/lib/types";
 import { SnapReview } from "@/components/SnapReview";
+import { Tabs } from "@/components/Tabs";
 import { signSnapUrls } from "@/lib/snaps/server";
 import { prettyDate, shiftDate } from "@/lib/dates";
 
@@ -51,58 +52,31 @@ export default async function MePage() {
   const list = (checkins ?? []) as Checkin[];
   const totalMinutes = list.reduce((s, c) => s + c.minutes_studied, 0);
 
-  return (
-    <main className="space-y-4">
-      <header className="card flex items-center gap-3">
-        {avatar ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={avatar} alt="" className="h-16 w-16 rounded-full object-cover border-2 border-accent" />
-        ) : (
-          <div className="text-4xl">{profile.avatar_emoji}</div>
-        )}
+  const tags = learnerTags((profile as { learner_profile?: LearnerProfile | null }).learner_profile);
+  const sibs = siblings ?? [];
+
+  // Fourteen cards stacked down a phone is a page nobody reaches the bottom of. Four tabs, one screen each.
+  const pictures = (
+    <section className="card space-y-3">
+      <div className="flex items-center justify-between gap-2">
         <div>
-          <h1 className="h1">{profile.full_name}</h1>
-          <p className="muted text-sm">Grade {profile.grade}</p>
+          <h2 className="h2">🖼️ My pictures</h2>
+          <p className="text-xs muted">Pick one as your avatar and one as the banner behind your home page. Only your family can see them.</p>
         </div>
-      </header>
-
-      {(() => {
-        const tags = learnerTags((profile as { learner_profile?: LearnerProfile | null }).learner_profile);
-        return (
-          <Link href="/me/about-me" className="card flex items-center gap-3 border-accent/50">
-            <span className="text-4xl sticker-still">🦸</span>
-            <div className="flex-1 min-w-0">
-              <div className="font-bold">{tags.length ? "How I learn" : "Tell your coach about you"}</div>
-              <div className="text-xs muted truncate">{tags.length ? tags.slice(0, 3).join(" · ") : "10 quick questions so lessons and quizzes fit you · +15 pts"}</div>
-            </div>
-            <span className="btn-ghost btn-sm">{tags.length ? "Edit" : "Start"}</span>
-          </Link>
-        );
-      })()}
-
-      <section className="card space-y-3">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <h2 className="h2">🖼️ My pictures</h2>
-            <p className="text-xs muted">Pick one as your avatar and one as the banner behind your home page. Only your family can see them.</p>
-          </div>
-          <HeroUploader familyId={family.id} studentId={profile.id} compact />
+        <HeroUploader familyId={family.id} studentId={profile.id} compact />
+      </div>
+      <HeroGallery items={heroes.map((h) => ({ id: h.id, url: heroUrls.get(h.id) ?? "", caption: h.caption })).filter((x) => x.url)} avatarId={profile.avatar_image_id} bannerId={profile.banner_image_id} canDelete />
+      {banner && (
+        <div className="space-y-1 pt-1">
+          <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-display)" }}>Frame your banner</div>
+          <BannerAdjuster url={banner} fit={profile.banner_fit ?? "full"} zoom={Number(profile.banner_zoom ?? 1) || 1} x={profile.banner_x ?? 50} y={profile.banner_y ?? 30} />
         </div>
-        <HeroGallery items={heroes.map((h) => ({ id: h.id, url: heroUrls.get(h.id) ?? "", caption: h.caption })).filter((x) => x.url)} avatarId={profile.avatar_image_id} bannerId={profile.banner_image_id} canDelete />
-        {banner && (
-          <div className="space-y-1 pt-1">
-            <div className="text-sm font-semibold" style={{ fontFamily: "var(--font-display)" }}>Frame your banner</div>
-            <BannerAdjuster url={banner} fit={profile.banner_fit ?? "full"} zoom={Number(profile.banner_zoom ?? 1) || 1} x={profile.banner_x ?? 50} y={profile.banner_y ?? 30} />
-          </div>
-        )}
-      </section>
+      )}
+    </section>
+  );
 
-      <HomeLayoutPicker current={profile.home_layout ?? "b"} />
-
-      <ThemePicker current={profile.theme} />
-
-      <InterestsForm interests={profile.interests} favourites={profile.favourite_subjects ?? []} subjects={subjects} />
-
+  const progress = (
+    <>
       <section className="card">
         <h2 className="h2 mb-2">Last two weeks</h2>
         <div className="grid grid-cols-3 gap-2 text-center">
@@ -111,8 +85,6 @@ export default async function MePage() {
           <div><div className="text-2xl font-extrabold">{list.length ? (list.reduce((s, c) => s + (c.mood ?? 3), 0) / list.length).toFixed(1) : "–"}</div><div className="text-xs muted">avg mood</div></div>
         </div>
       </section>
-
-      <PointsGuide />
 
       <section className="card space-y-2">
         <h2 className="h2">📊 Grades sheet</h2>
@@ -126,41 +98,47 @@ export default async function MePage() {
         {!(sheets ?? []).some((g) => g.month === monthStart) && <GradeSheetUploader familyId={family.id} studentId={profile.id} month={today.slice(0, 7)} />}
       </section>
 
-      {(siblings ?? []).length > 0 && (
-        <section className="card space-y-2">
-          <h2 className="h2">🤝 Rate your siblings today</h2>
-          <p className="text-xs muted">You are trusted with this. Only a ✗ counts against them, and your parents see who tapped.</p>
-          {(siblings ?? []).map((sib) => {
-            const ticks: Record<string, boolean> = {};
-            (sibTicks ?? []).filter((t) => t.student_id === sib.id).forEach((t) => (ticks[t.code] = t.value));
-            return <div key={sib.id} className="space-y-1"><div className="text-sm font-semibold">{sib.avatar_emoji} {sib.full_name.split(" ")[0]}</div><KpiTicks studentId={sib.id} kpis={mergeKpis(family.allowance_kpis)} ticks={ticks} /></div>;
-          })}
-        </section>
-      )}
+      <PointsGuide />
+    </>
+  );
 
-      {(siblings ?? []).length > 0 && (
-        <section className="card space-y-2">
-          <h2 className="h2">📸 Snaps to check{sibSnaps.length ? ` (${sibSnaps.length})` : ""}</h2>
-          <p className="text-xs muted">Look at the picture and decide: done or not. A ✓ gives the points; a ✗ sends it back with your note.</p>
-          {sibSnaps.length === 0 && <p className="text-sm muted">Nothing waiting.</p>}
-          {sibSnaps.map((x) => {
-            const sib = (siblings ?? []).find((z) => z.id === x.student_id);
-            const url = sibSnapUrls.get(x.id);
-            return (
-              <div key={x.id} className="tile space-y-2">
-                <div className="text-sm"><b>{sib?.avatar_emoji} {sib?.full_name.split(" ")[0]}</b> · {x.task_code} · <span className="muted">{prettyDate(x.taken_on)} {x.created_at.slice(11, 16)}</span></div>
-                {url && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="" className="w-full max-h-64 object-contain rounded-xl bg-panel-2" /></a>
-                )}
-                {x.ai_verdict && x.ai_verdict !== "skipped" && <div className="text-xs muted">Coach: {x.ai_note}</div>}
-                <SnapReview snapId={x.id} />
-              </div>
-            );
-          })}
-        </section>
-      )}
+  const familyTab = (
+    <>
+      <section className="card space-y-2">
+        <h2 className="h2">🤝 Rate your siblings today</h2>
+        <p className="text-xs muted">You are trusted with this. Only a ✗ counts against them, and your parents see who tapped.</p>
+        {sibs.map((sib) => {
+          const ticks: Record<string, boolean> = {};
+          (sibTicks ?? []).filter((t) => t.student_id === sib.id).forEach((t) => (ticks[t.code] = t.value));
+          return <div key={sib.id} className="space-y-1"><div className="text-sm font-semibold">{sib.avatar_emoji} {sib.full_name.split(" ")[0]}</div><KpiTicks studentId={sib.id} kpis={mergeKpis(family.allowance_kpis)} ticks={ticks} /></div>;
+        })}
+      </section>
 
+      <section className="card space-y-2">
+        <h2 className="h2">📸 Snaps to check{sibSnaps.length ? ` (${sibSnaps.length})` : ""}</h2>
+        <p className="text-xs muted">Look at the picture and decide: done or not. A ✓ gives the points; a ✗ sends it back with your note.</p>
+        {sibSnaps.length === 0 && <p className="text-sm muted">Nothing waiting.</p>}
+        {sibSnaps.map((x) => {
+          const sib = sibs.find((z) => z.id === x.student_id);
+          const url = sibSnapUrls.get(x.id);
+          return (
+            <div key={x.id} className="tile space-y-2">
+              <div className="text-sm"><b>{sib?.avatar_emoji} {sib?.full_name.split(" ")[0]}</b> · {x.task_code} · <span className="muted">{prettyDate(x.taken_on)} {x.created_at.slice(11, 16)}</span></div>
+              {url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="" className="w-full max-h-64 object-contain rounded-xl bg-panel-2" /></a>
+              )}
+              {x.ai_verdict && x.ai_verdict !== "skipped" && <div className="text-xs muted">Coach: {x.ai_note}</div>}
+              <SnapReview snapId={x.id} />
+            </div>
+          );
+        })}
+      </section>
+    </>
+  );
+
+  const more = (
+    <>
       <InstallCard compact />
       <RemindersCard settings={{ ...DEFAULT_NUDGES, ...(((profile as { nudges?: Partial<NudgeSettings> }).nudges) ?? {}) }} />
 
@@ -181,6 +159,42 @@ export default async function MePage() {
       <form action={logoutAction}>
         <button className="btn-ghost w-full">Sign out</button>
       </form>
+    </>
+  );
+
+  return (
+    <main className="space-y-3">
+      <header className="card flex items-center gap-3">
+        {avatar ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={avatar} alt="" className="h-16 w-16 rounded-full object-cover border-2 border-accent" />
+        ) : (
+          <div className="text-4xl">{profile.avatar_emoji}</div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h1 className="h1">{profile.full_name}</h1>
+          <p className="muted text-sm">Grade {profile.grade}</p>
+        </div>
+      </header>
+
+      <Link href="/me/about-me" className="card flex items-center gap-3 border-accent/50">
+        <span className="text-4xl sticker-still">🦸</span>
+        <div className="flex-1 min-w-0">
+          <div className="font-bold">{tags.length ? "How I learn" : "Tell your coach about you"}</div>
+          <div className="text-xs muted truncate">{tags.length ? tags.slice(0, 3).join(" · ") : "10 quick questions so lessons and quizzes fit you · +15 pts"}</div>
+        </div>
+        <span className="btn-ghost btn-sm">{tags.length ? "Edit" : "Start"}</span>
+      </Link>
+
+      <Tabs
+        storageKey="me"
+        tabs={[
+          { id: "me", label: "Me", emoji: "🧑‍🚀", content: <>{pictures}<HomeLayoutPicker current={profile.home_layout ?? "b"} /><ThemePicker current={profile.theme} /><InterestsForm interests={profile.interests} favourites={profile.favourite_subjects ?? []} subjects={subjects} /></> },
+          { id: "progress", label: "Progress", emoji: "📈", content: progress },
+          ...(sibs.length > 0 ? [{ id: "family", label: "Family", emoji: "🤝", badge: sibSnaps.length, content: familyTab }] : []),
+          { id: "more", label: "More", emoji: "⚙️", content: more },
+        ]}
+      />
     </main>
   );
 }

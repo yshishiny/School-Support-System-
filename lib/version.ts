@@ -1,7 +1,7 @@
 /** The product identity shown under More → About and in the daily report footer. Bump on every release. */
 export const APP_NAME = "Study Portal";
-export const APP_VERSION = "2.0.0-beta.21";
-export const APP_BASELINE = "V2 beta · the sisters can tick their brothers\u2019 snaps · carries everything up to 1.15.0";
+export const APP_VERSION = "2.0.0-beta.22";
+export const APP_BASELINE = "V2 beta \u00b7 lessons open at once and every page fits a phone \u00b7 carries everything up to 1.15.0";
 export const APP_OWNER = "Yasser Elshishiny";
 export const APP_TRADEMARK = "Betna Group";
 export const APP_YEAR = 2026;

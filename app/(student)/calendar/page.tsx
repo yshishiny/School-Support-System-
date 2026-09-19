@@ -5,19 +5,9 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn, shiftDate, prettyDate, relativeLabel, weekdayOf } from "@/lib/dates";
 import { setAssignmentStatusAction } from "@/lib/actions/assignments";
 import { KIND_EMOJI, type Assignment } from "@/lib/types";
-import { PlannerDays } from "@/components/PlannerDays";
+import { PlannerDays, type PlannerDay } from "@/components/PlannerDays";
 
 const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-
-export interface PlannerDay {
-  date: string;
-  label: string;
-  short: string;
-  isToday: boolean;
-  classes: { subject: string; start: string; room: string | null }[];
-  quizzes: { id: string; title: string; done: boolean }[];
-  due: { id: string; title: string; kind: string; subject: string | null; emoji: string }[];
-}
 
 /**
  * The planner: the next two weeks as days, each carrying what the school day actually holds — the classes from the
