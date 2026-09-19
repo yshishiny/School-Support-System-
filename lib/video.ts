@@ -3,7 +3,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { CLOUD_VOICES, defaultCloudVoice } from "@/lib/tts";
 import { closingLine, greetingLine } from "@/lib/teach/lines";
-import { speakable } from "@/lib/teach/speakable";
+import { spokenText } from "@/lib/teach/spoken";
 
 /**
  * Video presenters: each scripted line becomes a short clip of a realistic human presenter, lip-synced to the
@@ -116,7 +116,7 @@ async function pollTalk(talkId: string): Promise<{ status: string; result_url?: 
  */
 export async function requestClip(o: { characterId: string; voice: string; text: string; create?: boolean; kind?: string | null }): Promise<VideoAnswer> {
   if (!videoEnabled()) return { status: "off", reason: "not configured" };
-  const text = speakable(o.text.trim().slice(0, MAX_CHARS), o.voice.startsWith("ar") ? "ar" : "en");
+  const text = await spokenText(o.text.trim().slice(0, MAX_CHARS), o.voice.startsWith("ar") ? "ar" : "en");
   if (!text) return { status: "error", reason: "nothing to say" };
   if (o.create !== false && o.kind && !videoKinds(await videoMode()).includes(o.kind as BeatKind)) o.create = false;
   const presenters = await presenterUrls();
