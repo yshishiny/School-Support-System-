@@ -73,7 +73,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     const beats = await enrichBeats(body.beats, { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language }).catch(() => body.beats);
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: SCRIPT_VERSION })
       .select("id")
       .single();
     if (error || !row) return { error: error?.message ?? "Could not save the lesson." };

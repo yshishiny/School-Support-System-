@@ -9,7 +9,7 @@ import { sanitizeSvg } from "@/lib/svg";
  * whose steps appear on the teacher's cues. Runs once per scene when a script is written; the drawing is cached with it.
  */
 const OutSchema = z.object({
-  svg: z.string().describe("The complete <svg> element, at most 6000 characters"),
+  svg: z.string().describe("The complete <svg> element, at most 7000 characters"),
   cues: z.array(z.object({ phrase: z.string(), step: z.number().int().min(1).max(8) })).describe("One per data-step group, in order; phrase copied verbatim from the spoken line"),
 });
 export type Illustration = z.infer<typeof OutSchema>;
@@ -25,8 +25,16 @@ STYLE (textbook illustration, not a sketch):
 - TEXT: fill #1f2430 (never white, never light), font-weight 700, font-size 26-30 for names and letters, 22 for values and notes; add stroke="#ffffff" stroke-width="5" paint-order="stroke" on every text so it stays readable over anything. A label sits next to its object with a short leader line when needed.
 - SPACING: keep at least 28px between any two labels and 16px between a label and any other shape; never overlap. Reserve the right third (x 430-620) or the bottom strip (y 300-350) for labels and results when the drawing is busy. Objects added in later steps go into free space, never on top of earlier ones.
 - LAYERS AND STEPS: draw the base first (the things present from the start, no data-step). Then each addition the teacher names, in the order named, inside <g data-step="1">, <g data-step="2"> ... (3 to 6 groups). A step adds the element AND its label. Later groups may include a small "result" box (rounded rect #fff3cd stroke #f4a261) with the conclusion.
+- VISUAL VOCABULARY (use the right device for the idea, not generic shapes):
+  · Solids and buildings (pyramid, cube, prism, cylinder, sphere, a house, a tower) in isometric or two-point perspective with three faces shaded light/medium/dark of one hue, a cast shadow on the ground, and hidden edges dashed; a pyramid has a square base, four triangular faces and an apex, with height and base labelled.
+  · Cross-sections and cutaways for insides (the Earth's layers, a leaf, a battery, a volcano, the heart's chambers), with a magnifier inset (circle + connector) for a detail such as a cell or a molecule.
+  · Organelles, organs and apparatus drawn as their real shapes (nucleus with nucleolus, mitochondria with cristae, a beaker with a liquid level, a thermometer with a scale), not as circles and rectangles.
+  · Forces, motion and flows as arrows with markers, sized to magnitude and labelled; energy and cycles as arrows around a loop; processes as numbered stages left to right.
+  · Maps as simplified outlines with a north arrow, a scale bar and named places; timelines as a horizontal band with era blocks, dates and small icons; history scenes as an annotated diagram of the object (the pyramid, the temple, the tool) rather than people.
+  · Graphs with axes, ticks, units, a light grid and the plotted line or bars; geometry with true proportions, tick marks for equal sides, arcs for angles, right-angle squares.
+  · Colour with meaning (hot/cold, acid/base, before/after) and a small legend when colours carry meaning.
 - Content must be faithful to the subject: correct geometry (parallel lines truly parallel, right angles square, proportions plausible), correct biology/physics/geography, correct Arabic labels for Arabic lessons (the digits as in Egyptian textbooks). Never invent facts beyond the brief.
-- No scripts, no external images, no foreignObject, no animation elements. At most 6000 characters.
+- No scripts, no external images, no foreignObject, no animation elements. At most 7000 characters.
 
 CUES: for each step, copy 2-6 consecutive words exactly as they appear in the spoken line (same language, same letters) at which that step should appear. If the spoken line does not name a step, choose the nearest words that lead into it.`;
 
@@ -41,7 +49,7 @@ export async function illustrateScene(o: { subject: string; topic: string; langu
   try {
     const res = await client.messages.create({
       model: modelFor("illustrate"),
-      max_tokens: 9000,
+      max_tokens: 10000,
       system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
       messages: [{ role: "user", content: user }],
       output_config: { format: zodOutputFormat(OutSchema), ...effortFor("illustrate", "medium") },
