@@ -45,8 +45,14 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   const total = beats.length;
   const videoRef = useRef<HTMLVideoElement>(null);
   const speech = useSpeech(language, c, cloudVoices, videoRef);
-  const clips = useClips({ enabled: video && !demo, character: c.id, language, voice: isCloudVoice(speech.voiceId) ? speech.voiceId!.slice("cloud:".length) : null });
-  const warmBeat = (k: number) => { const b = beats[k]; if (b && videoKinds.includes(b.kind)) clips.warm(b.say, b.kind); };
+  const [videoOn, setVideoOn] = useState(true);
+  useEffect(() => { try { setVideoOn(localStorage.getItem("teach:video") !== "off"); } catch { /* ignore */ } }, []);
+  const useVideo = video && !demo && videoOn;
+  const clips = useClips({ enabled: useVideo, character: c.id, language, voice: isCloudVoice(speech.voiceId) ? speech.voiceId!.slice("cloud:".length) : null, kinds: videoKinds });
+  const warmBeat = (k: number) => { const b = beats[k]; if (b) clips.warm(b.say, b.kind); };
+  // Ask about every line once at the start: rendered clips play whatever the mode, and the allowed kinds start rendering.
+  useEffect(() => { if (useVideo) clips.prime(beats.map((b) => ({ text: b.say, kind: b.kind }))); // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useVideo, speech.voiceId]);
   const mic = useRecognition(language);
   const [started, setStarted] = useState(false);
   const [phase, setPhase] = useState<Phase>(startBeat > 0 ? "lesson" : "intro");
@@ -114,12 +120,16 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   // Each beat: say it; afterwards wait at a check, else advance when on auto.
   useEffect(() => {
     if (phase !== "lesson" || !beat || !started) return;
-    const clip = clips.get(beat.say);
-    speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clip);
-    if (!clip) warmBeat(i);
+    let cancelled = false;
+    (async () => {
+      let clip = useVideo ? clips.get(beat.say) : null;
+      if (useVideo && !clip) { warmBeat(i); clip = await clips.wait(beat.say, 2000); }
+      if (cancelled) return;
+      speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clip);
+    })();
     if (beats[i + 1]) speech.prefetch(beats[i + 1].say);
     warmBeat(i + 1); warmBeat(i + 2);
-    return () => { cancelAdvance(); };
+    return () => { cancelled = true; cancelAdvance(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, i, started]);
 
@@ -155,7 +165,7 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
   function togglePlay() {
     if (speech.paused) { speech.resume(); return; }
     if (speech.speaking) { cancelAdvance(); speech.pause(); return; }
-    if (phase === "lesson" && beat) speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, clips.get(beat.say));
+    if (phase === "lesson" && beat) speak(beat.say, () => { if (beat.kind !== "check") scheduleAdvance(i); }, useVideo ? clips.get(beat.say) : null);
   }
 
   function raiseHand() {
@@ -256,7 +266,11 @@ export function Stage({ sessionId, scriptId, character, script, language, startB
             {beats.map((b, k) => { const bl = beatLabel(b.kind); return <button key={k} type="button" title={bl.label} onClick={() => goTo(k)} className={`h-2.5 flex-1 max-w-8 rounded-full transition ${k < i || phase === "outro" ? "bg-[#ffd166]" : k === i && phase === "lesson" ? "bg-white scale-y-150" : "bg-white/30"}`} aria-label={`${bl.label} ${k + 1}`} />; })}
           </div>
         </div>
-        {video && !demo && phase === "lesson" && beat && videoKinds.includes(beat.kind) && speech.speaking && !speech.videoPlaying && <span className="shrink-0 rounded-full bg-black/40 px-2 py-1 text-[10px] font-bold text-white/80 backdrop-blur" title={rtl ? "يُجهَّز الفيديو لهذا الدرس" : "The video for this lesson is being prepared"}>🎬 {rtl ? "يُجهَّز" : "preparing"}</span>}
+        {video && !demo && (
+          <button type="button" onClick={() => { const next = !videoOn; setVideoOn(next); try { localStorage.setItem("teach:video", next ? "on" : "off"); } catch { /* ignore */ } }} className={`shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-bold backdrop-blur ${videoOn ? "bg-accent/80 text-white" : "bg-black/40 text-white/70"}`} title={rtl ? "المعلم بالفيديو أو الرسوم" : "Human presenter on video, or the animated teacher"}>
+            🎬 {videoOn ? (phase === "lesson" && beat && videoKinds.includes(beat.kind) && speech.speaking && !speech.videoPlaying ? (rtl ? "يُجهَّز" : "preparing") : (rtl ? "فيديو" : "Video")) : (rtl ? "رسوم" : "Cartoon")}
+          </button>
+        )}
         <button type="button" onClick={() => setAuto((a) => !a)} className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-bold backdrop-blur ${auto ? "bg-good/80 text-white" : "bg-black/40 text-white/80"}`}>{auto ? (rtl ? "تلقائي" : "Auto ▶") : (rtl ? "يدوي" : "Manual")}</button>
       </header>
 
