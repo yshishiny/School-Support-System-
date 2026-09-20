@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 
@@ -17,7 +18,7 @@ export async function enableHourlySchedulerAction(): Promise<{ error?: string; o
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL ?? `${h.get("x-forwarded-proto") ?? "https"}://${h.get("x-forwarded-host") ?? h.get("host")}`).replace(/\/$/, "");
   const admin = createAdminClient();
   const { error } = await admin.from("ops_settings").upsert([{ key: "cron_secret", value: secret, updated_at: new Date().toISOString() }, { key: "app_url", value: appUrl, updated_at: new Date().toISOString() }]);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.ops-scheduler.enableHourlyScheduler", error);
   revalidatePath("/parent/admin");
   return { ok: true };
 }

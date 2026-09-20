@@ -1,5 +1,6 @@
 "use server";
 
+import { failed } from "@/lib/ops/fault";
 import { weekFor } from "@/lib/allowance";
 import { openCompensation } from "@/lib/compensation/run";
 
@@ -33,7 +34,7 @@ export async function logPrayerAction(prayer: PrayerName): Promise<PrayerResult>
   const { data: existing } = await admin.from("prayer_logs").select("id").eq("student_id", profile.id).eq("log_date", logDate).eq("prayer", prayer).maybeSingle();
   if (existing) return { error: "Already logged." };
   const { data: row, error } = await admin.from("prayer_logs").insert({ student_id: profile.id, log_date: logDate, prayer, status, logged_at: now.toISOString() }).select("id").single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.prayers.logPrayer", error, "Could not save.");
 
   let earned = 0;
   const { error: pErr } = await admin.from("points_ledger").insert({
@@ -89,7 +90,7 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
     .insert({ student_id: profile.id, log_date: date, prayer, status, logged_at: new Date().toISOString(), entered_late: true, claim: atSchool ? "school" : "other" })
     .select("id")
     .single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.prayers.logPastPrayer", error, "Could not save.");
   const delta = pastPrayerPoints(claim, atSchool);
   let earned = 0;
   const reason = claim === "missed" ? `${prayer[0].toUpperCase() + prayer.slice(1)}: missed, said honestly` : `${prayer[0].toUpperCase() + prayer.slice(1)} prayer ${claim === "on_time" ? (atSchool ? "on time at school" : "on time (logged later)") : "(late)"}`;

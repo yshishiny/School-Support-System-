@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -35,11 +36,11 @@ export async function addQuranItemAction(_prev: MemorizeFormResult | undefined, 
       })
       .select("id")
       .single();
-    if (error || !data) return { error: error?.message ?? "Could not save." };
+    if (error || !data) return failed("actions.memorize.addQuranItem", error, "Could not save.");
     revalidatePath("/learn/memorize");
     return { id: data.id };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not fetch the ayahs." };
+    return failed("actions.memorize.addQuranItem", err, "Could not fetch the ayahs.");
   }
 }
 
@@ -56,7 +57,7 @@ export async function addHadithItemAction(_prev: MemorizeFormResult | undefined,
     .insert({ student_id: profile.id, kind: "hadith", title, reference, text_ar: text, translation, segments: [{ ref: reference ?? title, text, translation }] })
     .select("id")
     .single();
-  if (error || !data) return { error: error?.message ?? "Could not save." };
+  if (error || !data) return failed("actions.memorize.addHadithItem", error, "Could not save.");
   revalidatePath("/learn/memorize");
   return { id: data.id };
 }

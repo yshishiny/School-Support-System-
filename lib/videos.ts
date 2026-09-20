@@ -1,3 +1,4 @@
+import { report } from "@/lib/ops/fault";
 /**
  * Video lessons from several channels ("different areas"), so a topic is never explained by one voice only.
  * With YOUTUBE_API_KEY set, each source becomes a real, embeddable video; without it, a search link per source.
@@ -55,7 +56,10 @@ async function searchYouTube(q: string): Promise<{ videoId: string; title: strin
     const it = json.items?.[0];
     if (!it?.id?.videoId) return null;
     return { videoId: it.id.videoId, title: decodeEntities(it.snippet?.title ?? q), channel: it.snippet?.channelTitle ?? "" };
-  } catch {
+  } catch (err) {
+    // A lesson without a video is still a lesson; a key that has expired or a quota that has run out would
+    // otherwise quietly remove videos from every lesson with nobody the wiser.
+    await report("videos.search", err, { meta: { query: q } });
     return null;
   }
 }

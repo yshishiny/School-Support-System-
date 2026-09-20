@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -18,7 +19,7 @@ export async function saveLearnerProfileAction(answers: LearnerAnswers): Promise
   if (Object.keys(clean).length < 5) return { error: "Answer at least five questions." };
   const supabase = await createClient();
   const { error } = await supabase.from("profiles").update({ learner_profile: { answers: clean, completed_at: new Date().toISOString() } }).eq("id", profile.id);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.learner.saveLearnerProfile", error);
   // A small thank-you the first time only (unique ref keeps it single).
   const admin = createAdminClient();
   const { error: payErr } = await admin.from("points_ledger").insert({ student_id: profile.id, delta: FIRST_TIME_POINTS, reason: "Told the coach how you learn", ref_type: "learner", ref_id: profile.id });

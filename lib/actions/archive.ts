@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { archiveStats, parseArchiveText, parseArchiveZip, sampleForModel, type ArchiveMessage } from "@/lib/whatsapp/archive";
@@ -27,10 +28,13 @@ export async function processChatArchiveAction(storagePath: string, label: strin
     .insert({ family_id: family.id, student_id: studentId || null, label: label.trim().slice(0, 120) || "WhatsApp export", storage_path: storagePath, status: "processing", uploaded_by: profile.id })
     .select("id")
     .single();
-  if (insErr || !row) return { error: insErr?.message ?? "Could not register the archive." };
+  if (insErr || !row) return failed("actions.archive.processChatArchive", insErr, "Could not register the archive.");
   const archiveId = row.id as string;
 
-  const fail = async (msg: string) => {
+  // Whatever went wrong is written on the archive row, where the parent reads it, and into the ops log under
+  // the same reference, so the two can be put side by side.
+  const fail = async (cause: unknown, user?: string) => {
+    const { error: msg } = await failed("actions.archive.processChatArchive", cause, user);
     await admin.from("chat_archives").update({ status: "failed", error: msg }).eq("id", archiveId);
     revalidatePath("/parent/import/archive");
     return { error: msg, archiveId };
@@ -113,7 +117,7 @@ export async function processChatArchiveAction(storagePath: string, label: strin
     revalidatePath("/parent/import/archive");
     return { archiveId, messages: messages.length, attachments };
   } catch (err) {
-    return await fail(err instanceof Error ? err.message : String(err));
+    return await fail(err, "The archive could not be read.");
   }
 }
 

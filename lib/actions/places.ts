@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { parseCoordinates } from "@/lib/places";
@@ -33,15 +34,15 @@ export async function addPlaceAction(_prev: { error?: string } | undefined, form
       if (!g) return { error: "Could not find that address. Paste the coordinates from Google Maps instead (long-press the spot → copy the numbers)." };
       coords = { lat: g.lat, lng: g.lng };
       address = g.display;
-    } catch {
-      return { error: "The map service did not answer. Paste coordinates instead." };
+    } catch (err) {
+      return await failed("actions.places.addPlace.geocode", err, "The map service did not answer. Paste coordinates instead.");
     }
   } else {
     address = where.length < 120 ? where : null;
   }
   const supabase = await createClient();
   const { error } = await supabase.from("places").insert({ family_id: family.id, student_id: kind === "home" ? null : studentId, kind, label, address, latitude: coords.lat, longitude: coords.lng, radius_m: radius });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.places.addPlace", error);
   ["/parent/settings", "/parent"].forEach((p) => revalidatePath(p));
   return {};
 }

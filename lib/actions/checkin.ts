@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -82,7 +83,7 @@ export async function submitCheckinAction(_prev: CheckinResult | undefined, form
     )
     .select()
     .single();
-  if (error || !checkin) return { error: error?.message ?? "Could not save the check-in." };
+  if (error || !checkin) return failed("actions.checkin.submitCheckin", error, "Could not save the check-in.");
 
   if (assignments && assignments.length) {
     await supabase.from("checkin_items").upsert(

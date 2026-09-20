@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.16.0 — Every failure says where it happened (20 September 2026)
+
+- **A child can now report a fault.** Anything that genuinely breaks hands back a plain sentence and a six-character reference: *“That is already saved. (ref k3f9a2)”*. The same reference sits on the log row beside the exact function it happened in, so “it said k3f9a2” finds one row instead of a haystack. The characters avoid everything misread aloud — no 0, O, 1, l or i.
+- **No child is shown a database error again.** Dozens of places handed a Postgres message straight to the screen — `duplicate key value violates unique constraint "kpi_ticks_pkey"` — and logged nothing at all. Each now reads as a sentence: *that is already saved*, *something required was left empty*, *you are not allowed to do that*. The raw text, the code and the constraint go to the log, where they are useful. Every code in that table was checked by provoking the failure on the real database.
+- **A refusal is not a fault.** “Pick a reward”, “title is required” — the app working correctly. No reference, no log, no noise. Only things that actually broke are recorded.
+- **Failures that used to vanish leave a trace.** Work that must not take a child's tap down with it — a bonus beside a saved prayer, a video search against an expired key — was `catch {}`, so nobody ever found out. It still never fails the tap, and now it says so in the log. The few that stay silent say in a comment why.
+- **Every failure knows who hit it.** The signed-in child is remembered for the length of the request, so a log row names them without a single id threaded through the code.
+- **The Admin error log answers the question it actually gets.** A box at the top takes the reference somebody quoted; below it the failures group by function, so “which part is breaking” is answered before reading a single row.
+
 ## 1.15.1 — A page that outlived a deployment can prove it (19 September 2026)
 
 - Every build now carries the commit it was made from, and `/api/version` — the endpoint open tabs already poll to notice a new deployment — reports it alongside the deployment id. When a page hits an error it compares the two: if they differ, the page was left open across a deployment and reloads itself rather than showing anybody a fault. If they match, the error is real — and is reported with both stamps, so the next report says plainly whether the code is wrong.

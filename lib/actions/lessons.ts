@@ -1,5 +1,6 @@
 "use server";
 
+import { failed } from "@/lib/ops/fault";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { guessLesson, type LessonGuess } from "@/lib/ai/guess-lesson";
@@ -36,6 +37,6 @@ export async function guessLessonAction(subject: string, hint: string): Promise<
       recent: (logs ?? []).map((l) => l.note),
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "The helper did not answer." };
+    return failed("actions.lessons.guessLesson", err, "The helper did not answer.");
   }
 }

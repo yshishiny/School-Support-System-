@@ -10,6 +10,8 @@ export async function touchPresence(userId: string, path: string): Promise<void>
       body: JSON.stringify({ last_seen_at: new Date().toISOString(), last_path: path.slice(0, 120) }),
     });
   } catch {
+    // Deliberately silent: this runs in the edge middleware, which has no route to the ops log, and a
+    // missed heartbeat costs nothing. Everything that matters is logged where it can be.
     /* presence is best effort */
   }
 }

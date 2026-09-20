@@ -1,5 +1,6 @@
 "use server";
 
+import { failed } from "@/lib/ops/fault";
 import { logError } from "@/lib/ops/log";
 
 import { ACCEPT_LABEL, FILE_KINDS } from "@/lib/materials/files";
@@ -45,7 +46,7 @@ export async function registerMaterialAction(studentId: string, path: string, me
     .insert({ family_id: family.id, student_id: studentId, uploaded_by: profile.id, subject, title: fallbackTitle, instructions, path, mime: meta.mime, size_bytes: meta.size, is_week_summary: !!meta.weekSummary, covers_week_start: meta.weekSummary ? (meta.weekSummary === "this" ? schoolWeekStart(todayIn(family.timezone)) : shiftDate(schoolWeekStart(todayIn(family.timezone)), -7)) : null })
     .select("id")
     .single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.materials.registerMaterial", error, "Could not save.");
 
   const r = await readAndStore(row.id, { path, mime: meta.mime, subject, instructions, fallbackTitle, grade: student.grade, firstName: student.full_name.split(" ")[0], today: todayIn(family.timezone), weekChoice: meta.weekSummary ?? null });
   PATHS.forEach((p) => revalidatePath(p));
@@ -236,21 +237,21 @@ export async function createMaterialQuizAction(materialId: string, difficulty: "
       learner: learnerPromptLine(profile.learner_profile),
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not generate the quiz." };
+    return failed("actions.materials.createMaterialQuiz", err, "Could not generate the quiz.");
   }
   const { data: quiz, error } = await admin
     .from("quizzes")
     .insert({ student_id: profile.id, topic_id: null, track: "school", title: generated.title, passage: generated.passage, difficulty, language, material_id: materialId })
     .select("id")
     .single();
-  if (error || !quiz) return { error: error?.message ?? "Could not save the quiz." };
+  if (error || !quiz) return failed("actions.materials.createMaterialQuiz", error, "Could not save the quiz.");
   const { data: questions, error: qErr } = await admin
     .from("quiz_questions")
     .insert(generated.questions.map((q, i) => ({ quiz_id: quiz.id, position: i + 1, prompt: q.prompt, choices: q.choices, skill_tag: q.skill_tag })))
     .select("id, position");
   if (qErr || !questions) {
     await admin.from("quizzes").delete().eq("id", quiz.id);
-    return { error: qErr?.message ?? "Could not save the questions." };
+    return failed("actions.materials.createQuiz.questions", qErr, "Could not save the questions.");
   }
   await admin.from("quiz_answer_keys").insert(questions.map((row) => ({ question_id: row.id, correct_index: generated.questions[row.position - 1].correct_index, explanation: generated.questions[row.position - 1].explanation })));
   redirect(`/quiz/${quiz.id}`);
@@ -277,7 +278,7 @@ export async function prepareWorksheetAction(materialId: string): Promise<Prepar
     PATHS.forEach((p) => revalidatePath(p));
     return { questions: t.questions.length, skipped: t.skipped, note: t.note };
   } catch (err) {
-    return { error: friendlyAiError(err instanceof Error ? err.message : String(err)) };
+    return failed("actions.materials.prepareWorksheet", err, friendlyAiError(err instanceof Error ? err.message : String(err)));
   }
 }
 
@@ -294,14 +295,14 @@ export async function startWorksheetAction(materialId: string): Promise<{ error?
     .insert({ student_id: profile.id, topic_id: null, track: "school", title: `Worksheet: ${m.title}`, passage: null, difficulty: "medium", language: m.language === "arabic" ? "ar" : "en", material_id: materialId })
     .select("id")
     .single();
-  if (error || !quiz) return { error: error?.message ?? "Could not start." };
+  if (error || !quiz) return failed("actions.materials.startWorksheet", error, "Could not start.");
   const { data: rows, error: qErr } = await admin
     .from("quiz_questions")
     .insert(qs.map((q, i) => ({ quiz_id: quiz.id, position: i + 1, prompt: q.prompt, choices: q.choices, skill_tag: q.skill_tag })))
     .select("id, position");
   if (qErr || !rows) {
     await admin.from("quizzes").delete().eq("id", quiz.id);
-    return { error: qErr?.message ?? "Could not save the questions." };
+    return failed("actions.materials.createQuiz.questions", qErr, "Could not save the questions.");
   }
   await admin.from("quiz_answer_keys").insert(rows.map((r) => ({ question_id: r.id, correct_index: qs[r.position - 1].correct_index, explanation: qs[r.position - 1].explanation })));
   redirect(`/quiz/${quiz.id}`);

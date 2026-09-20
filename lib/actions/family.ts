@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -10,14 +11,14 @@ import { todayIn } from "@/lib/dates";
 const PATHS = ["/parent", "/parent/settings", "/parent/reports"];
 
 /** The parent's own card: how the kids call them, and a WhatsApp number for delivery. */
-export async function updateParentProfileAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+export async function updateParentProfileAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { profile } = await requireParent();
   const supabase = await createClient();
   const label = String(formData.get("parent_label") ?? "").trim().slice(0, 24) || null;
   const whatsapp = String(formData.get("whatsapp") ?? "").replace(/[^\d]/g, "") || null;
   const fullName = String(formData.get("full_name") ?? "").trim().slice(0, 80) || profile.full_name;
   const { error } = await supabase.from("profiles").update({ parent_label: label, whatsapp, full_name: fullName, live_pings: formData.get("live_pings") === "on" }).eq("id", profile.id);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.family.updateParentProfile", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: "Saved." };
 }
@@ -30,12 +31,12 @@ async function baseUrl(): Promise<string> {
 }
 
 /** Creates a one-use invite link for a co-parent. Valid 14 days. */
-export async function createInviteAction(_prev: { error?: string; link?: string } | undefined, formData: FormData) {
+export async function createInviteAction(_prev: { error?: string; link?: string } | undefined, formData: FormData): Promise<{ error?: string; link?: string }> {
   const { family, profile } = await requireParent();
   const supabase = await createClient();
   const label = String(formData.get("label") ?? "").trim().slice(0, 24) || null;
   const { data, error } = await supabase.from("family_invites").insert({ family_id: family.id, created_by: profile.id, label }).select("token").single();
-  if (error || !data) return { error: error?.message ?? "Could not create the invite." };
+  if (error || !data) return failed("actions.family.createInvite", error, "Could not create the invite.");
   revalidatePath("/parent/settings");
   return { link: `${await baseUrl()}/join/${data.token}` };
 }
