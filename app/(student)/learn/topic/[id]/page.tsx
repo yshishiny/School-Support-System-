@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { requireStudent } from "@/lib/auth";
+import { CheckMyWorking } from "@/components/CheckMyWorking";
 import { disclosure } from "@/lib/teaching/fluency";
 import { levelOf } from "@/lib/levels";
 import { createClient } from "@/lib/supabase/server";
@@ -157,6 +158,9 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
           },
         ]}
       />
+      {/* He has just read it; the next thing he does is try. This is where being told which line went wrong
+          is worth something — and why it stops short of the answer. */}
+      <CheckMyWorking topicId={topic.id} topicName={topic.name} />
     </main>
   );
 }
