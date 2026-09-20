@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
 import { requireStudent } from "@/lib/auth";
+import { disclosure } from "@/lib/teaching/fluency";
+import { levelOf } from "@/lib/levels";
 import { createClient } from "@/lib/supabase/server";
 import { AddResourcesButton, ExplainButton, PracticeButton } from "@/components/LearnButtons";
 import { TopicVideos, TopicVisuals } from "@/components/TopicResources";
@@ -25,12 +27,12 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
   // Both depths are fetched in one go; which of them a child may read is a separate question from whether it exists.
   const [{ data: lessonRows }, resources, { data: quizzes }, unlocked] = await Promise.all([
-    supabase.from("lessons").select("content_md, level").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade),
+    supabase.from("lessons").select("content_md, level, human_reviewed_at").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade),
     loadTopicResources(id, grade),
     supabase.from("quizzes").select("id, title, created_at, attempts(score, total, submitted_at, flagged)").eq("topic_id", id).eq("student_id", profile.id).order("created_at", { ascending: false }),
     deepUnlocked(profile.id, family.id),
   ]);
-  const lessons = (lessonRows ?? []) as { content_md: string; level: string }[];
+  const lessons = (lessonRows ?? []) as { content_md: string; level: string; human_reviewed_at: string | null }[];
   const lesson = lessons.find((l) => l.level === "basics") ?? null;
   const deep = lessons.find((l) => l.level === "advanced") ?? null;
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };
@@ -81,6 +83,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
                   <>
                     <article className="prose-lesson text-sm leading-relaxed space-y-2">
                       <ReactMarkdown>{lesson.content_md}</ReactMarkdown>
+                      <p className="mt-3 text-[11px] muted border-t border-line pt-2">{disclosure({ aiWritten: true, topicId: id, level: levelOf(lesson.level), model: "", checkedAt: "", failedChecks: [], humanReviewedBy: lesson.human_reviewed_at ? "parent" : null }, topic.language)}</p>
                     </article>
                     {resources ? (
                       <>
@@ -112,6 +115,7 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
                 ) : deep ? (
                   <article className="prose-lesson text-sm leading-relaxed space-y-2">
                     <ReactMarkdown>{deep.content_md}</ReactMarkdown>
+                      <p className="mt-3 text-[11px] muted border-t border-line pt-2">{disclosure({ aiWritten: true, topicId: id, level: levelOf(deep.level), model: "", checkedAt: "", failedChecks: [], humanReviewedBy: deep.human_reviewed_at ? "parent" : null }, topic.language)}</p>
                   </article>
                 ) : (
                   <>

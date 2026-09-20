@@ -16,6 +16,8 @@ import { wellbeingStatus, straightTalkLabels, type CheckHistoryRow } from "@/lib
 import { CheckpointPanel, type CheckpointRow } from "@/components/CheckpointPanel";
 import { GradeSheetUploader } from "@/components/GradeSheetUploader";
 import { SideTabs } from "@/components/SideTabs";
+import { LessonReview } from "@/components/LessonReview";
+import { reviewQueue } from "@/lib/teaching/queue";
 import { kidColor } from "@/lib/kid-tabs";
 import { computeAttention, type AttentionResult } from "@/lib/coach/signals-run";
 
@@ -52,9 +54,22 @@ export default async function ProgressPage() {
   const allTopics = (topics ?? []) as Topic[];
   const allAttempts = (attempts ?? []) as AttemptWithQuiz[];
 
+  // The one judgement the teaching contract gives a parent rather than a model, so it sits above the children
+  // rather than inside one of them: a lesson is cached per topic, not per child.
+  const toReview = await reviewQueue(family.id);
+
   return (
     <main className="space-y-4">
       <h1 className="h1">Progress</h1>
+      <section className="space-y-2">
+        <h2 className="h2 flex items-center gap-2">
+          Lessons to check
+          {toReview.length > 0 && (
+            <span className="rounded-full bg-accent text-white text-[11px] font-bold px-2 py-0.5 leading-none">{toReview.length}</span>
+          )}
+        </h2>
+        <LessonReview items={toReview} />
+      </section>
       <SideTabs storageKey="progress-kids" tabs={students.map((s, idx) => {
         const mine = allAttempts.filter((a) => a.student_id === s.id);
         const { topic: mastery, section } = masteryMaps(mine);

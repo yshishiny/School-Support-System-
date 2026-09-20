@@ -28,6 +28,11 @@ export interface ExplainSpec {
   track: "school" | "act" | "sat";
   language?: "en" | "ar";
   learner?: string | null;
+  /**
+   * What a parent said was wrong with the last lesson on this topic. This is the only thing in the brief that
+   * nobody but a person who saw the child's class could have written, so it is given the most weight.
+   */
+  corrections?: string[];
 }
 
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
@@ -50,6 +55,10 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
           spec.learner ? `${spec.learner} Adapt the style (analogies vs steps vs examples, length) to this.` : "",
           // The depth is the paid difference between the two tiers, so it is stated last and stated plainly.
           `How to pitch it: ${LEVEL[level].lessonBrief}`,
+          // Last, because it outranks everything above it: a parent watched this class and the model did not.
+          spec.corrections?.length
+            ? `A parent read the previous version of this lesson and sent it back. Do not repeat these mistakes:\n${spec.corrections.map((c) => `- ${c}`).join("\n")}`
+            : "",
         ]
           .filter(Boolean)
           .join("\n"),

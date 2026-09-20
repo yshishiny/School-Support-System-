@@ -84,7 +84,13 @@ export async function ensureLesson(t: Topic, grade: number | null, learner: stri
   const admin = createAdminClient();
   const { data: existing } = await admin.from("lessons").select("content_md").eq("topic_id", t.id).eq("level", level).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
   if (existing) return { status: "exists", excerpt: existing.content_md.slice(0, 1500) };
-  const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner, level });
+  // Anything a parent has sent back on this topic, newest first: the model is told before it writes, not after.
+  const { data: sentBack } = await admin
+    .from("lesson_rejections").select("reason").eq("topic_id", t.id).eq("level", level)
+    .order("created_at", { ascending: false }).limit(3);
+  const corrections = ((sentBack ?? []) as { reason: string }[]).map((r) => r.reason);
+
+  const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner, level, corrections });
 
   const review = await reviewLesson(
     {
