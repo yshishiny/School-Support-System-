@@ -12,6 +12,7 @@ import { materialStages, nextStage } from "@/lib/materials/study";
 import { loadRevisions } from "@/lib/revision/run";
 import { Tabs } from "@/components/Tabs";
 import { Seated } from "@/components/Seated";
+import { hasCurriculum, topicsFor } from "@/lib/curriculum";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
@@ -24,6 +25,24 @@ import type { Topic } from "@/lib/types";
 export const maxDuration = 300;
 
 
+/**
+ * This child's topics.
+ *
+ * When a parent has said which curriculum he follows, that is the answer and it is exact — his year, his stream,
+ * his subjects. Until then it falls back to what this page always did: everything tagged with his grade number,
+ * plus the exam tracks. The fallback is why a child on grade 9 used to see an empty page, and it stays only for
+ * the children nobody has set yet.
+ */
+async function curriculumTopics(profile: { id: string; grade: number | null; curriculum_id?: string | null; stream?: string | null }) {
+  const learner = { curriculumId: profile.curriculum_id ?? null, grade: profile.grade ?? null, stream: profile.stream ?? null };
+  if (hasCurriculum(learner)) {
+    const mine = await topicsFor(learner);
+    if (mine.length > 0) return { data: mine };
+  }
+  const supabase = await createClient();
+  return supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort");
+}
+
 export default async function LearnPage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
@@ -32,7 +51,7 @@ export default async function LearnPage() {
   const examTracks = new Set(exams.map(trackFor));
 
   const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }] = await Promise.all([
-    supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort"),
+    curriculumTopics(profile),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),

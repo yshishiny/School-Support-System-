@@ -6,6 +6,8 @@
  */
 import { createAdminClient } from "@/lib/supabase/admin";
 import { explainTopic } from "@/lib/ai/explain-topic";
+import { reviewLesson } from "@/lib/teaching/review";
+import { report } from "@/lib/ops/fault";
 import { drawTopicVisuals } from "@/lib/ai/topic-visuals";
 import { findVideos, type VideoLesson } from "@/lib/videos";
 import { shiftDate, todayIn } from "@/lib/dates";
@@ -71,20 +73,53 @@ export async function ensureTopicResources(t: Topic, grade: number | null, lesso
   return "made";
 }
 
-/** Lesson text for one topic at one depth (idempotent). The two depths are cached separately. */
-export async function ensureLesson(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ status: "made" | "exists"; excerpt: string | null }> {
+/**
+ * Lesson text for one topic at one depth (idempotent). The two depths are cached separately.
+ *
+ * Between writing it and storing it there is now a discernment pass. A lesson that fails a blocking check is not
+ * stored, which means it is never served: the cache only ever holds lessons that were checked and released. One
+ * that passes but carries a warning is stored with the warning on it, for a parent to see.
+ */
+export async function ensureLesson(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ status: "made" | "exists" | "held"; excerpt: string | null; failed?: string[] }> {
   const admin = createAdminClient();
   const { data: existing } = await admin.from("lessons").select("content_md").eq("topic_id", t.id).eq("level", level).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
   if (existing) return { status: "exists", excerpt: existing.content_md.slice(0, 1500) };
   const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner, level });
-  await admin.from("lessons").upsert({ topic_id: t.id, grade, level, content_md: content, model }, { onConflict: "topic_id,grade,level" });
-  return { status: "made", excerpt: content.slice(0, 1500) };
+
+  const review = await reviewLesson(
+    {
+      id: t.id, curriculumId: (t as Topic & { curriculum_id?: string | null }).curriculum_id ?? "school",
+      grade: grade ?? t.grade ?? 0, stream: (t as Topic & { stream?: string | null }).stream ?? null,
+      subject: t.subject, unit: t.unit, name: t.name, language: t.language,
+    },
+    level,
+    content,
+  );
+  if (!review.release) {
+    // Held, not stored. The next attempt writes a fresh lesson rather than serving this one, and the reference
+    // says which checks stopped it.
+    const ref = await report("learning.lessonHeld", new Error(`Lesson held: ${review.blocking.join(", ")}`), {
+      meta: { topicId: t.id, topic: t.name, level, blocking: review.blocking, results: review.results },
+    });
+    return { status: "held", excerpt: null, failed: [...review.blocking, `ref:${ref}`] };
+  }
+
+  await admin.from("lessons").upsert({
+    topic_id: t.id, grade, level, content_md: content, model,
+    checked_at: new Date().toISOString(), failed_checks: review.warnings, review_model: review.model,
+  }, { onConflict: "topic_id,grade,level" });
+  return { status: "made", excerpt: content.slice(0, 1500), failed: review.warnings };
 }
 
-/** Lesson, diagrams and videos for one topic, the lesson and the diagrams in parallel. */
-export async function ensureTopicMaterial(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ lesson: "made" | "exists"; resources: "made" | "exists" }> {
+/**
+ * Lesson, diagrams and videos for one topic, the lesson and the diagrams in parallel.
+ *
+ * A held lesson is reported rather than hidden: the caller needs to know the topic is still not ready, or the
+ * nightly job will count it as done and never come back to it.
+ */
+export async function ensureTopicMaterial(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ lesson: "made" | "exists" | "held"; resources: "made" | "exists"; failed?: string[] }> {
   const [lesson, resources] = await Promise.all([ensureLesson(t, grade, learner, level), ensureTopicResources(t, grade, null)]);
-  return { lesson: lesson.status, resources };
+  return { lesson: lesson.status, resources, failed: lesson.failed };
 }
 
 /** Gets this week's topics ready for one student, a few at a time, within a time budget. */
@@ -105,7 +140,12 @@ export async function prepareWeekMaterial(studentId: string, opts: { limit?: num
   for (const w of todo) {
     if (prepared >= limit || Date.now() - started > budget) break;
     try {
-      await ensureTopicMaterial(w.topic, w.grade, learner);
+      const made = await ensureTopicMaterial(w.topic, w.grade, learner);
+      if (made.lesson === "held") {
+        // Not prepared, and not an error either: it will be attempted again tomorrow with a fresh lesson.
+        errors.push(`${w.topic.name}: held (${(made.failed ?? []).join(", ")})`);
+        continue;
+      }
       prepared += 1;
     } catch (err) {
       errors.push(`${w.topic.name}: ${err instanceof Error ? err.message : String(err)}`);
