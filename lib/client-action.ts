@@ -21,15 +21,15 @@ export async function runAction<T>(fn: () => Promise<T>, onError: (msg: string) 
     // A throw that reached here never went through the action's own boundary, so it has no reference yet.
     // Say where the browser was, which is the one thing the server log cannot know.
     onError(msg);
-    void reportUnhandled(msg);
+    void reportUnhandled(msg, err instanceof Error ? err.stack ?? null : null);
     return undefined;
   }
 }
 
-async function reportUnhandled(message: string): Promise<void> {
+async function reportUnhandled(message: string, stack?: string | null): Promise<void> {
   try {
     const { reportClientErrorAction } = await import("@/lib/actions/ops");
-    await reportClientErrorAction(message.slice(0, 400), null, window.location.pathname);
+    await reportClientErrorAction(message.slice(0, 400), null, window.location.pathname, undefined, stack ?? null);
   } catch {
     // The report is a courtesy; failing to send it must not replace the error the person is already reading.
   }

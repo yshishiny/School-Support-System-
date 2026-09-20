@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.4 — `u is not a function` was a stale page, and three reasons nobody could tell (20 September 2026)
+
+- **The error was never a bug in the app.** Seen on the beta, and every one of the defects below was here too. All four reports landed 3 to 8 minutes after a deployment, on a day with sixteen of them: a page left open, a new build underneath it, and the next server action it tried failing against a deployment that no longer existed.
+- **The stored stack was of the reporting function itself.** `reportClientErrorAction` built a fresh `new Error(message)` on the server, so every report carried a perfect stack of that call, inside whichever server chunk webpack had placed it in — which is why a failure on `/calendar` pointed at `app/parent/snaps/page.js`. The browser's own stack is now sent and stored, and when the browser sends none the log says so rather than inventing one.
+- **The automatic refresh fired once per tab and then never again.** The marker was the error message alone, so the first `u is not a function` disarmed it for the life of the tab — exactly what the three failures in three minutes at 22:30 show, each one reported and none of them refreshed. It is now keyed to the build as well, so a page that healed after one deployment can heal after the next.
+- **The staleness check could not work in the case it exists for.** `/api/version` required a session, so a tab left open long enough for its session to lapse — the very tab most likely to be stale — was answered with the sign-in page, `res.json()` threw on the HTML, and the check quietly returned "not stale". The endpoint is public now (it reports a commit and nothing else) and the reply is only parsed when it is actually JSON.
+- The decision itself now lives in `lib/ops/stale.ts` with tests, including the case that started this: a differing build stamp means stale whatever the message says, and a matching one means a real fault whatever the message says.
+
 ## 2.1.3 — Nothing in the action modules is an endpoint by accident (20 September 2026)
 
 - **Nine functions were public endpoints.** Next gives every export of a `"use server"` module an id and a route, so a helper that merely lived in an action file was reachable by anyone who could post to it — no page, no button, no sign-in.

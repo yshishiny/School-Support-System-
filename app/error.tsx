@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { reportClientErrorAction } from "@/lib/actions/ops";
+import { looksStale } from "@/lib/ops/stale";
 
 const ONCE = "auto-reloaded-for";
 const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
@@ -10,7 +11,9 @@ const BUILD = process.env.NEXT_PUBLIC_BUILD_ID ?? "dev";
 async function serverBuild(): Promise<string | null> {
   try {
     const res = await fetch("/api/version", { cache: "no-store" });
-    if (!res.ok) return null;
+    // A lapsed session used to be answered with the sign-in page, and `res.json()` threw on the HTML — so the one
+    // tab this check exists for, the one left open for hours, always answered "not stale".
+    if (!res.ok || !(res.headers.get("content-type") ?? "").includes("application/json")) return null;
     const body = (await res.json()) as { commit?: unknown };
     return typeof body.commit === "string" ? body.commit : null;
   } catch {
@@ -26,7 +29,10 @@ async function serverBuild(): Promise<string | null> {
 export default function AppError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
   const [real, setReal] = useState(false);
   useEffect(() => {
-    const marker = error.digest ?? error.message ?? "x";
+    // Keyed to the build as well as the message: a tab that self-healed after one deployment must be allowed to
+    // heal again after the next. Keyed to the message alone, the first "u is not a function" disarmed the reload
+    // for the rest of the tab's life, and every later staleness came through as a reported fault instead.
+    const marker = `${BUILD}:${error.digest ?? error.message ?? "x"}`;
     try {
       if (sessionStorage.getItem(ONCE) !== marker) {
         sessionStorage.setItem(ONCE, marker);
@@ -39,14 +45,12 @@ export default function AppError({ error, reset }: { error: Error & { digest?: s
     let dropped = false;
     console.error("[app] error boundary", error);
     void (async () => {
-      const byMessage = /server action|failed to find|chunk|Loading CSS|dynamically imported module|Unexpected token '<'/i.test(error.message ?? "");
       const server = await serverBuild();
-      const skewed = !!server && server !== BUILD;
       if (dropped) return;
-      const stale = byMessage || skewed;
+      const stale = looksStale({ message: error.message ?? "", pageBuild: BUILD, serverBuild: server });
       setReal(!stale);
       if (!stale) {
-        void reportClientErrorAction(error.message ?? "unknown", error.digest ?? null, window.location.pathname, { build: BUILD, server }).catch(() => null);
+        void reportClientErrorAction(error.message ?? "unknown", error.digest ?? null, window.location.pathname, { build: BUILD, server }, error.stack ?? null).catch(() => null);
       }
     })();
     return () => {
