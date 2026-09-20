@@ -14,6 +14,7 @@ import { loadCompensations } from "@/lib/compensation/run";
 import { CompensationCard } from "@/components/CompensationCard";
 import { PastPrayersFill, type PastDay } from "@/components/PastPrayersFill";
 import { Tabs } from "@/components/Tabs";
+import { Seated } from "@/components/Seated";
 
 /** The child's allowance page: how much this week, why, how to get the full amount, and what extra he can do. */
 export default async function AllowancePage() {
@@ -201,6 +202,13 @@ export default async function AllowancePage() {
         </div>
         <p className="text-sm">{whyThisAmount(status, status.allowance)}</p>
       </section>
+
+      <Seated
+        links={[
+          { href: "/wallet", label: "Wallet", emoji: "\u{1F45B}", note: "What you have, earned and taken out" },
+          { href: "/rewards", label: "Rewards", emoji: "\u{1F381}", note: "What your points are worth" },
+        ]}
+      />
 
       <Tabs
         storageKey="allowance"

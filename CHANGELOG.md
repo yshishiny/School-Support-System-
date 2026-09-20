@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.4 — Five in the hand, and colour that means something (20 September 2026, `v2` branch)
+
+- **The kids' bottom bar carried eleven places.** On a 390-point phone that is 35 points a target against the 44 a thumb needs, and the labels had already been shrunk to 10px to make them fit. It is now five — Today, Learn, Snaps, Allowance, Me — at 78 points each, with the label back to a size a nine-year-old reads.
+- **Nothing was taken away.** Teacher and Coach now sit at the top of Learn, Wallet and Rewards at the top of Allowance, and the Planner on Me — each a full-width row with a real label and a line saying what is through the door, instead of a ten-pixel word. The Snaps page already carried the rater's Check that way. Deep inside any of them, the primary it belongs to still lights up.
+- **The parent menu carried sixteen unrelated colours**, one per section — two cyans, three oranges, two teals, a magenta — and nothing anywhere said what any of them meant. Colour that identifies everything identifies nothing, and left the accent with no voice on the day something genuinely needed attention. Identity now rests on the icon and the group; the accent marks the page you are on, and what is waiting.
+- **The More tab could never light up.** Its test required the path to start with `/parent`, which every parent page does, so the first four always answered first — Reports, Guide, Progress and nine others showed no tab at all. More is now simply every page the other four do not own.
+- The design philosophy behind all of this, and three plates drawing it, are in `design/`.
+
 ## 2.1.0-beta.3 — The teacher is actually gated, and you are warned before it lapses (20 September 2026, `v2` branch)
 
 - **The teacher was free.** The page showed an upgrade card, but nothing stopped a child starting a full lesson without access — a nudge, not a gate. Starting a lesson is now refused on the server, so a stale tab, a bookmarked link and a second window all meet the same answer.

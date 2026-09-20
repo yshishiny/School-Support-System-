@@ -1,21 +1,30 @@
 /** The parent area's sections: the desktop side menu, the phone More grid and the bottom bar all read this one list. */
-export interface ParentSection { href: string; label: string; emoji: string; color: string; group: string }
+export interface ParentSection { href: string; label: string; emoji: string; group: string }
 
+/**
+ * No colour here, deliberately.
+ *
+ * This list used to carry sixteen unrelated hex values — two cyans, three oranges, two teals, a magenta — one
+ * per section, and nothing anywhere told a parent what magenta meant. Colour that identifies everything
+ * identifies nothing, and leaves the accent with no voice on the day something is genuinely waiting. Identity
+ * belongs to the icon and to the group, which are already unique; the accent is spent on state alone — the page
+ * you are on, and the thing that needs you now.
+ */
 export const PARENT_SECTIONS: ParentSection[] = [
-  { href: "/parent", label: "Home", emoji: "🏠", color: "#3a86ff", group: "Today" },
-  { href: "/parent/notifications", label: "Inbox", emoji: "🔔", color: "#f15bb5", group: "Today" },
-  { href: "/parent/children", label: "Kids", emoji: "🧒", color: "#ff6b6b", group: "Today" },
-  { href: "/parent/assignments", label: "Tasks", emoji: "📝", color: "#ffbe0b", group: "Today" },
-  { href: "/parent/access", label: "Teacher access", emoji: "🎓", color: "#d9b061", group: "Learning" },
-  { href: "/parent/plan", label: "Quiz plan", emoji: "📅", color: "#2ec4b6", group: "Learning" },
-  { href: "/parent/progress", label: "Progress", emoji: "🧠", color: "#8338ec", group: "Learning" },
-  { href: "/parent/materials", label: "School files", emoji: "📎", color: "#fb5607", group: "Learning" },
-  { href: "/parent/import", label: "Import", emoji: "💬", color: "#06d6a0", group: "Learning" },
-  { href: "/parent/allowance", label: "Allowance", emoji: "💵", color: "#e0a800", group: "Fairness" },
-  { href: "/parent/manners", label: "Manners", emoji: "🤝", color: "#f77f00", group: "Fairness" },
-  { href: "/parent/snaps", label: "Snaps", emoji: "📸", color: "#ef476f", group: "Fairness" },
-  { href: "/parent/rewards", label: "Rewards", emoji: "🎁", color: "#118ab2", group: "Fairness" },
-  { href: "/parent/reports", label: "Reports", emoji: "📨", color: "#0e7c86", group: "Family" },
-  { href: "/parent/guide", label: "Guide", emoji: "❓", color: "#9b5de5", group: "Family" },
-  { href: "/parent/settings", label: "More", emoji: "⚙️", color: "#6c757d", group: "Family" },
+  { href: "/parent", label: "Home", emoji: "🏠", group: "Today" },
+  { href: "/parent/notifications", label: "Inbox", emoji: "🔔", group: "Today" },
+  { href: "/parent/children", label: "Kids", emoji: "🧒", group: "Today" },
+  { href: "/parent/assignments", label: "Tasks", emoji: "📝", group: "Today" },
+  { href: "/parent/access", label: "Teacher access", emoji: "🎓", group: "Learning" },
+  { href: "/parent/plan", label: "Quiz plan", emoji: "📅", group: "Learning" },
+  { href: "/parent/progress", label: "Progress", emoji: "🧠", group: "Learning" },
+  { href: "/parent/materials", label: "School files", emoji: "📎", group: "Learning" },
+  { href: "/parent/import", label: "Import", emoji: "💬", group: "Learning" },
+  { href: "/parent/allowance", label: "Allowance", emoji: "💵", group: "Fairness" },
+  { href: "/parent/manners", label: "Manners", emoji: "🤝", group: "Fairness" },
+  { href: "/parent/snaps", label: "Snaps", emoji: "📸", group: "Fairness" },
+  { href: "/parent/rewards", label: "Rewards", emoji: "🎁", group: "Fairness" },
+  { href: "/parent/reports", label: "Reports", emoji: "📨", group: "Family" },
+  { href: "/parent/guide", label: "Guide", emoji: "❓", group: "Family" },
+  { href: "/parent/settings", label: "More", emoji: "⚙️", group: "Family" },
 ];

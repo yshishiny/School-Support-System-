@@ -22,6 +22,7 @@ import { heroChoices, signHeroUrls, type HeroImage } from "@/lib/hero";
 import type { Checkin } from "@/lib/types";
 import { SnapReview } from "@/components/SnapReview";
 import { Tabs } from "@/components/Tabs";
+import { Seated } from "@/components/Seated";
 import { signSnapUrls } from "@/lib/snaps/server";
 import { prettyDate, shiftDate } from "@/lib/dates";
 
@@ -185,6 +186,10 @@ export default async function MePage() {
         </div>
         <span className="btn-ghost btn-sm">{tags.length ? "Edit" : "Start"}</span>
       </Link>
+
+      <Seated
+        links={[{ href: "/calendar", label: "Planner", emoji: "\u{1F5D3}\uFE0F", note: "Your week: school, exams and days off" }]}
+      />
 
       <Tabs
         storageKey="me"
