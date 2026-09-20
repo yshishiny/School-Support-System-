@@ -9,16 +9,19 @@ import type { PrayerName } from "@/lib/prayers";
 export interface PastDay { date: string; label: string; missing: PrayerName[] }
 const NAME: Record<PrayerName, string> = { fajr: "Fajr", dhuhr: "Dhuhr", asr: "Asr", maghrib: "Maghrib", isha: "Isha" };
 
-/** Past days of the allowance week with prayers not logged: three honest buttons per prayer. */
+/**
+ * Past days of the allowance week with prayers not logged: four honest buttons per prayer. Congregation is one
+ * of them, because a prayer at the mosque is almost never logged from inside the mosque.
+ */
 export function PastPrayersFill({ days }: { days: PastDay[] }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   const [done, setDone] = useState<Set<string>>(new Set());
-  const log = (date: string, prayer: PrayerName, claim: "on_time" | "late" | "missed") =>
+  const log = (date: string, prayer: PrayerName, claim: "on_time" | "late" | "missed", atMosque = false) =>
     start(async () => {
       setMsg(null);
-      const r = await runAction(() => logPastPrayerAction(prayer, date, claim), setMsg);
+      const r = await runAction(() => logPastPrayerAction(prayer, date, claim, atMosque), setMsg);
       if (!r) return;
       if (r.error) { setMsg(r.error); return; }
       setDone((s) => new Set(s).add(`${date}:${prayer}`));
@@ -32,10 +35,15 @@ export function PastPrayersFill({ days }: { days: PastDay[] }) {
           {d.missing.filter((p) => !done.has(`${d.date}:${p}`)).map((p) => (
             <div key={p} className="rounded-xl bg-panel-2/60 p-2 space-y-1.5">
               <div className="text-xs font-semibold">{NAME[p]}</div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "on_time")}>On time</button>
-                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "late")}>Late</button>
-                <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs !text-bad" onClick={() => log(d.date, p, "missed")}>Missed</button>
+              <div className="space-y-1.5">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" disabled={pending} className="btn-primary min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "on_time", true)} title="On time, in congregation at the mosque">🕌 On time, mosque</button>
+                  <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "on_time")}>On time, elsewhere</button>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs" onClick={() => log(d.date, p, "late")}>Late</button>
+                  <button type="button" disabled={pending} className="btn-ghost min-h-11 !px-1 text-xs !text-bad" onClick={() => log(d.date, p, "missed")}>Missed</button>
+                </div>
               </div>
             </div>
           ))}

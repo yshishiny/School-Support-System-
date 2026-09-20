@@ -64,13 +64,13 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
   const next = rows.find((r) => r.startMs > now);
   const due = current && !current.logged ? current : null;
 
-  const logPast = (prayer: PrayerName, date: string, claim: PastClaim) => {
+  const logPast = (prayer: PrayerName, date: string, claim: PastClaim, atMosque = false) => {
     setMsg(null);
-    setBusy(`${date}:${prayer}:${claim}`);
+    setBusy(`${date}:${prayer}:${claim}${atMosque ? ":mosque" : ""}`);
     start(async () => {
       try {
-        const res = await logPastPrayerAction(prayer, date, claim);
-        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"} · +${res.earned}`);
+        const res = await logPastPrayerAction(prayer, date, claim, atMosque);
+        setMsg(res.error ?? `${PRAYER_LABEL[prayer]} ${claim === "on_time" ? "on time" : claim === "late" ? "late" : "missed"}${atMosque ? " at the mosque 🕌" : ""} · +${res.earned}`);
       } catch {
         setMsg("That did not save. Check the connection and try again.");
       } finally {
@@ -100,12 +100,19 @@ export function PrayerPill({ rows, onTimeCount, yesterday = [], today = "", yest
   // so React would throw the rows away and rebuild them on each clock tick — and a button replaced between a
   // finger going down and coming up never fires its tap.
   const pastButtons = (prayer: PrayerName, date: string) => {
-    const label = (claim: PastClaim, text: string) => (busy === `${date}:${prayer}:${claim}` ? "…" : text);
+    const label = (key: string, text: string) => (busy === `${date}:${prayer}:${key}` ? "…" : text);
+    // Nobody opens the app at the mosque door, so congregation has to be claimable afterwards too — but only
+    // alongside "on time", never with a prayer that was late or missed.
     return (
-      <div className="mt-2 grid grid-cols-3 gap-1.5">
-        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="btn-ghost min-h-11 !px-1 text-xs" title="I prayed it on time (for example at school)">{label("on_time", "On time")}</button>
-        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="btn-ghost min-h-11 !px-1 text-xs">{label("late", "Late")}</button>
-        <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="btn-ghost min-h-11 !px-1 text-xs !text-bad">{label("missed", "Missed")}</button>
+      <div className="mt-2 space-y-1.5">
+        <div className="grid grid-cols-2 gap-1.5">
+          <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time", true)} className="btn-primary min-h-11 !px-1 text-xs" title="I prayed it on time, in congregation at the mosque">{label("on_time:mosque", "🕌 On time, mosque")}</button>
+          <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "on_time")} className="btn-ghost min-h-11 !px-1 text-xs" title="I prayed it on time (for example at school or at home)">{label("on_time", "On time, elsewhere")}</button>
+        </div>
+        <div className="grid grid-cols-2 gap-1.5">
+          <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "late")} className="btn-ghost min-h-11 !px-1 text-xs">{label("late", "Late")}</button>
+          <button type="button" disabled={pending} onClick={() => logPast(prayer, date, "missed")} className="btn-ghost min-h-11 !px-1 text-xs !text-bad">{label("missed", "Missed")}</button>
+        </div>
       </div>
     );
   };

@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1 — The mosque can be claimed afterwards (20 September 2026)
+
+- **A prayer at the mosque logged later now counts as congregation.** Nobody stops at the mosque door to open the app: your boys' Fajr is prayed at five and logged at noon, and the mosque buttons only existed inside the prayer's window. So the 20-point day and the 25-point Fajr week were, in practice, unreachable. Filling in a past prayer now offers *🕌 On time, mosque* beside *On time, elsewhere*, with *Late* and *Missed* underneath, both on Today and on the Allowance catch-up list.
+- A prayer claimed as late or missed still cannot be congregation, wherever it is claimed from. One rule, written once, and the day bonus and the Fajr streak read the flag rather than the moment the row was written — so a week of Fajr at the mosque pays even when every one of them was filled in at lunchtime.
+- The late entry still asks for its balance — two ayahs and one right answer — before it counts for the allowance, exactly as before.
+
 ## 2.0.0 — The same app as the beta, without the virtual teacher (20 September 2026)
 
 Everything built on the beta over the past week now runs here. The virtual teacher stays on the beta; so does the credits, invitations and ambassador system, which exists only to sell lessons. The two sites keep their own colour and icon so you can still tell them apart at a glance.
