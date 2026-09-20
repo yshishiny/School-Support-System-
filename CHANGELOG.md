@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.10 — The parent's half of the contract has somewhere to happen (20 September 2026, `v2` branch)
+
+- **Parent → Progress opens with *Lessons to check*.** Until now the gate was real but silent: a bad lesson was genuinely stopped, and you had no way to know it. Two things appear there, and they are deliberately worded differently. A **stopped** lesson failed a blocking check and was never stored, so no child saw it — you are being told. A **flagged** lesson passed every blocking check and is being read now, with one thing the checker was unsure about — there you are being asked, and your answer is the only thing that can settle it.
+- **The question is shown, not the slug.** "Would a grade 8 child follow it without meeting anything from a later year?" — the same sentence the checker was asked.
+- **"This matched the class"** is the one judgement the four dimensions hand to a person rather than a model, and it now has a button. The model has never seen your son's teacher's board; it must never claim to know. Once given, the line the child reads under the lesson changes from *"written by an AI"* to *"written by an AI and checked by one of your parents"* — in Arabic when he is reading Arabic.
+- **"It did not"** deletes the lesson rather than flagging it. The cache is the only reason it would ever be served again, so removing it is what actually stops a child reading it — and your reason is kept and **handed to the model the next time that topic is written**, so it does not repeat the mistake. That reason is the one thing in the system only someone who saw the class could supply.
+- A client component importing the queue dragged `node:async_hooks` into the browser bundle and broke the build. The check questions are resolved on the server now and the client imports only a type.
+
 ## 2.1.0-beta.9 — The curriculum has a door, and no lesson reaches a child unchecked (20 September 2026, `v2` branch)
 
 - **A parent chooses the curriculum, and the app follows it.** Kids → a child → Profile now asks which system, which year, and — only for the years that have one — which stream. From then on Learn shows the subjects and the whole year's topics from the curriculum instead of subject names typed into a box. Omar and Youssef are on the American curriculum: 7 subjects and 88 topics for grade 8, 5 subjects and 113 for grade 10.
