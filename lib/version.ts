@@ -1,6 +1,6 @@
 /** The product identity shown under More → About and in the daily report footer. Bump on every release. */
 export const APP_NAME = "Study Portal";
-export const APP_VERSION = "2.1.0-beta.2";
+export const APP_VERSION = "2.1.0-beta.3";
 export const APP_BASELINE = "V2 beta \u00b7 every failure says where it happened \u00b7 carries everything up to 1.15.1";
 export const APP_OWNER = "Yasser Elshishiny";
 export const APP_TRADEMARK = "Betna Group";

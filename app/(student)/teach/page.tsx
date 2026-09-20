@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { deepUnlocked } from "@/lib/entitlement";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { CHARACTERS, characterById } from "@/lib/characters";
@@ -25,6 +26,7 @@ export default async function TeachPage() {
   // her lessons come from the material she uploads.
   const atSchool = isSchoolStage((profile as { stage?: string | null }).stage);
   const access = await loadAccess(family.id).catch(() => null);
+  const unlocked = await deepUnlocked(profile.id, family.id);
   const [{ data: topics }, { data: logs }, { data: materials }, { data: sessions }] = await Promise.all([
     supabase.from("topics").select("*").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
     supabase.from("lesson_logs").select("subject_name, topic_id, note, log_date").eq("student_id", profile.id).gte("log_date", shiftDate(today, -7)).order("log_date", { ascending: false }),
@@ -44,6 +46,30 @@ export default async function TeachPage() {
         <header><h1 className="h1">Pick your teacher</h1><p className="text-sm muted">One teacher for all your subjects. Same knowledge, different style. You can change later.</p></header>
         <CharacterPicker current={null} />
         <p className="text-xs muted">Beta: lessons use your phone&apos;s voice. Turn the volume up.</p>
+      </main>
+    );
+  }
+
+  // Locked: say so once, plainly, and point at what is still open. Better than a page full of buttons that refuse.
+  if (!unlocked) {
+    return (
+      <main className="space-y-4">
+        <header className="flex items-center gap-3">
+          <Avatar c={chosen} speaking={false} size={90} mood="happy" />
+          <div className="flex-1 min-w-0">
+            <h1 className="h1">{chosen.name}</h1>
+            <p className="text-xs muted">{chosen.tagline}</p>
+          </div>
+        </header>
+        <section className="card space-y-2">
+          <h2 className="h2">Your time with the teacher has finished</h2>
+          <p className="text-sm muted">
+            He is here whenever it is renewed — your dad does that under Teacher access. Nothing you have done is
+            lost, and every written lesson is still open.
+          </p>
+          <Link href="/learn" className="btn-primary w-full">📖 Go to your lessons</Link>
+        </section>
+        {access && <UpgradeCard grants={access.grants} studentId={profile.id} today={today} />}
       </main>
     );
   }

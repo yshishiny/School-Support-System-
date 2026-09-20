@@ -1,10 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  CREDITS_PER_CHILD_DAY, CREDITS_PER_EGP, MAX_INVITES, REFERRAL_CREDITS,
-  INVITES_CEILING, REFERRAL_BONUS_CREDITS,
-  accessUntil, bonusDue, commissionFor, creditBalance, creditsFor, egpFor, grantWindow, hasAccess, inviteCode,
-  invitesAllowed, planById, priceAfterWelcome, priceList, tierFor,
-} from "./access";
+import { CREDITS_PER_CHILD_DAY, CREDITS_PER_EGP, MAX_INVITES, REFERRAL_CREDITS, INVITES_CEILING, REFERRAL_BONUS_CREDITS, accessUntil, bonusDue, commissionFor, creditBalance, creditsFor, egpFor, grantWindow, hasAccess, inviteCode, invitesAllowed, planById, priceAfterWelcome, priceList, tierFor, daysOfAccessLeft, expiringAccess, type AccessGrant } from "./access";
 
 describe("the price list holds together", () => {
   it("keeps the owner's two anchors: 1500 credits is two child-days, and a child-month is 450 EGP", () => {
@@ -175,5 +170,45 @@ describe("the double-sided referral", () => {
   it("is worth a child-month to the inviter", () => {
     expect(REFERRAL_BONUS_CREDITS).toBe(planById("child_month")!.credits);
     expect(egpFor(REFERRAL_BONUS_CREDITS)).toBe(450);
+  });
+});
+
+describe("warning a family before its month runs out", () => {
+  const g = (studentId: string | null, starts: string, ends: string): AccessGrant =>
+    ({ student_id: studentId, starts_on: starts, ends_on: ends, plan: "child_month" } as AccessGrant);
+
+  const grants = [g("omar", "2026-09-01", "2026-09-26"), g("youssef", "2026-09-01", "2026-09-30")];
+
+  it("counts the days that are left", () => {
+    expect(daysOfAccessLeft(grants, "omar", "2026-09-20")).toBe(6);
+    expect(daysOfAccessLeft(grants, "omar", "2026-09-26")).toBe(0);
+    expect(daysOfAccessLeft(grants, "nobody", "2026-09-20")).toBeNull();
+  });
+
+  it("warns three days out, while there is still time to renew", () => {
+    const due = expiringAccess(grants, ["omar", "youssef"], "2026-09-23");
+    expect(due.map((d) => d.studentId)).toEqual(["omar"]);
+    expect(due[0].daysLeft).toBe(3);
+    expect(due[0].endsOn).toBe("2026-09-26");
+  });
+
+  it("warns again on the day it runs out", () => {
+    expect(expiringAccess(grants, ["omar"], "2026-09-26").map((d) => d.daysLeft)).toEqual([0]);
+  });
+
+  it("stays quiet on every other night, so the warning is still read when it comes", () => {
+    for (const day of ["2026-09-20", "2026-09-21", "2026-09-22", "2026-09-24", "2026-09-25"]) {
+      expect(expiringAccess(grants, ["omar"], day)).toEqual([]);
+    }
+  });
+
+  it("says nothing about a child who never had access, or whose access already lapsed", () => {
+    expect(expiringAccess(grants, ["nobody"], "2026-09-23")).toEqual([]);
+    expect(expiringAccess(grants, ["omar"], "2026-09-28")).toEqual([]);
+  });
+
+  it("counts a whole-family grant as covering every child", () => {
+    const family = [g(null, "2026-09-01", "2026-09-26")];
+    expect(expiringAccess(family, ["omar", "youssef"], "2026-09-23").map((d) => d.studentId)).toEqual(["omar", "youssef"]);
   });
 });

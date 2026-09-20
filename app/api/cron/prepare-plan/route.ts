@@ -12,6 +12,7 @@ import { retryFailedMaterials } from "@/lib/actions/materials";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
 import { releaseStuckVisuals, warmLessonScripts } from "@/lib/teach/warm";
+import { warnAboutExpiringAccess } from "@/lib/access/expiry";
 import { buildMonthlyRevisions } from "@/lib/revision/run";
 import { todayIn } from "@/lib/dates";
 
@@ -28,6 +29,9 @@ type Admin = ReturnType<typeof createAdminClient>;
  * opens it at once instead of waiting a minute for the AI.
  */
 async function prepareTeacherLessons(admin: Admin, started: number, results: Record<string, string[]>): Promise<void> {
+  // Before anything else: tell a parent whose month is about to end, while there is still time to renew.
+  const warned = await warnAboutExpiringAccess();
+  if (warned.length) results.access = warned;
   try {
     const n = await releaseStuckVisuals();
     if (n) results.visuals = [`released ${n} stuck`];

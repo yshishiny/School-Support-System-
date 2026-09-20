@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
-import { defaultLevel } from "@/lib/entitlement";
+import { deepUnlocked } from "@/lib/entitlement";
+import type { Level } from "@/lib/levels";
 import { failed, report } from "@/lib/ops/fault";
 import { presenterGenders, renderScript, videoEnabled, videoVoice } from "@/lib/video";
 import { requireStudent } from "@/lib/auth";
@@ -37,8 +38,15 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
   let language: "en" | "ar" = "en";
   let topic: Topic | null = null;
   let material: { id: string; title: string; subject: string | null; digest: string | null; language: string | null } | null = null;
-  // The teacher performs at the depth this child is entitled to; the two are cached and fetched separately.
-  const level = await defaultLevel(profile.id, family.id);
+  // The teacher is what a family pays for, so the refusal lives here and not only on the page: a stale tab, a
+  // bookmarked link or a second window must all meet the same answer. It is a refusal, not a fault — nothing
+  // broke, and the written lessons under Learn are still open to him.
+  const unlocked = await deepUnlocked(profile.id, family.id);
+  if (!unlocked) {
+    return { error: "Your time with the teacher has finished. Ask your dad to renew it — the written lessons are still open under Learn." };
+  }
+  // He is entitled to the deep performance; the two depths are cached and fetched separately.
+  const level: Level = "advanced";
   if (source.topicId) {
     const { data } = await admin.from("topics").select("*").eq("id", source.topicId).maybeSingle();
     topic = data as Topic | null;

@@ -152,3 +152,38 @@ export function inviteCode(random: () => number = Math.random): string {
   const alphabet = "ACDEFHJKMNPRTVWXY3479";
   return Array.from({ length: 6 }, () => alphabet[Math.floor(random() * alphabet.length)]).join("");
 }
+
+/** How many days from `day` until access runs out; negative once it already has. Null when there is none at all. */
+export function daysOfAccessLeft(grants: AccessGrant[], studentId: string, day: string): number | null {
+  const until = accessUntil(grants, studentId, day);
+  if (!until) return null;
+  return Math.round((Date.parse(`${until}T00:00:00Z`) - Date.parse(`${day}T00:00:00Z`)) / 86_400_000);
+}
+
+/** A child whose access is about to run out, or has just run out, with the day it ends. */
+export interface ExpiringAccess {
+  studentId: string;
+  endsOn: string;
+  daysLeft: number;
+}
+
+/**
+ * Who to warn about, and when.
+ *
+ * A month that ends without a word is how a paying family becomes a former one, so the warning goes out while
+ * there is still time to act — three days before — and once more on the day it lapses. Only those two moments:
+ * a reminder that arrives every night is one nobody reads.
+ */
+export const WARN_DAYS_BEFORE = 3;
+
+export function expiringAccess(grants: AccessGrant[], studentIds: string[], day: string): ExpiringAccess[] {
+  const out: ExpiringAccess[] = [];
+  for (const studentId of studentIds) {
+    const left = daysOfAccessLeft(grants, studentId, day);
+    if (left === null) continue;
+    if (left === WARN_DAYS_BEFORE || left === 0) {
+      out.push({ studentId, endsOn: accessUntil(grants, studentId, day)!, daysLeft: left });
+    }
+  }
+  return out;
+}

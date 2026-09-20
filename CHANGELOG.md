@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.3 — The teacher is actually gated, and you are warned before it lapses (20 September 2026, `v2` branch)
+
+- **The teacher was free.** The page showed an upgrade card, but nothing stopped a child starting a full lesson without access — a nudge, not a gate. Starting a lesson is now refused on the server, so a stale tab, a bookmarked link and a second window all meet the same answer.
+- **The refusal is a closed door, not a broken one.** "Your time with the teacher has finished. Ask your dad to renew it — the written lessons are still open under Learn." A child whose access has lapsed sees one clear card with a way through to his lessons, rather than a page of buttons that refuse when tapped. Nothing he has done is lost.
+- **You are told before it runs out**, twice and only twice: three days before, while there is still time to renew, and on the day itself. The message names the children, the date, and what another month costs, and links to Teacher access. Which warning has been sent is recorded on the grant, so a nightly job can never turn it into noise nobody reads.
+- Omar and Youssef keep the teacher until 26 September; they will be warned on the 23rd and again on the 26th.
+
 ## 2.1.0-beta.2 — The teacher performs at both depths (20 September 2026, `v2` branch)
 
 - **The teacher now teaches at the level the child is entitled to**, not one lesson for everybody. At the plain depth he states the rule, works it twice with every step spoken, names the mistake most students make, and stops — six to eight beats. At the deep one he says *why* the rule is true, gives the case where it fails, connects it to what it is built on and what comes next year, works an example of several linked steps, and names the trap an exam sets on that topic — ten to twelve beats, with checks that need two ideas held at once.
