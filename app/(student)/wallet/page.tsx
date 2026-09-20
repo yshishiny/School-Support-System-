@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { prettyDate, todayIn } from "@/lib/dates";
-import { loadWallet } from "@/lib/actions/wallet";
+import { loadWallet } from "@/lib/wallet/ledger";
 import { balances, budgetSplit, categoryLabel, claimTotals, claimable, monthSummary, statementDesc } from "@/lib/wallet";
 import { ClaimForm, SpendForm } from "@/components/WalletForms";
 import { Tabs } from "@/components/Tabs";

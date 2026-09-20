@@ -6,6 +6,7 @@ import { requireParent, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
 import { CLAIM_PURPOSES, SPEND_CATEGORIES, claimable, type WalletEntry } from "@/lib/wallet";
+import { creditWallet } from "@/lib/wallet/ledger";
 
 const PATHS = ["/wallet", "/allowance", "/me", "/parent", "/parent/allowance"];
 
@@ -15,43 +16,23 @@ function money(raw: FormDataEntryValue | null): number | null {
   return Math.round(n * 100) / 100;
 }
 
-/** Everything in a child's wallet, oldest first, for the balances and the history. */
-export async function loadWallet(studentId: string): Promise<WalletEntry[]> {
+/**
+ * The child this form names, if he is actually one of yours.
+ *
+ * `requireParent()` says the caller is a parent; it says nothing about whose child the id in the form belongs to.
+ * These actions write with the service-role key, so without this the id was simply believed.
+ */
+async function ownChild(familyId: string, studentId: string): Promise<boolean> {
+  if (!studentId) return false;
   const admin = createAdminClient();
   const { data } = await admin
-    .from("wallet_entries")
-    .select("id, kind, amount_egp, label, category, occurred_on, note, claim_status, claim_purpose, claim_reason, asked_permission, claim_note")
-    .eq("student_id", studentId)
-    .order("occurred_on")
-    .order("created_at");
-  return ((data ?? []) as WalletEntry[]).map((e) => ({ ...e, amount_egp: Number(e.amount_egp) }));
-}
-
-/**
- * Money earned, credited once. `ref` keeps it that way: a paid allowance week or a cash reward can be recorded
- * twice by two taps and still add up only once.
- */
-export async function creditWallet(o: { studentId: string; familyId: string; amount: number; label: string; on: string; refType: string; refId: string; by?: string | null }): Promise<void> {
-  if (!(o.amount > 0)) return;
-  const admin = createAdminClient();
-  await admin
-    .from("wallet_entries")
-    .upsert(
-      { student_id: o.studentId, family_id: o.familyId, kind: "earn", amount_egp: o.amount, label: o.label.slice(0, 80), occurred_on: o.on, ref_type: o.refType, ref_id: o.refId, created_by: o.by ?? null },
-      { onConflict: "student_id,ref_type,ref_id", ignoreDuplicates: true },
-    );
-}
-
-/** A hand-over recorded once, keyed to what caused it, so marking a week paid twice cannot take the money twice. */
-export async function withdrawFromWallet(o: { studentId: string; familyId: string; amount: number; label: string; on: string; refType: string; refId: string; by?: string | null }): Promise<void> {
-  if (!(o.amount > 0)) return;
-  const admin = createAdminClient();
-  await admin
-    .from("wallet_entries")
-    .upsert(
-      { student_id: o.studentId, family_id: o.familyId, kind: "withdraw", amount_egp: o.amount, label: o.label.slice(0, 80), occurred_on: o.on, ref_type: o.refType, ref_id: o.refId, created_by: o.by ?? null },
-      { onConflict: "student_id,ref_type,ref_id", ignoreDuplicates: true },
-    );
+    .from("profiles")
+    .select("id")
+    .eq("id", studentId)
+    .eq("family_id", familyId)
+    .eq("role", "student")
+    .maybeSingle();
+  return !!data;
 }
 
 /** The father hands cash over: it leaves the held balance and becomes money in the child's pocket. */
@@ -60,6 +41,7 @@ export async function handOverAction(formData: FormData): Promise<{ error?: stri
   const studentId = String(formData.get("student_id") ?? "");
   const amount = money(formData.get("amount"));
   if (!studentId || !amount) return { error: "Say how much was handed over." };
+  if (!(await ownChild(family.id, studentId))) return { error: "That is not one of your children." };
   const on = String(formData.get("on") ?? "") || todayIn(family.timezone);
   const admin = createAdminClient();
   const { error } = await admin.from("wallet_entries").insert({
@@ -84,6 +66,7 @@ export async function adjustWalletAction(formData: FormData): Promise<{ error?: 
   const studentId = String(formData.get("student_id") ?? "");
   const amount = money(formData.get("amount"));
   if (!studentId || !amount) return { error: "Say how much." };
+  if (!(await ownChild(family.id, studentId))) return { error: "That is not one of your children." };
   const admin = createAdminClient();
   const { error } = await admin.from("wallet_entries").insert({
     student_id: studentId,
@@ -163,7 +146,7 @@ export async function decideClaimAction(formData: FormData): Promise<{ error?: s
   if (!row || row.claim_status !== "requested") return { error: "Nothing to decide on that one." };
   await admin.from("wallet_entries").update({ claim_status: decision, claim_note: note, claim_decided_by: profile.id, claim_decided_at: new Date().toISOString() }).eq("id", id);
   if (decision === "approved") {
-    await creditWallet({
+    const paid = await creditWallet({
       studentId: row.student_id as string,
       familyId: family.id,
       amount: Number(row.amount_egp),
@@ -173,6 +156,8 @@ export async function decideClaimAction(formData: FormData): Promise<{ error?: s
       refId: row.id as string,
       by: profile.id,
     });
+    // Approving it and failing to pay it back is the one outcome nobody must be told is fine.
+    if (!paid.ok) return { error: `Approved, but the money did not reach his wallet. Reference ${paid.ref}.` };
   }
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: decision === "approved" ? `${Number(row.amount_egp)} EGP put back.` : "Turned down." };

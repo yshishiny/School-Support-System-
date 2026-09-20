@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0-beta.5 — The wallet actually records the money (20 September 2026, `v2` branch)
+
+- **Nothing the app earned had ever reached a wallet.** The index that makes a credit happen once was partial (`where ref_id is not null`), and Postgres will not infer an arbiter from a partial index unless the statement repeats its predicate — which PostgREST's upsert does not. Every write raised 42P10 and the error was thrown away, so a closed allowance week, a cash reward and an approved expense claim all reported success and wrote nothing. Confirmed against the live database, and confirmed fixed there: the same statement is now accepted, a second write of the same thing is still ignored, and hand-entered lines with no reference still never collide.
+- **No money was lost.** No week had been marked paid, no cash reward redeemed and no claim approved since the wallet shipped, and the three closed weeks already in the ledger were put there by the migration that created it. The bug cost nothing; it was simply waiting to.
+- **A failed write is no longer silent.** It is recorded under its own reference with the child, the amount and what caused it, and a parent approving a repayment that does not land is told so with that reference instead of being told the money went back.
+- **Marking a week paid is both halves or neither.** It used to credit the earning and then record the hand-over regardless; if the first failed the second would have shown a child owing money he was in fact owed.
+- **Three wallet functions were public endpoints.** `loadWallet`, `creditWallet` and `withdrawFromWallet` were exported from a `"use server"` module, which makes each one callable, and all three took a child and a family from whoever called and wrote with the service-role key. They are ordinary server helpers and now live in `lib/wallet/ledger.ts`, where they are reachable only from code that has already established who is asking.
+- **A parent could name any child.** Recording a hand-over or an adjustment trusted the id on the form; both now check the child is one of yours.
+
 ## 2.1.0-beta.4 — Five in the hand, and colour that means something (20 September 2026, `v2` branch)
 
 - **The kids' bottom bar carried eleven places.** On a 390-point phone that is 35 points a target against the 44 a thumb needs, and the labels had already been shrunk to 10px to make them fit. It is now five — Today, Learn, Snaps, Allowance, Me — at 78 points each, with the label back to a size a nine-year-old reads.
