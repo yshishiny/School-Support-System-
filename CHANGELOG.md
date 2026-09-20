@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.3.0 — The curriculum has a door, and no lesson reaches a child unchecked (20 September 2026)
+
+- **A parent chooses the curriculum, and the app follows it.** Kids → a child → Profile now asks which system, which year, and — only for the years that have one — which stream. From then on Learn shows the subjects and the whole year's topics from the curriculum instead of subject names typed into a box. Omar and Youssef are on the American curriculum: 7 subjects and 88 topics for grade 8, 5 subjects and 113 for grade 10.
+- The picker refuses what the curriculum refuses: a streamed year with no stream chosen, or a stream that year does not offer. A child studying nothing looks exactly like a broken page, so it is never allowed to happen quietly.
+- **Every lesson is now checked before it is stored.** The writer writes the lesson, the discernment pass runs, and it is stored only if it passes. A lesson that fails a blocking check is *not written to the cache at all* — so it is never served, and tomorrow's attempt writes a fresh one rather than serving the bad one forever.
+- **The checks split by what can actually settle them.** Language, whether the lesson names its own topic, and whether it contains worked steps are decided mechanically — free and instant. Whether a fact is invented and whether a grade 8 child could follow it go to a second model, told to mark its own side's work strictly and to answer false when unsure.
+- **An unreachable judge holds the lesson.** If the review call throws or comes back unparseable, the checks stay unanswered, and an unanswered check already counts as failed. Nothing is released by silence.
+- The overnight job no longer counts a held topic as prepared, so it comes back to it tomorrow instead of leaving a gap nobody sees.
+
 ## 2.2.0 — Two curricula, and the discipline the teacher works under (20 September 2026)
 
 - **The curriculum knew about two grades.** `topics` held 190 rows covering grade 8 and grade 10 — Omar's and Youssef's — and had no idea a curriculum existed. It now holds **1,438 topics across 85 subject-years**: the American curriculum from grade 6 to 12, and the Egyptian national curriculum through prep and secondary.

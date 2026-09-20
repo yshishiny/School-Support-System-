@@ -7,6 +7,8 @@ import { prettyDate, todayIn } from "@/lib/dates";
 import { SideTabs } from "@/components/SideTabs";
 import { Tabs } from "@/components/Tabs";
 import { ChildProfileForm } from "@/components/ChildProfileForm";
+import { CurriculumPicker } from "@/components/CurriculumPicker";
+import { levelsOf, listCurricula, type Level } from "@/lib/curriculum";
 import { ageOn, daysToBirthday } from "@/lib/people";
 import { signHeroUrls } from "@/lib/hero";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -34,6 +36,11 @@ export default async function ChildrenPage() {
     admin.auth.admin.listUsers({ perPage: 200 }),
   ]);
   const avatarUrls = await signHeroUrls((heroRows ?? []) as { id: string; path: string }[]);
+  // The catalogue is the same for every child on the page, so it is read once.
+  const curricula = await listCurricula();
+  const levelsByCurriculum: Record<string, Level[]> = Object.fromEntries(
+    await Promise.all(curricula.map(async (c) => [c.id, await levelsOf(c.id)] as const)),
+  );
   const usernameOf = (id: string) => (authUsers?.users ?? []).find((u) => u.id === id)?.email?.split("@")[0] ?? null;
   const COLORS = ["#3a86ff", "#ff6b6b", "#2ec4b6", "#ffbe0b", "#8338ec", "#fb5607"];
 
@@ -123,6 +130,18 @@ export default async function ChildrenPage() {
                 <HeroUploader familyId={family.id} studentId={s.id} />
               </div>
             );
+            const curriculumTab = (
+              <CurriculumPicker
+                studentId={s.id}
+                curricula={curricula}
+                levelsByCurriculum={levelsByCurriculum}
+                current={{
+                  curriculumId: (s as Profile & { curriculum_id?: string | null }).curriculum_id ?? null,
+                  grade: s.grade ?? null,
+                  stream: (s as Profile & { stream?: string | null }).stream ?? null,
+                }}
+              />
+            );
             const styleTab = (
               <form action={setChildHomeLayoutAction} className="card flex items-center gap-2 text-sm">
                 <input type="hidden" name="student_id" value={s.id} />
@@ -147,7 +166,7 @@ export default async function ChildrenPage() {
                   storageKey={`kid-${s.id}`}
                   size="sm"
                   tabs={[
-                    { id: "profile", label: "Profile", emoji: "🪪", content: profileTab },
+                    { id: "profile", label: "Profile", emoji: "🪪", content: <>{curriculumTab}{profileTab}</> },
                     { id: "subjects", label: "Subjects", emoji: "📚", badge: subs.length || null, content: subjectsTab },
                     { id: "timetable", label: "Timetable", emoji: "🗓️", badge: tt.length || null, content: timetableTab },
                     { id: "pictures", label: "Pictures", emoji: "🖼️", content: picturesTab },
