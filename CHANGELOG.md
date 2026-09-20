@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.1 — Five in the hand, and colour that means something (20 September 2026)
+
+- **The kids' bottom bar carried ten places.** On a 390-point phone that is 39 points a target against the 44 a thumb needs, and the labels had already been shrunk to 10px to make them fit. It is now five — Today, Learn, Snaps, Allowance, Me — at 78 points each, with the label back to a size a nine-year-old reads.
+- **Nothing was taken away.** The Coach now sits at the top of Learn, Wallet and Rewards at the top of Allowance, and the Planner on Me — each a full-width row with a real label and a line saying what is through the door, instead of a ten-pixel word. The Snaps page already carried the rater's Check that way. Deep inside any of them, the primary it belongs to still lights up.
+- **The parent menu carried fifteen unrelated colours**, one per section — two cyans, three oranges, two teals, a magenta — and nothing anywhere said what any of them meant. Colour that identifies everything identifies nothing, and left the accent with no voice on the day something genuinely needed attention. Identity now rests on the icon and the group; the accent marks the page you are on, and what is waiting.
+- **The More tab could never light up.** Its test required the path to start with `/parent`, which every parent page does, so the first four always answered first — Reports, Guide, Progress and nine others showed no tab at all. More is now simply every page the other four do not own.
+- The design philosophy behind all of this, and three plates drawing it, are in `design/`.
+
 ## 2.1.0 — Every lesson at two depths (20 September 2026)
 
 - **The same topic, taught shallow or deep.** A child who missed the class needs the rule, one worked example, and enough to attempt tonight's homework. A child who already has that needs why the rule is true, where it breaks, and questions that do not come apart in one step. Teaching both to the same page fails one of them, so every topic now has two lessons: **The basics** and **Go deeper**.

@@ -60,7 +60,7 @@ export default async function SettingsPage() {
       <h1 className="h1">More</h1>
       <div className="grid grid-cols-3 gap-2 sm:hidden">
         {PARENT_SECTIONS.filter((i) => !["/parent", "/parent/settings", "/parent/notifications"].includes(i.href)).map((i) => (
-          <Link key={i.href} href={i.href} className="tile !p-2.5 text-center min-w-0" style={{ borderColor: `${i.color}66`, background: `${i.color}14` }}>
+          <Link key={i.href} href={i.href} className="tile !p-2.5 text-center min-w-0">
             <div className="text-2xl">{i.emoji}</div>
             <div className="text-xs font-bold mt-0.5 truncate" style={{ fontFamily: "var(--font-display)" }}>{i.label}</div>
           </Link>

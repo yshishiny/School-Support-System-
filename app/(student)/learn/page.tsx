@@ -11,6 +11,7 @@ import { fileEmoji } from "@/lib/materials/files";
 import { materialStages, nextStage } from "@/lib/materials/study";
 import { loadRevisions } from "@/lib/revision/run";
 import { Tabs } from "@/components/Tabs";
+import { Seated } from "@/components/Seated";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
@@ -297,6 +298,11 @@ export default async function LearnPage() {
   return (
     <main className="space-y-4">
       <h1 className="h1">Learn</h1>
+      <Seated
+        links={[
+          { href: "/coach", label: "Coach", emoji: "\u{1F9B8}", note: "Practice, habits and your next step" },
+        ]}
+      />
       <Tabs
         storageKey="learn"
         tabs={[
