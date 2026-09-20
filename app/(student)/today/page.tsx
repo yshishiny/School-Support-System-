@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
+import { TurnOnReminders } from "@/components/TurnOnReminders";
 import { createClient } from "@/lib/supabase/server";
 import { todayIn, shiftDate, weekdayOf, hourIn } from "@/lib/dates";
 import { formatInTimeZone } from "date-fns-tz";
@@ -211,8 +212,11 @@ export default async function TodayPage() {
       <span className="btn-primary btn-sm shrink-0">Snap</span>
     </Link>
   );
+  // The ask goes here and nowhere else: Today is the only page a child opens without being sent to it, and the
+  // browser will offer the permission prompt once per install. It hides itself when there is nothing to offer.
+  const remind = <TurnOnReminders firstName={profile.full_name.split(" ")[0]} />;
   const layout = profile.home_layout ?? "b";
-  if (layout === "a") return <>{morningCard}{snapBanner}<LayoutA d={d} /></>;
-  if (layout === "c") return <>{morningCard}{snapBanner}<LayoutC d={d} /></>;
-  return <>{morningCard}{snapBanner}<LayoutB d={d} /></>;
+  if (layout === "a") return <>{morningCard}{snapBanner}{remind}<LayoutA d={d} /></>;
+  if (layout === "c") return <>{morningCard}{snapBanner}{remind}<LayoutC d={d} /></>;
+  return <>{morningCard}{snapBanner}{remind}<LayoutB d={d} /></>;
 }
