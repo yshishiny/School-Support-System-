@@ -90,12 +90,6 @@ export async function removeParentAction(parentId: string): Promise<void> {
   PATHS.forEach((p) => revalidatePath(p));
 }
 
-/** Convenience for the home page: today's date in the family's zone. */
-export async function familyToday(): Promise<string> {
-  const { family } = await requireParent();
-  return todayIn(family.timezone);
-}
-
 /** Inbox: mark one or every notification read. */
 export async function markNotificationsReadAction(id: string | null): Promise<void> {
   const { profile } = await requireParent();

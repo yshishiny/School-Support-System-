@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { startReviewAttempt } from "@/lib/actions/learning";
+import { startReviewAttempt } from "@/lib/learning/attempts";
 import { QuizRunner } from "@/components/QuizRunner";
 
 export default async function ReviewPage() {

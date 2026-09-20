@@ -9,7 +9,7 @@ import { logAccess } from "@/lib/access/log";
 const CHILD_DOMAIN = process.env.CHILD_LOGIN_DOMAIN ?? "study.local";
 
 /** Children log in with a username; we turn it into their internal email. */
-export async function normalizeLogin(input: string): Promise<string> {
+async function normalizeLogin(input: string): Promise<string> {
   const v = input.trim().toLowerCase();
   return v.includes("@") ? v : `${v}@${CHILD_DOMAIN}`;
 }

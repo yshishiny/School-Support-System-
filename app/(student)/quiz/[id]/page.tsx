@@ -5,7 +5,7 @@ import { secondsPerQuestion } from "@/lib/exams";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { QuizRunner } from "@/components/QuizRunner";
 import { NotTakenButton } from "@/components/NotTakenButton";
-import { ensureAttempt } from "@/lib/actions/learning";
+import { ensureAttempt } from "@/lib/learning/attempts";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { Quiz, QuizQuestion } from "@/lib/types";
 

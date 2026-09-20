@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.3 — Nothing in the action modules is an endpoint by accident (20 September 2026)
+
+- **Nine functions were public endpoints.** Next gives every export of a `"use server"` module an id and a route, so a helper that merely lived in an action file was reachable by anyone who could post to it — no page, no button, no sign-in.
+- `fullWeekStreak`, `retryFailedMaterials` and `schedulerStatus` were the plain cases: any child's allowance history, a free "re-run the AI reader over every failed upload", and the state of the nightly job, all read with the service-role key and no check on who was asking. They are now ordinary helpers in `lib/rewards/streak.ts`, `lib/materials/retry.ts` and `lib/ops/scheduler.ts`, reachable only from code that has already established identity. `ensureAttempt` and `startReviewAttempt` did check the child and only ever touched his own rows, but were never meant to be callable either, and have moved to `lib/learning/attempts.ts`.
+- **Two were reachable but dead.** `familyToday` and `snapTemplates` had no caller anywhere; they are gone rather than hidden.
+- `normalizeLogin` and `availablePoints` are used only inside their own module, so they are simply no longer exported.
+- **A test now holds the line.** Every `"use server"` module in `lib/actions` is checked to export nothing but functions whose names end in `Action`, on every run. A helper that drifts back into an action file fails the build instead of quietly going live.
+
 ## 2.1.2 — The wallet actually records the money (20 September 2026)
 
 - **Nothing the app earned had ever reached a wallet.** The index that makes a credit happen once was partial (`where ref_id is not null`), and Postgres will not infer an arbiter from a partial index unless the statement repeats its predicate — which PostgREST's upsert does not. Every write raised 42P10 and the error was thrown away, so a closed allowance week, a cash reward and an approved expense claim all reported success and wrote nothing. Confirmed against the live database, and confirmed fixed there: the same statement is now accepted, a second write of the same thing is still ignored, and hand-entered lines with no reference still never collide.

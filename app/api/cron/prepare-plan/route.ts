@@ -8,7 +8,7 @@ import { closeAllowanceWeek } from "@/lib/allowance/week";
 import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
 import { loadSnapTasks, pruneOldSnaps } from "@/lib/snaps/server";
-import { retryFailedMaterials } from "@/lib/actions/materials";
+import { retryFailedMaterials } from "@/lib/materials/retry";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
 import { buildMonthlyRevisions } from "@/lib/revision/run";
