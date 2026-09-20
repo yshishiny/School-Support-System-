@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0-beta.12 — The app can listen (20 September 2026, `v2` branch)
+
+- **The teacher talked and nothing listened.** Azure reads lessons aloud in Egyptian Arabic, and there was no speech *input* anywhere in the codebase. `memorize_items` has never held a single row, and this is why: the feature asked a child to hide the text and mark himself, which is the one thing a child memorising cannot do — **he cannot hear his own mistake.**
+- **Recite it, and the words come back coloured.** Tap once, recite, tap stop. Every word is marked: correct, missed, or something said that is not in the text. Plus a score, and one sentence about it — never a list of everything he got wrong.
+- **The marking is aligned, not compared position by position.** A child who drops one word has missed one word; he has not got every word after it wrong. Turning the rest of an ayah red over a single slip is exactly what stops a child practising.
+- **A transcriber's spelling never fails a correct reciter.** Both sides are folded to their consonantal skeleton first — vowel marks, the dagger alef of ٱلرَّحْمَٰن, ٱ against ا, ى against ي, ة against ه. He is shown his own مصحف spelling; only the comparison uses the folded form. A child told he is wrong when he is right stops trusting the thing that told him.
+- **No new vendor.** The same Azure Speech key that already does the voices does the transcription, via the fast endpoint, because it accepts what a phone actually records — Chrome gives webm/opus, Safari gives mp4.
+- **His voice is never stored.** The audio is transcribed, marked, and dropped. What is kept is the score and which words slipped.
+- When the recogniser was unsure, it says so rather than hiding it: *a word marked wrong here may not have been.*
+
 ## 2.1.0-beta.11 — A reminder can finally reach a child (20 September 2026, `v2` branch)
 
 - **Not one child has ever received a notification.** There is a single push subscription in the whole database and it belongs to a parent. Omar and Youssef installed the app on 17 September and were never asked. The nudge job has run every hour for days — 16 to 24 times a day, reporting success every time — and sent nothing, because `sendDueNudges` filters to children who have a device or Telegram and correctly finds none. It was not broken. It had nobody to send to.
