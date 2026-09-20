@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.17.0 — No page a child has to scroll (20 September 2026)
+
+- **Me** was nine cards down a phone, so the grades sheet and the reminders were below everything. It opens on who you are and how you learn; *Me* (pictures, theme, layout, interests), *Progress* (the fortnight, grades sheet, how points work), *Family* (rate your siblings, their snaps to check) and *More* (reminders, install, the tour, sign out) are tabs.
+- **Allowance** was eight cards. The money, the band you are in and why is all that stays on screen; *Get it all*, *Catch up*, *Extra* and *Weeks* are tabs. Links that used to point at a section buried down the page now open the right tab.
+- **Snaps** put the handwriting corner below everything, where it was never reached. What is open to snap now, and the week so far, stay on screen; *Today* and *Handwriting* are tabs.
+- **Parent → Progress** already had one tab per child, but each child was eleven blocks in one card. Inside each: *How he is*, *School*, *Coach*, *Setup*.
+- **The planner is no longer empty.** It only ever showed homework somebody had typed in, which is why a week with none looked blank. It now reads the timetable and the quizzes already booked: the next two weeks as a strip of days you tap, with the classes, the quizzes and anything due on each. Tapping "classes this week", "quizzes booked" or "things due" narrows the fortnight to that one thing.
+- Every tab remembers where you were, so coming back to a page puts you where you left it.
+
 ## 1.16.0 — Every failure says where it happened (20 September 2026)
 
 - **A child can now report a fault.** Anything that genuinely breaks hands back a plain sentence and a six-character reference: *“That is already saved. (ref k3f9a2)”*. The same reference sits on the log row beside the exact function it happened in, so “it said k3f9a2” finds one row instead of a haystack. The characters avoid everything misread aloud — no 0, O, 1, l or i.

@@ -1,78 +1,111 @@
+import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
-import { todayIn, shiftDate, prettyDate, relativeLabel } from "@/lib/dates";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { todayIn, shiftDate, prettyDate, relativeLabel, weekdayOf } from "@/lib/dates";
 import { setAssignmentStatusAction } from "@/lib/actions/assignments";
 import { KIND_EMOJI, type Assignment } from "@/lib/types";
+import { PlannerDays, type PlannerDay } from "@/components/PlannerDays";
 
+const DAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+/**
+ * The planner: the next two weeks as days, each carrying what the school day actually holds — the classes from the
+ * timetable, the quizzes already planned for that date, and anything due. It used to show only homework somebody
+ * had typed in, which is why it looked empty on a week with none.
+ */
 export default async function CalendarPage() {
   const { profile, family } = await requireStudent();
   const supabase = await createClient();
+  const admin = createAdminClient();
   const today = todayIn(family.timezone);
-  const { data } = await supabase
-    .from("assignments")
-    .select("*")
-    .eq("student_id", profile.id)
-    .gte("created_at", shiftDate(today, -60))
-    .order("due_date", { ascending: true, nullsFirst: false });
-  const all = (data ?? []) as Assignment[];
-  const open = all.filter((a) => a.status === "open");
-  const done = all.filter((a) => a.status === "done").slice(-15).reverse();
+  const horizon = shiftDate(today, 13);
 
-  const groups: { title: string; items: Assignment[] }[] = [
-    { title: "⏰ Overdue", items: open.filter((a) => a.due_date && a.due_date < today) },
-    { title: "🔥 Today", items: open.filter((a) => a.due_date === today) },
-    { title: "➡️ Tomorrow", items: open.filter((a) => a.due_date === shiftDate(today, 1)) },
-    { title: "🗓️ This week", items: open.filter((a) => a.due_date && a.due_date > shiftDate(today, 1) && a.due_date <= shiftDate(today, 7)) },
-    { title: "🔭 Later", items: open.filter((a) => a.due_date && a.due_date > shiftDate(today, 7)) },
-    { title: "📌 No date", items: open.filter((a) => !a.due_date) },
-  ].filter((g) => g.items.length);
+  const [{ data: aRows }, { data: ttRows }, { data: qRows }, { data: offRows }] = await Promise.all([
+    supabase.from("assignments").select("*").eq("student_id", profile.id).gte("created_at", shiftDate(today, -60)).order("due_date", { ascending: true, nullsFirst: false }),
+    admin.from("timetable_entries").select("weekday, subject_name, start_time, room").eq("student_id", profile.id).order("start_time"),
+    admin.from("quizzes").select("id, title, scheduled_for, attempts(submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", today).lte("scheduled_for", horizon),
+    admin.from("school_days_off").select("day").eq("family_id", family.id).gte("day", today).lte("day", horizon),
+  ]);
+
+  const all = (aRows ?? []) as Assignment[];
+  const open = all.filter((a) => a.status === "open");
+  const timetable = (ttRows ?? []) as { weekday: number; subject_name: string; start_time: string; room: string | null }[];
+  const quizzes = (qRows ?? []) as { id: string; title: string; scheduled_for: string; attempts: { submitted_at: string | null }[] }[];
+  const daysOff = new Set((offRows ?? []).map((d) => d.day as string));
+
+  const days: PlannerDay[] = [];
+  for (let k = 0; k < 14; k += 1) {
+    const date = shiftDate(today, k);
+    const wd = weekdayOf(date);
+    days.push({
+      date,
+      label: k === 0 ? "Today" : k === 1 ? "Tomorrow" : prettyDate(date),
+      short: DAY_SHORT[wd],
+      isToday: k === 0,
+      classes: daysOff.has(date) ? [] : timetable.filter((t) => t.weekday === wd).map((t) => ({ subject: t.subject_name, start: t.start_time.slice(0, 5), room: t.room })),
+      quizzes: quizzes.filter((q) => q.scheduled_for === date).map((q) => ({ id: q.id, title: q.title, done: q.attempts.some((a) => a.submitted_at) })),
+      due: open.filter((a) => a.due_date === date).map((a) => ({ id: a.id, title: a.title, kind: a.kind, subject: a.subject_name, emoji: KIND_EMOJI[a.kind] })),
+    });
+  }
+
+  const overdue = open.filter((a) => a.due_date && a.due_date < today);
+  const noDate = open.filter((a) => !a.due_date);
+  const later = open.filter((a) => a.due_date && a.due_date > horizon);
 
   return (
-    <main className="space-y-4">
-      <h1 className="h1">Planner</h1>
-      {groups.length === 0 && <p className="card muted">Nothing open. Enjoy it, or add what the teacher gave you from the Today page.</p>}
-      {groups.map((g) => (
-        <section key={g.title} className="card">
-          <h2 className="h2 mb-2">{g.title}</h2>
+    <main className="space-y-3">
+      <header className="flex items-center gap-3">
+        <span className="text-3xl">🗓️</span>
+        <div className="flex-1 min-w-0">
+          <h1 className="h1">Planner</h1>
+          <p className="text-xs muted">The next two weeks: your classes, the quizzes already booked and everything due.</p>
+        </div>
+        <Link href="/today" className="btn-ghost btn-sm">Today</Link>
+      </header>
+
+      {overdue.length > 0 && (
+        <section className="card !py-3 border-2 border-bad/60">
+          <h2 className="h2 mb-1">⏰ Late · {overdue.length}</h2>
           <ul className="divide-y divide-line">
-            {g.items.map((a) => (
-              <li key={a.id} className="py-2 flex items-start gap-3">
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium">{KIND_EMOJI[a.kind]} {a.title}</div>
-                  <div className="text-xs muted">
-                    {a.subject_name ? `${a.subject_name} · ` : ""}{a.due_date ? `${prettyDate(a.due_date)} · ${relativeLabel(a.due_date, today)}` : "no date"}
-                    {a.source === "whatsapp" ? " · from class group" : ""}
-                  </div>
-                  {a.details && <div className="text-xs muted mt-1 whitespace-pre-line">{a.details}</div>}
-                </div>
-                {(a.kind === "homework" || a.kind === "project") && (
-                  <form action={setAssignmentStatusAction}>
-                    <input type="hidden" name="id" value={a.id} />
-                    <input type="hidden" name="status" value="done" />
-                    <button className="btn-ghost btn-sm">Done ✓</button>
-                  </form>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-      ))}
-      {done.length > 0 && (
-        <section className="card">
-          <h2 className="h2 mb-2">✅ Recently done</h2>
-          <ul className="text-sm space-y-1">
-            {done.map((a) => (
-              <li key={a.id} className="flex justify-between gap-2 muted">
-                <span className="line-through">{a.title}</span>
+            {overdue.map((a) => (
+              <li key={a.id} className="flex items-center gap-2 py-1.5 text-sm">
+                <span className="flex-1 min-w-0"><span className="font-semibold">{KIND_EMOJI[a.kind]} {a.title}</span><span className="muted"> · {relativeLabel(a.due_date, today)}</span></span>
                 <form action={setAssignmentStatusAction}>
                   <input type="hidden" name="id" value={a.id} />
-                  <input type="hidden" name="status" value="open" />
-                  <button className="text-xs underline">undo</button>
+                  <input type="hidden" name="status" value="done" />
+                  <button className="btn-ghost btn-sm min-h-9">Done ✓</button>
                 </form>
               </li>
             ))}
           </ul>
         </section>
+      )}
+
+      <PlannerDays days={days} />
+
+      {(noDate.length > 0 || later.length > 0) && (
+        <details className="card !py-3">
+          <summary className="cursor-pointer font-bold" style={{ fontFamily: "var(--font-display)" }}>📌 No date yet, and further ahead · {noDate.length + later.length}</summary>
+          <ul className="mt-2 divide-y divide-line text-sm">
+            {[...noDate, ...later].map((a) => (
+              <li key={a.id} className="flex items-center gap-2 py-1.5">
+                <span className="flex-1 min-w-0">{KIND_EMOJI[a.kind]} {a.title}{a.due_date ? <span className="muted"> · {prettyDate(a.due_date)}</span> : null}</span>
+                {(a.kind === "homework" || a.kind === "project") && (
+                  <form action={setAssignmentStatusAction}>
+                    <input type="hidden" name="id" value={a.id} />
+                    <input type="hidden" name="status" value="done" />
+                    <button className="btn-ghost btn-sm min-h-9">Done ✓</button>
+                  </form>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {timetable.length === 0 && (
+        <p className="card text-sm muted">No timetable yet, so the days are empty. A parent can add it under Children → timetable.</p>
       )}
     </main>
   );

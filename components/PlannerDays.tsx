@@ -1,0 +1,127 @@
+"use client";
+
+import { useState } from "react";
+
+/** One day of the planner, as the page builds it. */
+export interface PlannerDay {
+  date: string;
+  label: string;
+  short: string;
+  isToday: boolean;
+  classes: { subject: string; start: string; room: string | null }[];
+  quizzes: { id: string; title: string; done: boolean }[];
+  due: { id: string; title: string; kind: string; subject: string | null; emoji: string }[];
+}
+
+type Focus = "all" | "classes" | "quizzes" | "due";
+
+/**
+ * Two weeks as a strip of days you tap, so the whole plan fits on one screen instead of a page nobody scrolls.
+ * A day with nothing in it is still shown, greyed, because "no school today" is an answer too.
+ */
+export function PlannerDays({ days }: { days: PlannerDay[] }) {
+  const [pick, setPick] = useState(0);
+  const [only, setOnly] = useState<Focus>("all");
+  const d = days[pick] ?? days[0];
+  const count = (x: PlannerDay) => x.classes.length + x.quizzes.filter((q) => !q.done).length + x.due.length;
+  const week = days.slice(0, 7);
+  const totals = {
+    classes: week.reduce((s, x) => s + x.classes.length, 0),
+    quizzes: week.reduce((s, x) => s + x.quizzes.filter((q) => !q.done).length, 0),
+    due: week.reduce((s, x) => s + x.due.length, 0),
+  };
+  // Tapping a count narrows the week to that one thing; tapping it again gives the whole day back.
+  const toggle = (f: Focus) => setOnly((cur) => (cur === f ? "all" : f));
+  const show = { classes: only === "all" || only === "classes", quizzes: only === "all" || only === "quizzes", due: only === "all" || only === "due" };
+
+  return (
+    <section className="space-y-2">
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {([
+          { f: "classes" as const, label: "Classes this week", n: totals.classes, tone: "" },
+          { f: "quizzes" as const, label: "Quizzes booked", n: totals.quizzes, tone: "text-accent-2" },
+          { f: "due" as const, label: "Things due", n: totals.due, tone: totals.due ? "text-warn" : "" },
+        ]).map((t) => (
+          <button
+            key={t.f}
+            type="button"
+            onClick={() => toggle(t.f)}
+            aria-pressed={only === t.f}
+            className={`tile !p-2 transition ${only === t.f ? "!border-accent bg-accent/15" : ""}`}
+          >
+            <div className="text-[11px] muted">{t.label}</div>
+            <div className={`text-xl font-bold ${t.tone}`} style={{ fontFamily: "var(--font-display)" }}>{t.n}</div>
+          </button>
+        ))}
+      </div>
+      {only !== "all" && (
+        <button type="button" onClick={() => setOnly("all")} className="w-full text-center text-[11px] underline muted">
+          showing {only === "due" ? "what is due" : only} only · tap to see the whole day
+        </button>
+      )}
+      <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+        {days.map((x, k) => {
+          const n = count(x);
+          const on = k === pick;
+          return (
+            <button
+              key={x.date}
+              type="button"
+              onClick={() => setPick(k)}
+              className={`min-h-16 w-14 shrink-0 rounded-2xl border px-1 py-1.5 text-center transition ${on ? "border-accent bg-accent/20" : n ? "border-line bg-panel-2" : "border-line/60 bg-panel-2/40 opacity-60"}`}
+              aria-pressed={on}
+            >
+              <div className="text-[10px] font-bold uppercase tracking-wide">{x.short}</div>
+              <div className="text-lg font-bold leading-tight" style={{ fontFamily: "var(--font-display)" }}>{Number(x.date.slice(8, 10))}</div>
+              <div className="flex justify-center gap-0.5">
+                {x.due.length > 0 && <i className="h-1.5 w-1.5 rounded-full bg-warn" />}
+                {x.quizzes.some((q) => !q.done) && <i className="h-1.5 w-1.5 rounded-full bg-accent-2" />}
+                {x.classes.length > 0 && <i className="h-1.5 w-1.5 rounded-full bg-muted" />}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="card !py-3 space-y-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 className="h2">{d.label}</h2>
+          <span className="text-xs muted">{d.isToday ? "today" : d.date}</span>
+        </div>
+
+        {show.due && d.due.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-warn">Due</div>
+            {d.due.map((a) => <div key={a.id} className="text-sm">{a.emoji} {a.title}{a.subject ? <span className="muted"> · {a.subject}</span> : null}</div>)}
+          </div>
+        )}
+
+        {show.quizzes && d.quizzes.length > 0 && (
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-accent-2">Quiz booked</div>
+            {d.quizzes.map((q) => (
+              <a key={q.id} href={`/quiz/${q.id}`} className="block text-sm underline decoration-dotted">
+                {q.done ? "✅" : "⚡"} {q.title}
+              </a>
+            ))}
+          </div>
+        )}
+
+        {show.classes && d.classes.length > 0 ? (
+          <div className="space-y-1">
+            <div className="text-[11px] font-bold uppercase tracking-wider muted">Classes</div>
+            {d.classes.map((c, k) => (
+              <div key={`${c.subject}-${k}`} className="flex items-center gap-2 text-sm">
+                <span className="w-12 shrink-0 tabular-nums muted">{c.start}</span>
+                <span className="flex-1 min-w-0 truncate font-semibold">{c.subject}</span>
+                {c.room && <span className="text-xs muted">{c.room}</span>}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm muted">{show.classes ? "No classes on this day." : only === "due" ? (d.due.length ? "" : "Nothing due on this day.") : d.quizzes.length ? "" : "No quiz booked on this day."}</p>
+        )}
+      </div>
+    </section>
+  );
+}
