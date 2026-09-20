@@ -1,5 +1,7 @@
 "use server";
 
+import { deepUnlocked } from "@/lib/entitlement";
+import { levelOf } from "@/lib/levels";
 import { failed } from "@/lib/ops/fault";
 import { logError } from "@/lib/ops/log";
 
@@ -30,13 +32,16 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
   if (!topic) return { error: "Topic not found." };
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
+  const level = levelOf(formData.get("level"));
+  // The deeper version is what a family pays for: asking for it by hand must not be a way around that.
+  if (level === "advanced" && !(await deepUnlocked(profile.id, profile.family_id))) return { error: "The deeper lesson comes with the teacher." };
   const admin = createAdminClient();
-  const { data: existing } = await admin.from("lessons").select("id").eq("topic_id", topicId).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
+  const { data: existing } = await admin.from("lessons").select("id").eq("topic_id", topicId).eq("level", level).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
   if (existing) return {};
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   try {
     // Lesson and diagrams are written side by side, so the wait is one job long, not two.
-    await ensureTopicMaterial(t, grade, learnerPromptLine(profile.learner_profile));
+    await ensureTopicMaterial(t, grade, learnerPromptLine(profile.learner_profile), level);
   } catch (err) {
     await logError("learning.explain", err, { userId: profile.id, meta: { topicId } });
     return failed("actions.learning.explainTopic", err, "Could not write the lesson.");
@@ -84,6 +89,8 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
   const actSection = String(formData.get("act_section") ?? "") || null;
   const recall = String(formData.get("recall") ?? "") === "1";
   const difficulty = (String(formData.get("difficulty") ?? "medium") as "easy" | "medium" | "hard") || "medium";
+  // A set is written at the depth the child is entitled to, whatever difficulty he picked within it.
+  const level = (await deepUnlocked(profile.id, family.id)) ? "advanced" : "basics";
   if (!topicId && !actSection && !recall) return { error: "Choose a topic or an exam section." };
   if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
 
@@ -135,6 +142,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       topic: recall ? "what the student covered at school today" : topic?.name ?? (actSection === "mixed" ? "mixed SAT + ACT set across all sections" : "mixed skills across the whole section"),
       actSection: topic?.act_section ?? actSection,
       difficulty,
+      level,
       count: topic ? QUESTIONS_PER_SET : sectionInfo?.setSize ?? QUESTIONS_PER_SET,
       weakSkills: weak,
       avoidPrompts: avoid,

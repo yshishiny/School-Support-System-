@@ -10,22 +10,29 @@ import { masteryFor } from "@/lib/learning";
 import type { Topic } from "@/lib/types";
 import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import { Tabs } from "@/components/Tabs";
+import { LEVEL, LOCKED_NOTE } from "@/lib/levels";
+import { deepUnlocked } from "@/lib/entitlement";
 
 export const maxDuration = 300;
 
 export default async function TopicPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { profile } = await requireStudent();
+  const { profile, family } = await requireStudent();
   const supabase = await createClient();
   const { data: topic } = await supabase.from("topics").select("*").eq("id", id).single();
   if (!topic) notFound();
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
-  const [{ data: lesson }, resources, { data: quizzes }] = await Promise.all([
-    supabase.from("lessons").select("content_md").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle(),
+  // Both depths are fetched in one go; which of them a child may read is a separate question from whether it exists.
+  const [{ data: lessonRows }, resources, { data: quizzes }, unlocked] = await Promise.all([
+    supabase.from("lessons").select("content_md, level").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade),
     loadTopicResources(id, grade),
     supabase.from("quizzes").select("id, title, created_at, attempts(score, total, submitted_at, flagged)").eq("topic_id", id).eq("student_id", profile.id).order("created_at", { ascending: false }),
+    deepUnlocked(profile.id, family.id),
   ]);
+  const lessons = (lessonRows ?? []) as { content_md: string; level: string }[];
+  const lesson = lessons.find((l) => l.level === "basics") ?? null;
+  const deep = lessons.find((l) => l.level === "advanced") ?? null;
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };
   const list = (quizzes ?? []) as QZ[];
   // (sets that failed mid-generation are deleted by the action; nothing else to filter)
@@ -66,8 +73,8 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
           },
           {
             id: "lesson",
-            label: "Lesson",
-            emoji: "📖",
+            label: LEVEL.basics.label,
+            emoji: LEVEL.basics.emoji,
             content: (
               <section className="card space-y-3">
                 {lesson ? (
@@ -88,6 +95,28 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
                   <>
                     <p className="text-sm muted">Missed this at school, or did not get it? Get an explanation with worked examples, written the way you like to learn.</p>
                     <ExplainButton topicId={t.id} />
+                  </>
+                )}
+              </section>
+            ),
+          },
+          {
+            id: "deep",
+            label: LEVEL.advanced.label,
+            emoji: LEVEL.advanced.emoji,
+            content: (
+              <section className="card space-y-3">
+                <p className="text-xs muted">{LEVEL.advanced.blurb}</p>
+                {!unlocked ? (
+                  <p className="text-sm muted">{LOCKED_NOTE}</p>
+                ) : deep ? (
+                  <article className="prose-lesson text-sm leading-relaxed space-y-2">
+                    <ReactMarkdown>{deep.content_md}</ReactMarkdown>
+                  </article>
+                ) : (
+                  <>
+                    <p className="text-sm muted">Not written yet. It takes about a minute, and it is kept afterwards.</p>
+                    <ExplainButton topicId={t.id} level="advanced" />
                   </>
                 )}
               </section>

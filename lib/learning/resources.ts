@@ -10,6 +10,7 @@ import { drawTopicVisuals } from "@/lib/ai/topic-visuals";
 import { findVideos, type VideoLesson } from "@/lib/videos";
 import { shiftDate, todayIn } from "@/lib/dates";
 import type { Topic } from "@/lib/types";
+import type { Level } from "@/lib/levels";
 
 export interface Visual { title: string; caption: string; svg: string }
 export interface TopicResources { visuals: Visual[]; videos: VideoLesson[]; model: string | null; updated_at: string }
@@ -43,7 +44,7 @@ export async function weekTopicsFor(studentId: string, studentGrade: number | nu
   const { data: topicRows } = await admin.from("topics").select("*").in("id", ids);
   const topics = (topicRows ?? []) as Topic[];
   const [{ data: lessons }, { data: resources }] = await Promise.all([
-    admin.from("lessons").select("topic_id, grade").in("topic_id", ids),
+    admin.from("lessons").select("topic_id, grade").eq("level", "basics").in("topic_id", ids),
     admin.from("topic_resources").select("topic_id, grade").in("topic_id", ids),
   ]);
   const has = (rows: { topic_id: string; grade: number | null }[] | null, t: Topic) => (rows ?? []).some((r) => r.topic_id === t.id && (r.grade ?? null) === gradeKey(t, studentGrade));
@@ -70,19 +71,19 @@ export async function ensureTopicResources(t: Topic, grade: number | null, lesso
   return "made";
 }
 
-/** Lesson text for one topic (idempotent). */
-export async function ensureLesson(t: Topic, grade: number | null, learner: string | null): Promise<{ status: "made" | "exists"; excerpt: string | null }> {
+/** Lesson text for one topic at one depth (idempotent). The two depths are cached separately. */
+export async function ensureLesson(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ status: "made" | "exists"; excerpt: string | null }> {
   const admin = createAdminClient();
-  const { data: existing } = await admin.from("lessons").select("content_md").eq("topic_id", t.id).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
+  const { data: existing } = await admin.from("lessons").select("content_md").eq("topic_id", t.id).eq("level", level).filter("grade", grade === null ? "is" : "eq", grade).maybeSingle();
   if (existing) return { status: "exists", excerpt: existing.content_md.slice(0, 1500) };
-  const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner });
-  await admin.from("lessons").upsert({ topic_id: t.id, grade, content_md: content, model }, { onConflict: "topic_id,grade" });
+  const { content, model } = await explainTopic({ grade, subject: t.subject, unit: t.unit, topic: t.name, track: t.track, language: t.language, learner, level });
+  await admin.from("lessons").upsert({ topic_id: t.id, grade, level, content_md: content, model }, { onConflict: "topic_id,grade,level" });
   return { status: "made", excerpt: content.slice(0, 1500) };
 }
 
 /** Lesson, diagrams and videos for one topic, the lesson and the diagrams in parallel. */
-export async function ensureTopicMaterial(t: Topic, grade: number | null, learner: string | null): Promise<{ lesson: "made" | "exists"; resources: "made" | "exists" }> {
-  const [lesson, resources] = await Promise.all([ensureLesson(t, grade, learner), ensureTopicResources(t, grade, null)]);
+export async function ensureTopicMaterial(t: Topic, grade: number | null, learner: string | null, level: Level = "basics"): Promise<{ lesson: "made" | "exists"; resources: "made" | "exists" }> {
+  const [lesson, resources] = await Promise.all([ensureLesson(t, grade, learner, level), ensureTopicResources(t, grade, null)]);
   return { lesson: lesson.status, resources };
 }
 

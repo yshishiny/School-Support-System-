@@ -1,5 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { effortFor, modelFor } from "./models";
+import { LEVEL, type Level } from "@/lib/levels";
 
 const SYSTEM = `You are a patient tutor writing a lesson for a teenage student at an American-curriculum school. Write in clear, friendly English. Markdown is allowed (headings, bold, bullet lists, numbered steps) but keep it light. Use unicode math (x², √, ×, π), never LaTeX.
 
@@ -13,10 +14,14 @@ Structure every lesson as:
 
 Length: 450-700 words.
 
+When the request asks for the deeper version, keep the same six headings but let "The big idea" carry why the rule is true, put the boundary cases in "Key rules", make the worked examples multi-step, and end "Where to go deeper" on what this leads to next year. 700-1000 words there.
+
 If the request says the language is Arabic, write the whole lesson in clear Modern Standard Arabic (Egyptian Ministry of Education style), keep the same six-part structure with Arabic headings, and use Arabic examples.`;
 
 export interface ExplainSpec {
   grade: number | null;
+  /** Which depth to teach at. The same topic, taught shallow or deep — never a different topic. */
+  level?: Level;
   subject: string;
   unit: string | null;
   topic: string;
@@ -27,6 +32,7 @@ export interface ExplainSpec {
 
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
   const client = new Anthropic();
+  const level = spec.level ?? "basics";
   const stream = client.messages.stream({
     model: modelFor("explain"),
     max_tokens: 8000,
@@ -42,6 +48,8 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
           `Topic: ${spec.topic}`,
           spec.language === "ar" ? "Language: Arabic (write the whole lesson in Arabic)" : "",
           spec.learner ? `${spec.learner} Adapt the style (analogies vs steps vs examples, length) to this.` : "",
+          // The depth is the paid difference between the two tiers, so it is stated last and stated plainly.
+          `How to pitch it: ${LEVEL[level].lessonBrief}`,
         ]
           .filter(Boolean)
           .join("\n"),

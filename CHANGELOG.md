@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0 — Every lesson at two depths (20 September 2026)
+
+- **The same topic, taught shallow or deep.** A child who missed the class needs the rule, one worked example, and enough to attempt tonight's homework. A child who already has that needs why the rule is true, where it breaks, and questions that do not come apart in one step. Teaching both to the same page fails one of them, so every topic now has two lessons: **The basics** and **Go deeper**.
+- **The basics are free, always, for everybody.** A child who cannot follow his class is never stopped by a price. The deeper version, and the teacher who performs it, are what a family pays for — so on this site the deep tab says honestly what is in it and where it lives, and never nags.
+- **Practice follows the same line.** Easy, medium and hard still move within a level; the level decides what kind of question is on the table at all. Basic sets keep one idea per question and tidy numbers. Deep sets combine topics, transfer the idea somewhere unfamiliar, and build the wrong answers out of the specific misunderstanding a student has on that topic.
+- Both depths are written and cached separately, so opening one never overwrites the other, and asking for the deep one by hand is refused rather than quietly written.
+
 ## 2.0.1 — The mosque can be claimed afterwards (20 September 2026)
 
 - **A prayer at the mosque logged later now counts as congregation.** Nobody stops at the mosque door to open the app: your boys' Fajr is prayed at five and logged at noon, and the mosque buttons only existed inside the prayer's window. So the 20-point day and the 25-point Fajr week were, in practice, unreachable. Filling in a past prayer now offers *🕌 On time, mosque* beside *On time, elsewhere*, with *Late* and *Missed* underneath, both on Today and on the Allowance catch-up list.
