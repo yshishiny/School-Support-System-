@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.8 — Two curricula, and the discipline the teacher works under (20 September 2026, `v2` branch)
+
+- **The curriculum knew about two grades.** `topics` held 190 rows covering grade 8 and grade 10 — Omar's and Youssef's — and had no idea a curriculum existed. It now holds **1,438 topics across 85 subject-years**: the American curriculum from grade 6 to 12, and the Egyptian national curriculum through prep and secondary.
+- **The Egyptian system has a shape, and the data now has it too.** Prep 1–3, Secondary 1 common to everybody, then Secondary 2 splitting into علمي and أدبي and Secondary 3 into علمي علوم, علمي رياضة and أدبي. Two children in the same grade study different subjects from the second secondary year, and a model told only "grade 11" would teach the wrong one. Arabic-medium throughout but for the English subject.
+- **The four dimensions are now a contract, not advice.** `lib/teaching/fluency.ts` holds Delegation, Description, Discernment and Diligence as typed functions over a real curriculum row: who does what and why, a brief built from the topic's own unit and language, checks that block a lesson from reaching a child, and the provenance the child is shown. `docs/TEACHING-MODEL.md` states the model underneath it.
+- The rule that carries the weight: **a check that did not run counts as failed.** The same lesson as the stale-page hunt, written into the teaching path before it can cost a child anything.
+- **Every foreign key is indexed.** Postgres does not do it for you, and 68 of them had no covering index — every `topic_id` among them. It never showed while the largest table held 459 rows; with the curriculum seven times larger and six tables pointing at it, it was about to. This is the performance work a separate curriculum server would not have done.
+
 ## 2.1.0-beta.7 — `u is not a function` was a stale page, and three reasons nobody could tell (20 September 2026, `v2` branch)
 
 - **The error was never a bug in the app.** All four reports landed 3 to 8 minutes after a production deployment, on a day with sixteen of them: a page left open, a new build underneath it, and the next server action it tried — the planner's *Done ✓*, the check-in's *Finish* — failing against a deployment that no longer existed. It has not happened once since the build-stamp check shipped at 23:15 that night, across every deployment since.
