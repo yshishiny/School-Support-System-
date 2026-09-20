@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0-beta.27 — The mosque can be claimed afterwards (20 September 2026, `v2` branch)
+
+- **A prayer at the mosque logged later now counts as congregation.** The mosque buttons only existed inside the prayer's window, and almost nobody logs inside it — Fajr is prayed at five and entered at noon — so the 20-point day and the 25-point Fajr week were unreachable in practice. Filling in a past prayer now offers *🕌 On time, mosque* beside *On time, elsewhere*, on Today and on the Allowance catch-up list alike.
+- A late or missed prayer still cannot be congregation, and that rule now lives in one function instead of being written out twice. The day bonus and the Fajr streak read the flag rather than when the row was written.
+
 ## 2.0.0-beta.26 — The wallet is a balance sheet (20 September 2026, `v2` branch)
 
 - **Three numbers with no arithmetic between them is what made it confusing.** "Kept for you", "in your pocket" and a bar was a picture, not a statement. The page now opens on a balance sheet that reads downward to one total: *earned*, what a parent added or took back, *spent*, and a rule, then **everything you own**.

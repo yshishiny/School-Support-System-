@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PRAYERS, PRAYER_POINTS, allAtMosque, fajrMosqueStreak, fajrWeekEarned, pastPrayerPoints, prayerLogDate, prayerPoints, prayerState, prayerWindows, schoolSpan, windowAtSchool, type PastClaim, type PrayerName } from "@/lib/prayers";
+import { PRAYERS, PRAYER_POINTS, allAtMosque, fajrMosqueStreak, fajrWeekEarned, pastPrayerPoints, prayerLogDate, prayerPoints, prayerState, prayerWindows, schoolSpan, windowAtSchool, countsAsCongregation, type PastClaim, type PrayerName } from "@/lib/prayers";
 import { shiftDate, todayIn } from "@/lib/dates";
 
 export interface PrayerResult {
@@ -63,8 +63,7 @@ export async function logPrayerAction(prayer: PrayerName, atMosque = false): Pro
   const admin = createAdminClient();
   const { data: existing } = await admin.from("prayer_logs").select("id").eq("student_id", profile.id).eq("log_date", logDate).eq("prayer", prayer).maybeSingle();
   if (existing) return { error: "Already logged." };
-  // Congregation only counts when he was there for it: a prayer already missed cannot become a mosque prayer.
-  const mosque = atMosque && status === "on_time";
+  const mosque = countsAsCongregation(status, atMosque);
   const { data: row, error } = await admin.from("prayer_logs").insert({ student_id: profile.id, log_date: logDate, prayer, status, logged_at: now.toISOString(), at_mosque: mosque }).select("id").single();
   if (error || !row) return failed("actions.prayers.logPrayer", error, "Could not save.");
 
@@ -101,8 +100,13 @@ export async function logPrayerAction(prayer: PrayerName, atMosque = false): Pro
  * A prayer whose window already closed (today or yesterday), reported honestly afterwards:
  * on time (full points when the window fell in school hours, otherwise 2), late (1), or missed (1 for honesty).
  * The parent sees "logged later" next to it.
+ *
+ * Congregation can be claimed here too, and it has to be: nobody stops at the mosque door to open the app, so
+ * almost every mosque prayer in this house is logged hours later. Only an *on time* claim can be at the mosque —
+ * a prayer already missed was not prayed in congregation — and the entry still has to be balanced like any other
+ * late one before it counts for the allowance.
  */
-export async function logPastPrayerAction(prayer: PrayerName, date: string, claim: PastClaim): Promise<PrayerResult> {
+export async function logPastPrayerAction(prayer: PrayerName, date: string, claim: PastClaim, atMosque = false): Promise<PrayerResult> {
   const { profile, family } = await requireStudent();
   if (!PRAYERS.includes(prayer) || !["on_time", "late", "missed"].includes(claim)) return { error: "Unknown prayer." };
   const today = todayIn(family.timezone);
@@ -118,17 +122,21 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
   const { data: tt } = await admin.from("timetable_entries").select("weekday, start_time, end_time").eq("student_id", profile.id);
   const atSchool = claim === "on_time" && windowAtSchool(window, schoolSpan(date, tt ?? []), family.timezone);
   const status = claim;
+  const mosque = countsAsCongregation(claim, atMosque);
   const { data: row, error } = await admin
     .from("prayer_logs")
-    .insert({ student_id: profile.id, log_date: date, prayer, status, logged_at: new Date().toISOString(), entered_late: true, claim: atSchool ? "school" : "other" })
+    .insert({ student_id: profile.id, log_date: date, prayer, status, logged_at: new Date().toISOString(), entered_late: true, at_mosque: mosque, claim: atSchool ? "school" : "other" })
     .select("id")
     .single();
   if (error || !row) return failed("actions.prayers.logPastPrayer", error, "Could not save.");
   const delta = pastPrayerPoints(claim, atSchool);
   let earned = 0;
-  const reason = claim === "missed" ? `${prayer[0].toUpperCase() + prayer.slice(1)}: missed, said honestly` : `${prayer[0].toUpperCase() + prayer.slice(1)} prayer ${claim === "on_time" ? (atSchool ? "on time at school" : "on time (logged later)") : "(late)"}`;
+  const where = mosque ? "on time at the mosque (logged later)" : atSchool ? "on time at school" : "on time (logged later)";
+  const reason = claim === "missed" ? `${prayer[0].toUpperCase() + prayer.slice(1)}: missed, said honestly` : `${prayer[0].toUpperCase() + prayer.slice(1)} prayer ${claim === "on_time" ? where : "(late)"}`;
   const { error: pErr } = await admin.from("points_ledger").insert({ student_id: profile.id, delta, reason, ref_type: "prayer", ref_id: row.id });
   if (!pErr) earned = delta;
+  // The day's congregation bonuses are worked out from the whole day, so filling in the last one late still pays.
+  if (mosque) earned += await awardMosqueBonuses(profile.id, date);
   // A prayer reported later counts for the allowance once it is balanced: two ayahs read, one question right.
   // Built after the answer goes back, because it fetches the verses and the child should not watch a dead button.
   if (claim !== "missed") after(() => openCompensation(profile.id, family.id, "prayer", `prayer:${date}:${prayer}`, `${prayer[0].toUpperCase() + prayer.slice(1)} on ${date}, reported later`));

@@ -26,6 +26,15 @@ export const PRAYER_POINTS = {
   FAJR_MOSQUE_WEEK_BONUS: 25,
 } as const;
 
+/**
+ * Congregation is a claim about *where* he prayed, and it only stands on a prayer that was on time: a prayer
+ * already late or missed was not prayed with the jama'ah. Whether he tapped it inside the window or filled it
+ * in afterwards makes no difference — he was either at the mosque or he was not.
+ */
+export function countsAsCongregation(status: string, atMosque: boolean): boolean {
+  return atMosque && status === "on_time";
+}
+
 /** How many days in a row, counting back from `upTo`, Fajr was prayed at the mosque. */
 export function fajrMosqueStreak(logs: { log_date: string; prayer: string; at_mosque: boolean }[], upTo: string): number {
   const days = new Set(logs.filter((l) => l.prayer === "fajr" && l.at_mosque).map((l) => l.log_date));

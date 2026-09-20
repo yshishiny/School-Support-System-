@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prayerWindows, prayerState, prayerLogDate, prayerPoints, allAtMosque, fajrMosqueStreak, fajrWeekEarned, PRAYERS } from "./prayers";
+import { PRAYERS, allAtMosque, countsAsCongregation, fajrMosqueStreak, fajrWeekEarned, prayerLogDate, prayerPoints, prayerState, prayerWindows } from "./prayers";
 
 const CAIRO = { lat: 30.0444, lng: 31.2357, tz: "Africa/Cairo" };
 
@@ -62,5 +62,36 @@ describe("praying in congregation", () => {
     expect([0, 1, 6].map(fajrWeekEarned)).toEqual([false, false, false]);
     expect([7, 14, 21].map(fajrWeekEarned)).toEqual([true, true, true]);
     expect([8, 9, 13].map(fajrWeekEarned)).toEqual([false, false, false]);
+  });
+});
+
+describe("congregation, whenever it is entered", () => {
+  it("stands on a prayer that was on time", () => {
+    expect(countsAsCongregation("on_time", true)).toBe(true);
+  });
+
+  it("never stands on one that was late or missed, however it is claimed", () => {
+    expect(countsAsCongregation("late", true)).toBe(false);
+    expect(countsAsCongregation("missed", true)).toBe(false);
+  });
+
+  it("is not assumed when he did not say so", () => {
+    expect(countsAsCongregation("on_time", false)).toBe(false);
+  });
+
+  // The boys almost never open the app inside the window: Fajr is prayed at the mosque at five and logged at
+  // noon. A bonus that only counted same-second taps would never be paid, so the day and the streak are worked
+  // out from the flag alone, not from when the row was written.
+  it("pays the day bonus for prayers filled in afterwards", () => {
+    const day = "2026-09-20";
+    const logs = ["fajr", "dhuhr", "asr", "maghrib", "isha"].map((prayer) => ({ log_date: day, prayer, at_mosque: true }));
+    expect(allAtMosque(logs, day)).toBe(true);
+  });
+
+  it("counts a week of Fajr at the mosque regardless of when each was entered", () => {
+    const days = ["09-14", "09-15", "09-16", "09-17", "09-18", "09-19", "09-20"].map((d) => ({ log_date: `2026-${d}`, prayer: "fajr", at_mosque: true }));
+    const streak = fajrMosqueStreak(days, "2026-09-20");
+    expect(streak).toBe(7);
+    expect(fajrWeekEarned(streak)).toBe(true);
   });
 });
