@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { creditWallet, withdrawFromWallet } from "./wallet";
+import { creditWallet, withdrawFromWallet } from "@/lib/wallet/ledger";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pingParents } from "@/lib/notify";
@@ -55,8 +55,12 @@ export async function markAllowancePaidAction(weekId: string): Promise<void> {
   // wallets existed) and then the hand-over, so what you still hold for him drops by exactly that amount.
   if (week?.amount) {
     const amount = Number(week.amount);
-    await creditWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance week ${week.week_start}`, on: week.week_end as string, refType: "allowance_week", refId: week.id as string, by: profile.id }).catch(() => null);
-    await withdrawFromWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance for ${week.week_start} handed over`, on: todayIn(family.timezone), refType: "allowance_paid", refId: week.id as string, by: profile.id }).catch(() => null);
+    const earned = await creditWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance week ${week.week_start}`, on: week.week_end as string, refType: "allowance_week", refId: week.id as string, by: profile.id });
+    // Both halves or neither: a hand-over recorded against an earning that never landed would show the child
+    // owing money he was in fact owed. The failed half is already logged under its own reference.
+    if (earned.ok) {
+      await withdrawFromWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance for ${week.week_start} handed over`, on: todayIn(family.timezone), refType: "allowance_paid", refId: week.id as string, by: profile.id });
+    }
   }
   [...PATHS, "/wallet"].forEach((p) => revalidatePath(p));
 }

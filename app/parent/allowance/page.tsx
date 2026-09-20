@@ -10,7 +10,7 @@ import { assignConsequenceAction, closeConsequenceAction, markAllowancePaidActio
 import { AllowanceMeter } from "@/components/AllowanceMeter";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { ClaimDecision, ParentWalletForms } from "@/components/WalletForms";
-import { loadWallet } from "@/lib/actions/wallet";
+import { loadWallet } from "@/lib/wallet/ledger";
 import { balances, categoryLabel, type WalletEntry } from "@/lib/wallet";
 import type { Consequence, Profile } from "@/lib/types";
 

@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { creditWallet } from "./wallet";
+import { creditWallet } from "@/lib/wallet/ledger";
 import { failed } from "@/lib/ops/fault";
 import { todayIn } from "@/lib/dates";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
@@ -85,7 +85,7 @@ export async function decideRedemptionAction(formData: FormData) {
     // A reward that pays money goes into his wallet, held until it is handed over.
     const rw = (r as { rewards?: { title?: string; cash_amount_egp?: number | null } }).rewards;
     if (rw?.cash_amount_egp) {
-      await creditWallet({ studentId: r.student_id as string, familyId: family.id, amount: Number(rw.cash_amount_egp), label: `Reward: ${rw.title ?? "reward"}`, on: todayIn(family.timezone), refType: "reward", refId: id, by: parent.id }).catch(() => null);
+      await creditWallet({ studentId: r.student_id as string, familyId: family.id, amount: Number(rw.cash_amount_egp), label: `Reward: ${rw.title ?? "reward"}`, on: todayIn(family.timezone), refType: "reward", refId: id, by: parent.id });
     }
   }
   revalidatePath("/parent/rewards");
