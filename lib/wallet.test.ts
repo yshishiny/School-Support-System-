@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { balances, budgetSplit, claimTotals, claimable, monthSummary, weeksToGoal, type WalletEntry } from "./wallet";
+import { balances, budgetSplit, claimTotals, claimable, monthSummary, statement, statementDesc, weeksToGoal, type WalletEntry } from "./wallet";
 
 const e = (kind: WalletEntry["kind"], amount: number, occurred_on: string, label = "x", category: string | null = null): WalletEntry =>
   ({ id: `${kind}-${occurred_on}-${amount}`, kind, amount_egp: amount, label, category, occurred_on });
@@ -106,5 +106,81 @@ describe("claiming money back", () => {
 
   it("a wallet with no claims totals nothing", () => {
     expect(claimTotals([e("spend", 10, "2026-09-01")])).toEqual({ requested: 0, approved: 0, count: 0 });
+  });
+});
+
+describe("the statement, as a balance sheet that must agree", () => {
+  const round = (n: number) => Math.round(n * 100) / 100;
+
+  const week = [
+    e("earn", 100, "2026-09-01", "Allowance week"),
+    e("earn", 60, "2026-09-08", "Allowance week"),
+    e("withdraw", 40, "2026-09-09", "Dad handed it over"),
+    e("spend", 15, "2026-09-10", "Sandwich"),
+    e("adjust", 20, "2026-09-11", "Eid money"),
+    e("withdraw", 25, "2026-09-12", "Dad handed it over"),
+    e("spend", 10, "2026-09-13", "Pens"),
+  ];
+
+  it("money arriving lifts the total and sits with Dad until he hands it over", () => {
+    const [first] = statement(week);
+    expect(first.kind).toBe("in");
+    expect(first.withDad).toBe(100);
+    expect(first.inPocket).toBe(0);
+    expect(first.total).toBe(100);
+  });
+
+  it("a hand-over moves money without changing the total — the line that used to confuse", () => {
+    const rows = statement(week);
+    const before = rows[1];
+    const handover = rows[2];
+    expect(handover.kind).toBe("moved");
+    expect(handover.delta).toBe(0);
+    expect(handover.total).toBe(before.total);
+    expect(handover.withDad).toBe(before.withDad - 40);
+    expect(handover.inPocket).toBe(before.inPocket + 40);
+  });
+
+  it("spending comes off the pocket and lowers the total", () => {
+    const rows = statement(week);
+    const spend = rows[3];
+    expect(spend.kind).toBe("out");
+    expect(spend.delta).toBe(-15);
+    expect(spend.inPocket).toBe(25);
+    expect(spend.total).toBe(rows[2].total - 15);
+  });
+
+  it("the two sides always add up to the total, on every single line", () => {
+    for (const r of statement(week)) expect(round(r.withDad + r.inPocket)).toBe(r.total);
+  });
+
+  it("the last line agrees with the totals at the top of the page", () => {
+    const rows = statement(week);
+    const last = rows[rows.length - 1];
+    const b = balances(week);
+    expect(last.withDad).toBe(b.withDad);
+    expect(last.inPocket).toBe(b.inPocket);
+    expect(last.total).toBe(b.net);
+  });
+
+  it("earned minus spent is the total, which is what a balance sheet means", () => {
+    const b = balances(week);
+    expect(round(b.earned + b.adjusted - b.spent)).toBe(b.net);
+    expect(round(b.withDad + b.inPocket)).toBe(b.net);
+  });
+
+  it("a parent taking something back reads as money out, not as an arrival", () => {
+    const rows = statement([e("earn", 50, "2026-09-01"), e("adjust", -20, "2026-09-02", "Broke the window")]);
+    expect(rows[1].kind).toBe("out");
+    expect(rows[1].total).toBe(30);
+  });
+
+  it("reads oldest first, and newest first when asked", () => {
+    expect(statement(week)[0].entry.occurred_on).toBe("2026-09-01");
+    expect(statementDesc(week)[0].entry.occurred_on).toBe("2026-09-13");
+  });
+
+  it("is empty for a wallet nobody has used", () => {
+    expect(statement([])).toEqual([]);
   });
 });

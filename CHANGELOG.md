@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0-beta.26 — The wallet is a balance sheet (20 September 2026, `v2` branch)
+
+- **Three numbers with no arithmetic between them is what made it confusing.** "Kept for you", "in your pocket" and a bar was a picture, not a statement. The page now opens on a balance sheet that reads downward to one total: *earned*, what a parent added or took back, *spent*, and a rule, then **everything you own**.
+- **Underneath it, where that money actually is:** kept by Dad, in your pocket, and the line `120 + 45 = 165 ✓`. The two sides always agree, which is the whole lesson, and the page now says so instead of drawing it.
+- **A hand-over is a move, not a loss.** This is the line that confused. Dad handing money over does not change what a child owns by a single pound — it moves from his side to the pocket. The statement marks those lines 🤝 with an arrow and no plus or minus, and the total visibly stays still across them. Spending is the only thing that makes the total fall.
+- **Every line now carries its date and the balance after it**: the amount, then *Dad · pocket · total* underneath, newest first. "Why is my total that number" is only ever answered by the lines that made it.
+- How much Dad has handed over in total is stated in words, so *earned*, *handed over* and *total* are all on one screen.
+- The running balances are worked out over the whole history and only the printing stops at the last forty lines, so an old wallet still reconciles.
+
 ## 2.0.0-beta.25 — The last three long pages (20 September 2026, `v2` branch)
 
 - **Snaps** stacked eight blocks down a phone, so the handwriting corner sat below everything and was never reached. The meter — what is open now, and the week so far — stays on screen; *Today* and *Handwriting* are tabs.

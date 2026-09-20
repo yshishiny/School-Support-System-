@@ -146,3 +146,62 @@ export function weeksToGoal(goal: number, saved: number, perWeek: number): numbe
   const left = Math.max(0, goal - saved);
   return Math.ceil(left / perWeek);
 }
+
+/**
+ * One line of the statement, with the two running balances after it.
+ *
+ * Every line does exactly one of three things, and saying which is the whole point of the page:
+ *  - money *arrives* (a paid allowance week, something a parent added) — the total goes up, and it sits with Dad;
+ *  - money is *handed over* — the total does not change at all, it only moves from Dad's side to the pocket;
+ *  - money is *spent* — it leaves the pocket, and the total goes down.
+ *
+ * A hand-over looking like a loss is what made the old page confusing. Here it is shown as a move, with both
+ * sides printed after it, so the child can see the total stay still.
+ */
+export type LineKind = "in" | "moved" | "out";
+
+export interface StatementLine {
+  entry: WalletEntry;
+  kind: LineKind;
+  /** Signed against the total: +in, 0 for a hand-over, −out. */
+  delta: number;
+  amount: number;
+  withDad: number;
+  inPocket: number;
+  total: number;
+}
+
+/** The ledger, oldest first, with the balances after every line. */
+export function statement(entries: WalletEntry[]): StatementLine[] {
+  const ordered = [...entries].sort((a, b) => a.occurred_on.localeCompare(b.occurred_on));
+  let withDad = 0;
+  let inPocket = 0;
+  const out: StatementLine[] = [];
+  for (const entry of ordered) {
+    const amount = Number(entry.amount_egp);
+    let kind: LineKind;
+    let delta: number;
+    if (entry.kind === "withdraw") {
+      withDad -= amount;
+      inPocket += amount;
+      kind = "moved";
+      delta = 0;
+    } else if (entry.kind === "spend") {
+      inPocket -= amount;
+      kind = "out";
+      delta = -amount;
+    } else {
+      // earn and adjust both arrive on Dad's side; an adjustment may be negative when he takes something back.
+      withDad += amount;
+      kind = amount < 0 ? "out" : "in";
+      delta = amount;
+    }
+    out.push({ entry, kind, delta, amount, withDad: round2(withDad), inPocket: round2(inPocket), total: round2(withDad + inPocket) });
+  }
+  return out;
+}
+
+/** The statement newest first, which is how anybody actually reads one. */
+export function statementDesc(entries: WalletEntry[]): StatementLine[] {
+  return statement(entries).reverse();
+}

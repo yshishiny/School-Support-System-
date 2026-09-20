@@ -2,18 +2,15 @@ import Link from "next/link";
 import { requireStudent } from "@/lib/auth";
 import { prettyDate, todayIn } from "@/lib/dates";
 import { loadWallet } from "@/lib/actions/wallet";
-import { balances, budgetSplit, categoryLabel, claimTotals, claimable, monthSummary } from "@/lib/wallet";
+import { balances, budgetSplit, categoryLabel, claimTotals, claimable, monthSummary, statementDesc } from "@/lib/wallet";
 import { ClaimForm, SpendForm } from "@/components/WalletForms";
 import { Tabs } from "@/components/Tabs";
 
-const KIND_LINE: Record<string, { sign: string; tone: string; what: string }> = {
-  earn: { sign: "+", tone: "text-good", what: "earned" },
-  adjust: { sign: "+", tone: "text-good", what: "added" },
-  withdraw: { sign: "→", tone: "text-accent-2", what: "handed to you" },
-  spend: { sign: "−", tone: "text-warn", what: "spent" },
-};
-
-/** The child's own money: what Dad still holds, what is in his pocket, and where the month went. */
+/**
+ * The child's own money, as a balance sheet: what came in, what went out, what is left, and where that money
+ * physically is. The statement underneath shows the running balance after every line, with its date, because
+ * "why is my total that number" is only ever answered by the lines that made it.
+ */
 export default async function WalletPage() {
   const { profile, family } = await requireStudent();
   const today = todayIn(family.timezone);
@@ -21,9 +18,109 @@ export default async function WalletPage() {
   const entries = await loadWallet(profile.id);
   const b = balances(entries);
   const m = monthSummary(entries, month);
-  const recent = [...entries].reverse().slice(0, 25);
   const split = budgetSplit(b.inPocket);
   const claims = claimTotals(entries);
+
+  // Balances run over everything; only the printing stops at the last 40 lines.
+  const ledger = statementDesc(entries).slice(0, 40);
+
+  /**
+   * The balance sheet. It reads as three lines that end in one, so the total is never a number that appeared
+   * from nowhere: what came in, what a parent added, what went out, and what is left. Underneath, where that
+   * money physically is — and the two sides adding back up to the same total, which is the lesson.
+   */
+  const sheet = (
+    <section className="card space-y-3">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="h2">Your balance sheet</h2>
+        <span className="text-xs muted">to {prettyDate(today)}</span>
+      </div>
+
+      <dl className="text-sm">
+        <div className="flex items-baseline justify-between gap-3 py-1.5">
+          <dt>Earned</dt>
+          <dd className="tabular-nums font-semibold text-good">+{b.earned}</dd>
+        </div>
+        {b.adjusted !== 0 && (
+          <div className="flex items-baseline justify-between gap-3 py-1.5">
+            <dt>{b.adjusted > 0 ? "Added by a parent" : "Taken back by a parent"}</dt>
+            <dd className={`tabular-nums font-semibold ${b.adjusted > 0 ? "text-good" : "text-bad"}`}>{b.adjusted > 0 ? "+" : "−"}{Math.abs(b.adjusted)}</dd>
+          </div>
+        )}
+        <div className="flex items-baseline justify-between gap-3 py-1.5">
+          <dt>Spent</dt>
+          <dd className={`tabular-nums font-semibold ${b.spent ? "text-warn" : "muted"}`}>{b.spent ? `−${b.spent}` : "0"}</dd>
+        </div>
+        <div className="mt-1 flex items-baseline justify-between gap-3 border-t-2 border-line pt-2">
+          <dt className="font-bold" style={{ fontFamily: "var(--font-display)" }}>Everything you own</dt>
+          <dd className="tabular-nums text-2xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{b.net} <span className="text-sm muted">EGP</span></dd>
+        </div>
+      </dl>
+
+      <div className="rounded-xl bg-panel-2/60 p-2.5 space-y-2">
+        <div className="text-[11px] font-bold uppercase tracking-wider muted">Where it is right now</div>
+        <div className="grid grid-cols-2 gap-2 text-center">
+          <div className="tile !p-2">
+            <div className="text-[11px] muted">Kept by Dad</div>
+            <div className="text-xl font-bold text-good tabular-nums" style={{ fontFamily: "var(--font-display)" }}>{b.withDad}</div>
+          </div>
+          <div className="tile !p-2">
+            <div className="text-[11px] muted">In your pocket</div>
+            <div className="text-xl font-bold text-accent-2 tabular-nums" style={{ fontFamily: "var(--font-display)" }}>{b.inPocket}</div>
+          </div>
+        </div>
+        <p className="text-center text-xs muted tabular-nums">{b.withDad} + {b.inPocket} = {b.net} ✓ the two sides always agree</p>
+      </div>
+
+      {entries.length === 0 ? (
+        <p className="text-xs muted">Nothing in it yet. It fills the first time an allowance week is paid.</p>
+      ) : (
+        <p className="text-xs muted">
+          Dad has handed you {b.withdrawn} EGP so far. Handing it over does not make you richer or poorer — the
+          money only moves from his side to yours. You are poorer only when you spend.
+        </p>
+      )}
+    </section>
+  );
+
+  const statementTab = (
+    <section className="card !py-3 space-y-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <h2 className="h2">Every line, newest first</h2>
+        <span className="text-[11px] muted">balance after each</span>
+      </div>
+      {ledger.length === 0 && <p className="text-sm muted">Nothing yet. Your wallet fills when an allowance week is paid.</p>}
+      <ul className="divide-y divide-line">
+        {ledger.map((r) => {
+          const cat = r.entry.kind === "spend" ? categoryLabel(r.entry.category) : null;
+          const icon = r.kind === "moved" ? "🤝" : cat ? cat.emoji : r.delta < 0 ? "↩️" : "💰";
+          const amount = r.kind === "moved" ? `→ ${r.amount}` : r.delta < 0 ? `− ${Math.abs(r.delta)}` : `+ ${r.delta}`;
+          const tone = r.kind === "moved" ? "text-accent-2" : r.delta < 0 ? "text-warn" : "text-good";
+          return (
+            <li key={r.entry.id} className="py-2">
+              <div className="flex items-baseline gap-2 text-sm">
+                <span className="text-base leading-none">{icon}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate font-semibold">{r.entry.label}</div>
+                  <div className="text-[11px] muted">{prettyDate(r.entry.occurred_on)}{r.kind === "moved" ? " · moved to your pocket" : ""}</div>
+                </div>
+                <span className={`shrink-0 font-bold tabular-nums ${tone}`}>{amount}</span>
+              </div>
+              <div className="mt-0.5 flex items-center justify-end gap-3 text-[11px] muted tabular-nums">
+                <span>Dad {r.withDad}</span>
+                <span>pocket {r.inPocket}</span>
+                <span className="font-semibold text-ink">total {r.total}</span>
+              </div>
+              {r.entry.claim_status === "requested" && <div className="mt-1 text-[11px] text-accent-2">⏳ Asked to be paid back · waiting for your dad</div>}
+              {r.entry.claim_status === "approved" && <div className="mt-1 text-[11px] text-good">✓ Paid back{r.entry.claim_note ? ` · “${r.entry.claim_note}”` : ""}</div>}
+              {r.entry.claim_status === "rejected" && <div className="mt-1 text-[11px] text-bad">✗ Not paid back{r.entry.claim_note ? ` · “${r.entry.claim_note}”` : ""}</div>}
+              {claimable(r.entry) && <div className="mt-1"><ClaimForm entryId={r.entry.id} label={r.entry.label} amount={r.entry.amount_egp} /></div>}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
 
   // The two numbers are the page. Writing a purchase down, the month's shape and every line each get a tab,
   // so nothing important sits below the fold.
@@ -88,75 +185,25 @@ export default async function WalletPage() {
     </section>
   );
 
-  const lines = (
-    <section className="card space-y-2">
-      <h2 className="h2">Every line</h2>
-      {recent.length === 0 && <p className="text-sm muted">Your wallet is empty. It fills when an allowance week is paid.</p>}
-      {recent.map((e) => {
-        const k = KIND_LINE[e.kind] ?? KIND_LINE.spend;
-        const cat = e.kind === "spend" ? categoryLabel(e.category) : null;
-        return (
-          <div key={e.id} className="border-b border-line py-1.5 last:border-0">
-            <div className="flex items-center gap-2 text-sm">
-              <span className="text-lg">{cat ? cat.emoji : e.kind === "withdraw" ? "🤝" : "💰"}</span>
-              <div className="min-w-0 flex-1">
-                <div className="truncate font-semibold">{e.label}</div>
-                <div className="text-[11px] muted">{prettyDate(e.occurred_on)} · {k.what}</div>
-              </div>
-              <span className={`shrink-0 font-bold tabular-nums ${k.tone}`}>{k.sign}{e.amount_egp}</span>
-            </div>
-            {e.claim_status === "requested" && <div className="mt-1 text-[11px] text-accent-2">⏳ Asked to be paid back · waiting for your dad</div>}
-            {e.claim_status === "approved" && <div className="mt-1 text-[11px] text-good">✓ Paid back{e.claim_note ? ` · “${e.claim_note}”` : ""}</div>}
-            {e.claim_status === "rejected" && <div className="mt-1 text-[11px] text-bad">✗ Not paid back{e.claim_note ? ` · “${e.claim_note}”` : ""}</div>}
-            {claimable(e) && <div className="mt-1"><ClaimForm entryId={e.id} label={e.label} amount={e.amount_egp} /></div>}
-          </div>
-        );
-      })}
-    </section>
-  );
-
   return (
     <main className="space-y-3">
       <header className="flex items-center gap-3">
         <span className="text-4xl">👛</span>
         <div className="flex-1 min-w-0">
           <h1 className="h1">My wallet</h1>
-          <p className="text-sm muted">What you own, and where it went.</p>
+          <p className="text-sm muted">What you own, where it is, and every line that got you here.</p>
         </div>
         <Link href="/allowance" className="btn-ghost btn-sm">Allowance</Link>
       </header>
 
-      <section className="grid grid-cols-2 gap-3">
-        <div className="card !p-4">
-          <div className="text-xs muted">Kept for you</div>
-          <div className="text-[1.7rem] font-bold text-good leading-tight" style={{ fontFamily: "var(--font-display)" }}>{b.withDad} <span className="text-base">EGP</span></div>
-          <div className="text-[11px] muted mt-1">Earned but not taken yet. Ask when you want it.</div>
-        </div>
-        <div className="card !p-4">
-          <div className="text-xs muted">In your pocket</div>
-          <div className="text-[1.7rem] font-bold text-accent-2 leading-tight" style={{ fontFamily: "var(--font-display)" }}>{b.inPocket} <span className="text-base">EGP</span></div>
-          <div className="text-[11px] muted mt-1">Cash you were handed, minus what you spent.</div>
-        </div>
-      </section>
-
-      <section className="card !py-3 space-y-2">
-        <div className="flex items-baseline justify-between gap-2">
-          <h2 className="h2">Everything you own</h2>
-          <div className="text-xl font-bold" style={{ fontFamily: "var(--font-display)" }}>{b.net} EGP</div>
-        </div>
-        <div className="flex h-3 overflow-hidden rounded-full bg-panel-2">
-          <div className="bg-good" style={{ width: `${b.net ? Math.round((b.withDad / b.net) * 100) : 0}%` }} />
-          <div className="bg-accent-2" style={{ width: `${b.net ? Math.round((b.inPocket / b.net) * 100) : 0}%` }} />
-        </div>
-        <p className="text-xs muted">Kept for you {b.withDad} + in your pocket {b.inPocket} = {b.net}. That is a balance sheet: the two sides always agree.</p>
-      </section>
+      {sheet}
 
       <Tabs
         storageKey="wallet"
         tabs={[
+          { id: "lines", label: "Statement", emoji: "📜", content: statementTab },
           { id: "spend", label: "Spent", emoji: "🧾", badge: claims.count, content: spend },
           { id: "month", label: "This month", emoji: "📊", content: monthTab },
-          { id: "lines", label: "Every line", emoji: "📜", content: lines },
         ]}
       />
     </main>
