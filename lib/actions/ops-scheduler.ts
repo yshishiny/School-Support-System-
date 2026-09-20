@@ -30,12 +30,3 @@ export async function disableHourlySchedulerAction(): Promise<void> {
   revalidatePath("/parent/admin");
 }
 
-export async function schedulerStatus(): Promise<{ enabled: boolean; appUrl: string | null; lastRun: string | null; lastOk: boolean | null }> {
-  const admin = createAdminClient();
-  const [{ data: rows }, { data: run }] = await Promise.all([
-    admin.from("ops_settings").select("key, value").in("key", ["cron_secret", "app_url"]),
-    admin.from("cron_runs").select("started_at, ok").eq("job", "nudges").order("started_at", { ascending: false }).limit(1).maybeSingle(),
-  ]);
-  const map = new Map((rows ?? []).map((r) => [r.key, r.value]));
-  return { enabled: map.has("cron_secret"), appUrl: map.get("app_url") ?? null, lastRun: run?.started_at ?? null, lastOk: run?.ok ?? null };
-}

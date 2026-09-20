@@ -6,81 +6,13 @@ import { requireParent, requireSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
 import {
-  REFERRAL_BONUS_CREDITS, accessUntil, bonusDue, commissionFor, creditBalance, grantWindow, hasAccess, inviteCode,
-  invitesAllowed, planById, priceAfterWelcome, tierFor,
-  type AccessGrant, type CreditEntry,
+  REFERRAL_BONUS_CREDITS, accessUntil, bonusDue, commissionFor, grantWindow, hasAccess, inviteCode,
+  planById, priceAfterWelcome,
+  type AccessGrant,
 } from "@/lib/access";
+import { loadAccess } from "@/lib/access/store";
 
 const PATHS = ["/teach", "/today", "/parent", "/parent/settings", "/parent/admin"];
-
-export interface AccessState {
-  credits: number;
-  grants: AccessGrant[];
-  invites: { id: string; code: string; label: string | null; accepted: boolean; rewarded: boolean }[];
-  invitesLeft: number;
-  /** The families this one brought, and what each has actually paid. */
-  referred: { familyId: string; name: string; joinedOn: string; payments: number; creditsSpent: number; live: boolean; bonusPaid: boolean }[];
-  payingReferred: number;
-  tier: ReturnType<typeof tierFor>;
-  commissionEarned: number;
-  welcomeUsed: boolean;
-  invitedBy: string | null;
-}
-
-/** Everything a family needs to see about what it has bought and what it has left. */
-export async function loadAccess(familyId: string): Promise<AccessState> {
-  const admin = createAdminClient();
-  const [{ data: credits }, { data: grants }, { data: invites }, { data: me }, { data: children }] = await Promise.all([
-    admin.from("credit_entries").select("delta, kind, ref_type").eq("family_id", familyId),
-    admin.from("access_grants").select("student_id, starts_on, ends_on, plan").eq("family_id", familyId),
-    admin.from("access_invites").select("id, code, label, accepted_at, rewarded_at, accepted_family_id").eq("family_id", familyId).order("created_at"),
-    admin.from("families").select("welcome_used, invited_by_family_id").eq("id", familyId).maybeSingle(),
-    admin.from("families").select("id, name, created_at").eq("invited_by_family_id", familyId),
-  ]);
-  const list = (invites ?? []).map((i) => ({ id: i.id as string, code: i.code as string, label: (i.label as string | null) ?? null, accepted: !!i.accepted_at, rewarded: !!i.rewarded_at }));
-  const kids = (children ?? []) as { id: string; name: string | null; created_at: string }[];
-
-  // What each referred family has actually paid for, which is what the ladder and the commission are built on.
-  const today = new Date().toISOString().slice(0, 10);
-  const referred = await Promise.all(kids.map(async (f) => {
-    const { data: theirGrants } = await admin.from("access_grants").select("credits_spent, ends_on").eq("family_id", f.id);
-    const rows = (theirGrants ?? []) as { credits_spent: number; ends_on: string }[];
-    const paid = rows.filter((g) => Number(g.credits_spent) > 0);
-    const invite = (invites ?? []).find((i) => i.accepted_family_id === f.id);
-    return {
-      familyId: f.id,
-      name: f.name ?? "A family",
-      joinedOn: f.created_at.slice(0, 10),
-      payments: paid.length,
-      creditsSpent: paid.reduce((n, g) => n + Number(g.credits_spent), 0),
-      live: rows.some((g) => g.ends_on >= today),
-      bonusPaid: !!invite?.rewarded_at,
-    };
-  }));
-
-  const payingReferred = referred.filter((r) => r.payments > 0).length;
-  const entries = (credits ?? []) as (CreditEntry & { ref_type: string | null })[];
-  return {
-    credits: creditBalance(entries),
-    grants: (grants ?? []) as AccessGrant[],
-    invites: list,
-    invitesLeft: Math.max(0, invitesAllowed(referred.filter((r) => r.payments >= 1).length) - list.length),
-    referred,
-    payingReferred,
-    tier: tierFor(payingReferred),
-    commissionEarned: entries.filter((e) => e.ref_type === "commission").reduce((n, e) => n + e.delta, 0),
-    welcomeUsed: !!me?.welcome_used,
-    invitedBy: (me?.invited_by_family_id as string | null) ?? null,
-  };
-}
-
-/** Whether this child may open the virtual teacher today. Families with no credit system in use are unaffected. */
-export async function childHasAccess(familyId: string, studentId: string, today: string): Promise<{ ok: boolean; until: string | null }> {
-  const admin = createAdminClient();
-  const { data } = await admin.from("access_grants").select("student_id, starts_on, ends_on, plan").eq("family_id", familyId);
-  const grants = (data ?? []) as AccessGrant[];
-  return { ok: hasAccess(grants, studentId, today), until: accessUntil(grants, studentId, today) };
-}
 
 /** Admin only: hand a family credits, with a reason on the record. */
 export async function grantCreditsAction(formData: FormData): Promise<{ error?: string; ok?: string }> {

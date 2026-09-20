@@ -2,7 +2,7 @@ import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { prettyDate, todayIn } from "@/lib/dates";
-import { loadAccess } from "@/lib/actions/access";
+import { loadAccess } from "@/lib/access/store";
 import { WELCOME_DISCOUNT, accessUntil, egpFor, priceAfterWelcome, priceList } from "@/lib/access";
 import { BuyAccess, InviteBox } from "@/components/AccessForms";
 import { AmbassadorPanel } from "@/components/AmbassadorPanel";

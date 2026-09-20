@@ -10,7 +10,7 @@ import { Tabs } from "@/components/Tabs";
 import { isArabicSubject, subjectEmoji, subjectLabel } from "@/lib/plan";
 import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { isSchoolStage } from "@/lib/allowance";
-import { loadAccess } from "@/lib/actions/access";
+import { loadAccess } from "@/lib/access/store";
 import { UpgradeCard } from "@/components/UpgradeCard";
 import type { Topic } from "@/lib/types";
 

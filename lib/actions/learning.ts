@@ -10,6 +10,7 @@ import { revalidatePath } from "next/cache";
 import { settleCheckpoint } from "@/lib/checkpoint/build";
 import { pingParents } from "@/lib/notify";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
+import { ensureAttempt } from "@/lib/learning/attempts";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
@@ -190,16 +191,6 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
   redirect(`/quiz/${quiz.id}`);
 }
 
-/** Ensures there is one open attempt for this quiz and returns its id. */
-export async function ensureAttempt(quizId: string): Promise<string> {
-  const { profile } = await requireStudent();
-  const admin = createAdminClient();
-  const { data: open } = await admin.from("attempts").select("id").eq("student_id", profile.id).eq("quiz_id", quizId).is("submitted_at", null).maybeSingle();
-  if (open) return open.id;
-  const { data } = await admin.from("attempts").insert({ student_id: profile.id, quiz_id: quizId, kind: "quiz" }).select("id").single();
-  return data!.id;
-}
-
 export interface AnswerResult {
   correct: boolean;
   correct_index: number;
@@ -310,24 +301,6 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   }
   ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
-}
-
-/** Builds a review attempt from due questions. Returns null when nothing is due. */
-export async function startReviewAttempt(limit = 10): Promise<{ attemptId: string; questionIds: string[] } | null> {
-  const { profile, family } = await requireStudent();
-  const admin = createAdminClient();
-  const today = todayIn(family.timezone);
-  const { data: open } = await admin.from("attempts").select("id").eq("student_id", profile.id).eq("kind", "review").is("submitted_at", null).order("started_at", { ascending: false }).limit(1).maybeSingle();
-  if (open) {
-    // Reuse: questions are the ones still due.
-    const { data: due } = await admin.from("review_queue").select("question_id").eq("student_id", profile.id).lte("due_date", today).order("due_date").limit(limit);
-    if (!due || due.length === 0) return null;
-    return { attemptId: open.id, questionIds: due.map((d) => d.question_id) };
-  }
-  const { data: due } = await admin.from("review_queue").select("question_id").eq("student_id", profile.id).lte("due_date", today).order("due_date").limit(limit);
-  if (!due || due.length === 0) return null;
-  const { data } = await admin.from("attempts").insert({ student_id: profile.id, kind: "review" }).select("id").single();
-  return { attemptId: data!.id, questionIds: due.map((d) => d.question_id) };
 }
 
 export async function setTargetExamAction(formData: FormData) {

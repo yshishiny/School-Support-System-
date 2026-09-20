@@ -3,7 +3,8 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import { registerMaterialAction, type RegisterMaterialResult } from "@/lib/actions/materials";
+import { registerMaterialAction } from "@/lib/actions/materials";
+import type { RegisterMaterialResult } from "@/lib/materials/read";
 import { ACCEPT, ACCEPT_LABEL, extFor, resolveMime } from "@/lib/materials/files";
 
 const MAX = 25 * 1024 * 1024;

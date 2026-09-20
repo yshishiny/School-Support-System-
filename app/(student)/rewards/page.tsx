@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { RedeemButton } from "@/components/RedeemButton";
 import Link from "next/link";
 import { TargetButton } from "@/components/AllowanceClaims";
-import { fullWeekStreak } from "@/lib/actions/rewards";
+import { fullWeekStreak } from "@/lib/rewards/streak";
 import { PointsGuide } from "@/components/PointsGuide";
 import { Tabs } from "@/components/Tabs";
 import { allowanceWeekStatus } from "@/lib/allowance/week";

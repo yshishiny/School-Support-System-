@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { creditWallet } from "@/lib/wallet/ledger";
+import { fullWeekStreak } from "@/lib/rewards/streak";
 import { failed } from "@/lib/ops/fault";
 import { todayIn } from "@/lib/dates";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
@@ -106,7 +107,7 @@ export async function adjustPointsAction(formData: FormData) {
 }
 
 /** Balance minus points held by pending redemption requests. */
-export async function availablePoints(studentId: string): Promise<number> {
+async function availablePoints(studentId: string): Promise<number> {
   await requireSession();
   const supabase = await createClient();
   const [{ data: ledger }, { data: pending }] = await Promise.all([
@@ -132,15 +133,6 @@ export async function enableRewardTemplateAction(formData: FormData): Promise<vo
   await supabase.from("rewards").insert({ family_id: family.id, title: t.title, description: t.description, kind: t.kind, cost_points: t.cost_points, cash_amount_egp: t.cash_amount_egp ?? null, emoji: t.emoji, requires_full_weeks: t.requires_full_weeks ?? 0, effort_note: t.effort_note ?? null });
   revalidatePath("/parent/rewards");
   revalidatePath("/rewards");
-}
-
-/** Consecutive closed weeks that paid the full allowance, newest first. */
-export async function fullWeekStreak(studentId: string): Promise<number> {
-  const admin = createAdminClient();
-  const { data } = await admin.from("allowance_weeks").select("band").eq("student_id", studentId).order("week_start", { ascending: false }).limit(12);
-  let n = 0;
-  for (const w of data ?? []) { if (w.band === "full") n += 1; else break; }
-  return n;
 }
 
 /** The child picks the reward he is working toward; it shows on Rewards and the allowance meter. */

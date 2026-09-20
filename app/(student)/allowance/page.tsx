@@ -6,7 +6,7 @@ import { BANDS, allowancePlan, bandFor, whyThisAmount } from "@/lib/allowance";
 import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { AllowanceClaims, type ClosedWeek } from "@/components/AllowanceClaims";
 import { ConsequenceCard } from "@/components/ConsequenceCard";
-import { fullWeekStreak } from "@/lib/actions/rewards";
+import { fullWeekStreak } from "@/lib/rewards/streak";
 import type { Consequence, Reward } from "@/lib/types";
 import { shiftDate, weekdayOf } from "@/lib/dates";
 import { PRAYERS, type PrayerName } from "@/lib/prayers";

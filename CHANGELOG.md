@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0-beta.6 — Nothing in the action modules is an endpoint by accident (20 September 2026, `v2` branch)
+
+- **Eleven more functions were public endpoints**, for the same reason the three wallet ones were: Next gives every export of a `"use server"` module an id and a route, so a helper that merely lived in an action file was reachable by anyone who could post to it — no page, no button, no sign-in.
+- **The worst was `loadAccess`**, which took a family id and read with the service-role key: in effect "show me any family's credits, purchases, invite codes and referral earnings". It is now an ordinary helper in `lib/access/store.ts`, and its two callers both hold a family id that signing in already established.
+- `fullWeekStreak`, `retryFailedMaterials` and `schedulerStatus` were the same shape — any child's allowance history, a free "re-run the AI reader over every failed upload", and the state of the nightly job — and have moved out alongside it, to `lib/rewards/streak.ts`, `lib/materials/retry.ts` and `lib/ops/scheduler.ts`. `ensureAttempt` and `startReviewAttempt` checked who was asking and only ever touched that child's own rows, but were never meant to be callable either, and are now in `lib/learning/attempts.ts`.
+- **Three were reachable but dead.** `childHasAccess`, `familyToday` and `snapTemplates` had no caller anywhere; two of them read the database with no check at all. They are gone rather than hidden.
+- `normalizeLogin` and `availablePoints` are used only inside their own module, so they are simply no longer exported.
+- **A test now holds the line.** Every `"use server"` module in `lib/actions` is checked to export nothing but functions whose names end in `Action` — 44 modules, checked on every run. A helper that drifts back into an action file fails the build instead of quietly going live.
+
 ## 2.1.0-beta.5 — The wallet actually records the money (20 September 2026, `v2` branch)
 
 - **Nothing the app earned had ever reached a wallet.** The index that makes a credit happen once was partial (`where ref_id is not null`), and Postgres will not infer an arbiter from a partial index unless the statement repeats its predicate — which PostgREST's upsert does not. Every write raised 42P10 and the error was thrown away, so a closed allowance week, a cash reward and an approved expense claim all reported success and wrote nothing. Confirmed against the live database, and confirmed fixed there: the same statement is now accepted, a second write of the same thing is still ignored, and hand-entered lines with no reference still never collide.

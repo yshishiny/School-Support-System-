@@ -7,7 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { Tabs } from "@/components/Tabs";
 import { configChecks, databaseChecks, githubCommits, googleStatus, jobChecks, recentErrors, supabaseStatus, vercelDeployments, type Check } from "@/lib/ops/health";
 import { resolveErrorsAction } from "@/lib/actions/ops";
-import { schedulerStatus } from "@/lib/actions/ops-scheduler";
+import { schedulerStatus } from "@/lib/ops/scheduler";
 import { SchedulerSwitch } from "@/components/SchedulerSwitch";
 import { VideoPresenters } from "@/components/VideoPresenters";
 import { clipStats, presenterGenders, presenterUrls, videoCap, videoEnabled, videoMode, videoMonthCount } from "@/lib/video";

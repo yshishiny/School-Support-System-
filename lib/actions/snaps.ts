@@ -232,7 +232,3 @@ export async function deleteSnapTaskAction(id: string): Promise<void> {
   [...STUDENT_PATHS, ...PARENT_PATHS].forEach((p) => revalidatePath(p));
 }
 
-/** The templates, for the settings UI (server-safe re-export). */
-export async function snapTemplates() {
-  return SNAP_TEMPLATES;
-}
