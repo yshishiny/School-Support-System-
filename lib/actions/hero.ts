@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -15,7 +16,7 @@ export async function registerHeroImageAction(studentId: string, path: string, c
   if (profile.role !== "parent" && profile.id !== studentId) return { error: "Not allowed." };
   const supabase = await createClient();
   const { data, error } = await supabase.from("hero_images").insert({ student_id: studentId, family_id: family.id, path, caption: caption.trim().slice(0, 120) || null, uploaded_by: profile.id }).select("id").single();
-  if (error || !data) return { error: error?.message ?? "Could not save." };
+  if (error || !data) return failed("actions.hero.registerHeroImage", error, "Could not save.");
   // First picture becomes the avatar and banner automatically so it shows up immediately.
   const { data: p } = await supabase.from("profiles").select("avatar_image_id, banner_image_id").eq("id", studentId).single();
   const patch: Record<string, string> = {};

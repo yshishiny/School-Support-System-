@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateClinicianReport, type ClinicianScope } from "@/lib/coach/clinician";
@@ -23,6 +24,6 @@ export async function generateClinicianReportAction(_prev: { error?: string; id?
     revalidatePath("/coach");
     return { id };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not generate the summary." };
+    return failed("actions.clinician.generateClinicianReport", err, "Could not generate the summary.");
   }
 }

@@ -1,5 +1,6 @@
 "use server";
 
+import { failed } from "@/lib/ops/fault";
 import { logError } from "@/lib/ops/log";
 
 import { redirect } from "next/navigation";
@@ -21,7 +22,7 @@ import type { Topic } from "@/lib/types";
 const QUESTIONS_PER_SET = 8;
 
 /** Writes (or returns) the cached lesson for a topic at the student's grade. */
-export async function explainTopicAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function explainTopicAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { profile } = await requireSession();
   const topicId = String(formData.get("topic_id"));
   const supabase = await createClient();
@@ -38,14 +39,14 @@ export async function explainTopicAction(_prev: { error?: string } | undefined, 
     await ensureTopicMaterial(t, grade, learnerPromptLine(profile.learner_profile));
   } catch (err) {
     await logError("learning.explain", err, { userId: profile.id, meta: { topicId } });
-    return { error: err instanceof Error ? err.message : "Could not write the lesson." };
+    return failed("actions.learning.explainTopic", err, "Could not write the lesson.");
   }
   revalidatePath(`/learn/topic/${topicId}`);
   return {};
 }
 
 /** Diagrams and video lessons for a topic that already has its lesson. */
-export async function addResourcesAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function addResourcesAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { profile } = await requireSession();
   const topicId = String(formData.get("topic_id"));
   const supabase = await createClient();
@@ -59,7 +60,7 @@ export async function addResourcesAction(_prev: { error?: string } | undefined, 
     await ensureTopicResources(t, grade, lesson?.content_md ?? null);
   } catch (err) {
     await logError("learning.resources", err, { userId: profile.id, meta: { topicId } });
-    return { error: err instanceof Error ? err.message : "Could not draw this topic." };
+    return failed("actions.learning.addResources", err, "Could not draw this topic.");
   }
   revalidatePath(`/learn/topic/${topicId}`);
   return {};
@@ -77,7 +78,7 @@ export async function prepareWeekAction(): Promise<{ error?: string; prepared?: 
 }
 
 /** Generates a practice set for a topic or a mixed ACT section and sends the student to it. */
-export async function createQuizAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function createQuizAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { profile, family } = await requireStudent();
   const topicId = String(formData.get("topic_id") ?? "") || null;
   const actSection = String(formData.get("act_section") ?? "") || null;
@@ -144,7 +145,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
       learner: learnerPromptLine(profile.learner_profile),
     });
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not generate the quiz." };
+    return failed("actions.learning.createQuiz", err, "Could not generate the quiz.");
   }
 
   const { data: quiz, error } = await admin
@@ -162,7 +163,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
     })
     .select()
     .single();
-  if (error || !quiz) return { error: error?.message ?? "Could not save the quiz." };
+  if (error || !quiz) return failed("actions.learning.createQuiz", error, "Could not save the quiz.");
 
   const { data: questions, error: qErr } = await admin
     .from("quiz_questions")
@@ -170,7 +171,7 @@ export async function createQuizAction(_prev: { error?: string } | undefined, fo
     .select("id, position");
   if (qErr || !questions) {
     await admin.from("quizzes").delete().eq("id", quiz.id);
-    return { error: qErr?.message ?? "Could not save the questions." };
+    return failed("actions.learning.createQuiz.questions", qErr, "Could not save the questions.");
   }
   await admin.from("quiz_answer_keys").insert(
     questions.map((row) => {

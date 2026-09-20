@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { report } from "@/lib/ops/fault";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { effortFor, modelFor } from "@/lib/ai/models";
 import { illustrateScene } from "@/lib/ai/illustrate";
@@ -61,7 +62,8 @@ export async function upgradeScriptVisuals(scriptId: string): Promise<void> {
       return { ...b, show, photo: photoPhrase, image: image ?? (b as StoredBeat).image ?? null };
     }));
     await admin.from("lesson_scripts").update({ script: { beats, quiz: r.script.quiz }, visuals_version: VISUALS_VERSION }).eq("id", scriptId);
-  } catch {
+  } catch (err) {
+    await report("teach.upgradeVisuals", err, { meta: { scriptId } });
     await admin.from("lesson_scripts").update({ visuals_version: null }).eq("id", scriptId);
   }
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed, report } from "@/lib/ops/fault";
 import { requireParent, requireSession } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
@@ -91,7 +92,7 @@ export async function grantCreditsAction(formData: FormData): Promise<{ error?: 
   if (!familyId || !Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 1_000_000) return { error: "Say which family and how many credits." };
   const admin = createAdminClient();
   const { error } = await admin.from("credit_entries").insert({ family_id: familyId, delta: amount, reason, kind: amount > 0 ? "grant" : "refund", granted_by: profile.id });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.access.grantCredits", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: `${amount > 0 ? "Gave" : "Took back"} ${Math.abs(amount)} credits.` };
 }
@@ -128,7 +129,7 @@ export async function buyAccessAction(formData: FormData): Promise<{ error?: str
     .insert({ family_id: family.id, student_id: studentId || null, plan: plan.id, ...window, credits_spent: price, discounted, created_by: profile.id })
     .select("id")
     .single();
-  if (error || !grant) return { error: error?.message ?? "Could not record that." };
+  if (error || !grant) return failed("actions.access.buyAccess", error, "Could not record that.");
   await admin.from("credit_entries").insert({ family_id: family.id, delta: -price, reason: discounted ? `${plan.label} (welcome price)` : plan.label, kind: "spend", ref_type: "access_grant", ref_id: grant.id, granted_by: profile.id });
   if (discounted) await admin.from("families").update({ welcome_used: true }).eq("id", family.id);
   await rewardInviter(family.id, grant.id as string, price);
@@ -175,7 +176,10 @@ async function rewardInviter(buyerFamilyId: string, grantId: string, creditsSpen
       });
       if (!error) await admin.from("access_invites").update({ rewarded_at: new Date().toISOString() }).eq("id", invite.id);
     }
-  } catch { /* the purchase stands; a reward that fails is chased from the dashboard */ }
+  } catch (err) {
+    // The purchase stands either way, but an unpaid inviter is somebody out of pocket: it is logged.
+    await report("access.rewardInviter", err, { familyId: buyerFamilyId, meta: { grantId, creditsSpent } });
+  }
 }
 
 /** A parent makes one of their two invite links. */
@@ -192,7 +196,8 @@ export async function createInviteAction(formData: FormData): Promise<{ error?: 
       PATHS.forEach((p) => revalidatePath(p));
       return { ok: "Invite ready. Send them the link.", code: data.code as string };
     }
-    if (error && !error.message.includes("duplicate")) return { error: error.message };
+    // A clash on the code is expected and retried; anything else is a real failure.
+    if (error && !error.message.includes("duplicate")) return failed("actions.access.createInvite", error, "Could not make an invite.");
   }
   return { error: "Could not make a code; try once more." };
 }

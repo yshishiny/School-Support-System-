@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -8,7 +9,7 @@ import { findTelegramChat, sendTelegram } from "@/lib/whatsapp/send";
 
 const CHILD_DOMAIN = process.env.CHILD_LOGIN_DOMAIN ?? "study.local";
 
-export async function createChildAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+export async function createChildAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { family } = await requireParent();
   const fullName = String(formData.get("full_name") ?? "").trim();
   const username = String(formData.get("username") ?? "").trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
@@ -33,7 +34,7 @@ export async function createChildAction(_prev: { error?: string; ok?: string } |
     email_confirm: true,
     user_metadata: { role: "student", full_name: fullName, family_id: family.id, grade: grade || null, avatar_emoji: emoji },
   });
-  if (error || !data.user) return { error: error?.message ?? "Could not create the account." };
+  if (error || !data.user) return failed("actions.children.addChild", error, "Could not create the account.");
   await admin.from("profiles").update({ stage, birth_date: /^\d{4}-\d{2}-\d{2}$/.test(birthDate) ? birthDate : null }).eq("id", data.user.id);
 
   if (subjects.length) {
@@ -67,7 +68,7 @@ export async function applyTimetableTemplateAction(formData: FormData) {
   revalidatePath("/today");
 }
 
-export async function updateFamilyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+export async function updateFamilyAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { family } = await requireParent();
   const supabase = await createClient();
   const timezone = String(formData.get("timezone") ?? "Africa/Cairo").trim() || "Africa/Cairo";
@@ -77,7 +78,7 @@ export async function updateFamilyAction(_prev: { error?: string; ok?: string } 
     .from("families")
     .update({ timezone, report_hour: reportHour, name })
     .eq("id", family.id);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.children.updateFamily", error);
   revalidatePath("/parent/settings");
   return { ok: "Saved." };
 }
@@ -123,7 +124,7 @@ export async function deleteTimetableAction(formData: FormData) {
   revalidatePath("/parent/children");
 }
 
-export async function connectTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+export async function connectTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { profile } = await requireParent();
   const supabase = await createClient();
   // Accept a bare id, or a pasted link like https://web.telegram.org/a/#8902952794
@@ -142,7 +143,7 @@ export async function connectTelegramAction(_prev: { error?: string; ok?: string
     return { error: "That number is the bot's own ID. Leave the box empty, send the bot a message in Telegram, and tap Connect." };
   }
   const { error } = await supabase.from("profiles").update({ telegram_chat_id: chatId }).eq("id", profile.id);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.children.connectTelegram", error);
   const test = await sendTelegram(chatId, `✅ Study Portal connected for ${profile.full_name.split(" ")[0]}. Daily reports and alerts will arrive here.`);
   revalidatePath("/parent/settings");
   return test.ok ? { ok: `Connected to ${name}. A test message was sent.` } : { error: `Saved, but the test message failed: ${test.error}` };
@@ -206,12 +207,12 @@ export async function updateChildProfileAction(_prev: { error?: string; ok?: str
     rater: formData.get("rater") === "on",
   };
   const { error } = await admin.from("profiles").update(patch).eq("id", studentId);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.children.updateChildProfile", error);
   const pw = String(formData.get("new_password") ?? "");
   if (pw) {
     if (pw.length < 6) return { error: "Saved, but the new password needs 6+ characters." };
     const { error: pwErr } = await admin.auth.admin.updateUserById(studentId, { password: pw });
-    if (pwErr) return { error: `Saved, but the password was not changed: ${pwErr.message}` };
+    if (pwErr) return failed("actions.children.updateChildProfile.password", pwErr, "Saved, but the password was not changed.");
   }
   ["/parent", "/parent/children", "/parent/progress", "/today", "/me", "/coach"].forEach((p) => revalidatePath(p));
   return { ok: pw ? "Saved, password changed." : "Saved." };

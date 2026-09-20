@@ -1,5 +1,7 @@
 "use server";
 
+import { report } from "@/lib/ops/fault";
+import { failed } from "@/lib/ops/fault";
 import { logError } from "@/lib/ops/log";
 
 import { revalidatePath } from "next/cache";
@@ -52,7 +54,7 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
     .insert({ student_id: profile.id, family_id: family.id, task_id: t.id, task_code: t.code, kind: t.kind, path, sha256: sha256 || null, taken_on: today })
     .select("id")
     .single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.snaps.registerSnap", error, "Could not save.");
 
   // AI first opinion (when the family keeps it on). Failures never block the child: the snap stays pending.
   let verdict = "error";
@@ -95,8 +97,8 @@ export async function registerSnapAction(taskId: string, path: string, sha256: s
       }
       await admin.from("snaps").update({ ai_verdict: r.verdict, ai_score: Math.round(r.score * 100) / 100, ai_note: r.note, ai_detail: Object.keys(detail).length ? detail : null }).eq("id", row.id);
     } catch (err) {
-      await logError("snaps.check", err, { familyId: family.id, userId: profile.id, meta: { snapId: row.id, task: t.code } });
-      await admin.from("snaps").update({ ai_verdict: "error", ai_note: `AI check failed: ${err instanceof Error ? err.message : String(err)}` }).eq("id", row.id);
+      const ref = await report("snaps.check", err, { familyId: family.id, userId: profile.id, meta: { snapId: row.id, task: t.code } });
+      await admin.from("snaps").update({ ai_verdict: "error", ai_note: `The check could not run (ref ${ref}). A parent can still approve it.` }).eq("id", row.id);
     }
   }
 

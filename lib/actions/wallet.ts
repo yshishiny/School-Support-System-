@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
@@ -72,7 +73,7 @@ export async function handOverAction(formData: FormData): Promise<{ error?: stri
     ref_type: "manual",
     created_by: profile.id,
   });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.wallet.handOver", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: `${amount} EGP handed over.` };
 }
@@ -94,7 +95,7 @@ export async function adjustWalletAction(formData: FormData): Promise<{ error?: 
     ref_type: "manual",
     created_by: profile.id,
   });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.wallet.adjustWallet", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: `${amount} EGP added.` };
 }
@@ -119,7 +120,7 @@ export async function spendAction(formData: FormData): Promise<{ error?: string;
     ref_type: "manual",
     created_by: profile.id,
   });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.wallet.spend", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: `${amount} EGP written down.` };
 }
@@ -145,7 +146,7 @@ export async function claimExpenseAction(formData: FormData): Promise<{ error?: 
     .from("wallet_entries")
     .update({ claim_status: "requested", claim_purpose: purpose, claim_reason: reason, asked_permission: asked === "yes", claim_decided_by: null, claim_decided_at: null })
     .eq("id", id);
-  if (error) return { error: error.message };
+  if (error) return failed("actions.wallet.claimExpense", error);
   PATHS.forEach((p) => revalidatePath(p));
   return { ok: asked === "yes" ? "Asked for. Your dad will look at it." : "Asked for. Be honest that you did not ask first; he decides." };
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { generateCoachReport } from "@/lib/coach/run";
@@ -15,6 +16,6 @@ export async function generateCoachReportAction(studentId: string): Promise<{ er
     ["/parent/progress", "/parent", "/today", "/parent/plan"].forEach((p) => revalidatePath(p));
     return { headline: report.headline };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "The coach could not run." };
+    return failed("actions.coach.generateCoachReport", err, "The coach could not run.");
   }
 }

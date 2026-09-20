@@ -1,6 +1,6 @@
 "use server";
 
-import { logError } from "@/lib/ops/log";
+import { failed } from "@/lib/ops/fault";
 
 import { revalidatePath } from "next/cache";
 import { requireSession } from "@/lib/auth";
@@ -24,7 +24,7 @@ export async function registerGradeSheetAction(studentId: string, path: string, 
   const m = month && /^\d{4}-\d{2}$/.test(month) ? `${month}-01` : `${today.slice(0, 7)}-01`;
   const { data: prev } = await admin.from("grade_sheets").select("average").eq("student_id", studentId).eq("status", "ready").lt("month", m).order("month", { ascending: false }).limit(1).maybeSingle();
   const { data: row, error } = await admin.from("grade_sheets").upsert({ student_id: studentId, family_id: family.id, month: m, path, mime, status: "new", previous_average: prev?.average ?? null }, { onConflict: "student_id,month" }).select("id").single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.grades.registerGradeSheet", error, "Could not save.");
   try {
     const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(path);
     if (!file) throw new Error("Could not read the file back.");
@@ -35,10 +35,9 @@ export async function registerGradeSheetAction(studentId: string, path: string, 
     PATHS.forEach((p) => revalidatePath(p));
     return { average: r.average, appraisal: r.appraisal };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    await logError("grades.read", err, { meta: { sheetId: row.id } });
+    const { error: msg } = await failed("actions.grades.readGradeSheet", err, "Saved, but the sheet could not be read.");
     await admin.from("grade_sheets").update({ status: "failed", error: msg }).eq("id", row.id);
     PATHS.forEach((p) => revalidatePath(p));
-    return { error: `Saved, but it could not be read: ${msg}` };
+    return { error: msg };
   }
 }

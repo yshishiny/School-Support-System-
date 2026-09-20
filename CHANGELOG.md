@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.0.0-beta.23 — Every failure says where it happened (20 September 2026, `v2` branch)
+
+- **A child can now report a fault.** Anything that genuinely breaks hands back a plain sentence and a six-character reference: *“That is already saved. (ref k3f9a2)”*. The same reference is on the log row, next to the exact function it happened in, so “it said k3f9a2” finds one row instead of a haystack. The characters avoid everything that is misread aloud — no 0, O, 1, l or i.
+- **No child is shown a database error again.** Thirty-eight places handed a Postgres message straight to the screen — `duplicate key value violates unique constraint "kpi_ticks_pkey"` — and logged nothing at all. Each now reads as a sentence: *that is already saved*, *something required was left empty*, *you are not allowed to do that*. The raw text, the code and the constraint go to the log where they are useful. Every code in that table was checked by provoking the failure on the real database, not written from memory.
+- **A refusal is no longer treated as a fault.** “Pick a plan”, “title is required” — the app working correctly. These stay exactly as they were: no reference, no log, no noise. Only things that actually broke are recorded.
+- **Failures that used to vanish now leave a trace.** A referral bonus that never paid, a mosque bonus that never landed, a lesson that was never illustrated, a video search against an expired key — all were `catch {}`, which meant nobody ever found out. Each one still refuses to take the child's tap down with it, and each one now says so in the log. The handful still deliberately silent — the logger's own fallbacks, and the edge middleware, which has no route to the log — say in a comment that they were a decision.
+- **Every failure knows who hit it.** The signed-in child is remembered for the length of the request, so a log row names them without a single id being passed down through the code. Most failures used to be recorded against nobody.
+- **The Admin error log is built around the question it gets asked.** A box at the top takes the reference somebody quoted. Below it, the failures group by function, so "which part is breaking" is answered before reading a single row, and each row shows the database code and what the database actually said.
+- Fixed: a Wikimedia timeout used to be cached as “no photograph exists for this phrase”, permanently. A search that ran and found nothing is still remembered; a search that failed is not.
+
 ## 2.0.0-beta.22 — The lesson opens at once, and no page needs scrolling (19 September 2026, `v2` branch)
 
 - **Tapping a topic no longer costs a minute of waiting.** The teacher used to write the lesson *and* draw every scene before the child saw anything. Now the words are saved and the lesson opens the moment they exist; the drawings and photographs arrive behind it, and the stage says "pictures coming" rather than showing a spinner. A drawing that fails leaves the lesson whole and is retried the next time it is opened.

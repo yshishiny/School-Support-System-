@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 
@@ -9,7 +10,7 @@ function revalidateAll() {
   PATHS.forEach((p) => revalidatePath(p));
 }
 
-export async function createAssignmentAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function createAssignmentAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { profile } = await requireSession();
   const supabase = await createClient();
   const isParent = profile.role === "parent";
@@ -28,7 +29,7 @@ export async function createAssignmentAction(_prev: { error?: string } | undefin
     source: isParent ? "manual" : "student",
     created_by: profile.id,
   });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.assignments.createAssignment", error);
   revalidateAll();
   return {};
 }

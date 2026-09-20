@@ -1,5 +1,6 @@
 "use server";
 
+import { failed, report } from "@/lib/ops/fault";
 import { weekFor } from "@/lib/allowance";
 import { openCompensation } from "@/lib/compensation/run";
 
@@ -40,7 +41,10 @@ async function awardMosqueBonuses(studentId: string, logDate: string): Promise<n
         if (!error) earned += PRAYER_POINTS.FAJR_MOSQUE_WEEK_BONUS;
       }
     }
-  } catch { /* the prayer is saved; a bonus is not worth failing the tap */ }
+  } catch (err) {
+    // The prayer is saved; a bonus is not worth failing the tap, but a bonus that never paid is worth knowing.
+    await report("prayers.mosqueBonus", err, { userId: studentId, meta: { logDate } });
+  }
   return earned;
 }
 
@@ -62,7 +66,7 @@ export async function logPrayerAction(prayer: PrayerName, atMosque = false): Pro
   // Congregation only counts when he was there for it: a prayer already missed cannot become a mosque prayer.
   const mosque = atMosque && status === "on_time";
   const { data: row, error } = await admin.from("prayer_logs").insert({ student_id: profile.id, log_date: logDate, prayer, status, logged_at: now.toISOString(), at_mosque: mosque }).select("id").single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.prayers.logPrayer", error, "Could not save.");
 
   let earned = 0;
   const { error: pErr } = await admin.from("points_ledger").insert({
@@ -119,7 +123,7 @@ export async function logPastPrayerAction(prayer: PrayerName, date: string, clai
     .insert({ student_id: profile.id, log_date: date, prayer, status, logged_at: new Date().toISOString(), entered_late: true, claim: atSchool ? "school" : "other" })
     .select("id")
     .single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.prayers.logPastPrayer", error, "Could not save.");
   const delta = pastPrayerPoints(claim, atSchool);
   let earned = 0;
   const reason = claim === "missed" ? `${prayer[0].toUpperCase() + prayer.slice(1)}: missed, said honestly` : `${prayer[0].toUpperCase() + prayer.slice(1)} prayer ${claim === "on_time" ? (atSchool ? "on time at school" : "on time (logged later)") : "(late)"}`;

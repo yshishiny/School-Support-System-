@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { failed } from "@/lib/ops/fault";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push/server";
@@ -16,7 +17,7 @@ export async function savePushSubscriptionAction(sub: SubscriptionInput): Promis
   const h = await headers();
   const supabase = await createClient();
   const { error } = await supabase.from("push_subscriptions").upsert({ user_id: profile.id, endpoint: sub.endpoint, p256dh: sub.keys.p256dh, auth: sub.keys.auth, user_agent: (h.get("user-agent") ?? "").slice(0, 200) }, { onConflict: "endpoint" });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.push.savePushSubscription", error);
   ["/me", "/parent/settings"].forEach((p) => revalidatePath(p));
   return {};
 }

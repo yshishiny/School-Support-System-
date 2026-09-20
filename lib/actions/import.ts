@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { parseWhatsAppExport, filterSince, renderForModel } from "@/lib/whatsapp/parse-export";
@@ -46,14 +47,14 @@ export async function analyzeExportAction(_prev: AnalyzeResult | undefined, form
   try {
     images = await imagesFrom(formData);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Bad image." };
+    return failed("actions.import.analyzeExport", err, "Bad image.");
   }
   if (images.length > 0) {
     try {
       const extraction = await extractItemsFromImages(images, today);
       return { studentId, messageCount: images.length, summary: extraction.summary, items: extraction.items };
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Could not read the photos." };
+      return failed("actions.import.analyzeExport", err, "Could not read the photos.");
     }
   }
 
@@ -76,7 +77,7 @@ export async function analyzeExportAction(_prev: AnalyzeResult | undefined, form
     const extraction = await extractItemsFromMessages(renderForModel(messages), today, conventions);
     return { studentId, messageCount: messages.length, summary: extraction.summary, items: extraction.items };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Analysis failed." };
+    return failed("actions.import.analyzeExport", err, "Analysis failed.");
   }
 }
 
@@ -144,7 +145,7 @@ export async function analyzeTimetablePhotoAction(_prev: TimetableAnalyzeResult 
   try {
     images = await imagesFrom(formData);
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Bad image." };
+    return failed("actions.import.analyzeTimetablePhoto", err, "Bad image.");
   }
   if (images.length !== 1) return { error: "Upload exactly one timetable photo." };
   try {
@@ -152,7 +153,7 @@ export async function analyzeTimetablePhotoAction(_prev: TimetableAnalyzeResult 
     if (tt.entries.length === 0) return { error: "No lessons found in that photo." };
     return { studentId, grade: tt.grade, entries: tt.entries };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "Could not read the timetable." };
+    return failed("actions.import.analyzeTimetablePhoto", err, "Could not read the timetable.");
   }
 }
 

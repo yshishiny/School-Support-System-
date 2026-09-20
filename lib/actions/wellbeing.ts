@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { INSTRUMENTS, scoreInstrument, type Instrument } from "@/lib/wellbeing";
@@ -44,7 +45,7 @@ export async function submitCheckAction(instrument: Instrument, answers: Record<
     .insert({ student_id: profile.id, instrument, answers: clean, score, band, free_text: text, taken_on: today })
     .select("id")
     .single();
-  if (error || !row) return { error: error?.message ?? "Could not save." };
+  if (error || !row) return failed("actions.wellbeing.submitCheck", error, "Could not save.");
 
   // Points once per instrument per day.
   let earned = 0;
@@ -113,7 +114,8 @@ export async function coachChatAction(message: string): Promise<ChatReply> {
     }
     return { reply: out.reply, risk: out.risk_level, helplines: out.risk_level === "moderate" || out.risk_level === "high" ? HELPLINES : undefined };
   } catch (err) {
-    return { reply: "", risk: "none", error: err instanceof Error ? err.message : "The coach did not answer." };
+    const { error } = await failed("actions.wellbeing.coachReply", err, "The coach did not answer.");
+    return { reply: "", risk: "none", error };
   }
 }
 

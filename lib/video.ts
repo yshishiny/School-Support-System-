@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { attempt } from "@/lib/ops/fault";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CHARACTERS, type Character } from "@/lib/characters";
 import { CLOUD_VOICES, defaultCloudVoice } from "@/lib/tts";
@@ -227,6 +228,7 @@ export async function renderScript(o: { characterId: string; voice: string; beat
   ];
   for (const b of lines) {
     if (!kinds.includes(b.kind as BeatKind)) continue;
-    try { await requestClip({ characterId: o.characterId, voice: o.voice, text: b.say }); } catch { /* next line */ }
+    // One line that will not render must not cost the rest of the lesson its presenter.
+    await attempt("video.requestClip", () => requestClip({ characterId: o.characterId, voice: o.voice, text: b.say }), null);
   }
 }

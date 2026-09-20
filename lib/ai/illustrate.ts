@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { effortFor, modelFor } from "./models";
+import { report } from "@/lib/ops/fault";
 import { sanitizeSvg } from "@/lib/svg";
 import { GeometrySchema, GraphSchema, renderGeometry, renderGraph } from "@/lib/teach/geometry";
 
@@ -74,7 +75,9 @@ export async function illustrateScene(o: { subject: string; topic: string; langu
     const svg = sanitizeSvg(drawn);
     if (!svg || !/data-step=/.test(svg)) return null;
     return { svg, cues: out.cues };
-  } catch {
+  } catch (err) {
+    // A lesson without a diagram is still a lesson, so the beat goes on without one — logged, not hidden.
+    await report("ai.illustrateScene", err, { meta: { subject: o.subject, topic: o.topic } });
     return null;
   }
 }

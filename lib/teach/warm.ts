@@ -1,3 +1,4 @@
+import { report } from "@/lib/ops/fault";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
 import { generateLessonScript, SCRIPT_VERSION, VISUALS_VERSION } from "@/lib/ai/lesson-script";
@@ -83,8 +84,9 @@ export async function warmLessonScripts(studentId: string, budgetMs: number): Pr
         visuals_version: VISUALS_VERSION,
       });
       if (!error) done.push(topic.name);
-    } catch {
-      // One topic that will not write must not stop the rest of the night.
+    } catch (err) {
+      // One topic that will not write must not stop the rest of the night, but it is not a secret either.
+      await report("teach.warmLesson", err, { userId: studentId, meta: { topic: topic.name, topicId: topic.id } });
     }
   }
   return done;

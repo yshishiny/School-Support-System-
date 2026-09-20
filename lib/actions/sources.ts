@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { checkSource } from "@/lib/sources/check";
@@ -14,7 +15,7 @@ export async function addSourceAction(_prev: { error?: string } | undefined, for
   if (/facebook\.com|instagram\.com/i.test(url)) return { error: "Facebook and Instagram pages cannot be read without logging in, so they will come back empty. Use the school website's news page, or export the WhatsApp group instead." };
   const supabase = await createClient();
   const { data, error } = await supabase.from("sources").insert({ family_id: family.id, student_id: studentId, label, url }).select("id, family_id, label, url, last_hash").single();
-  if (error || !data) return { error: error?.message ?? "Could not save." };
+  if (error || !data) return failed("actions.sources.addSource", error, "Could not save.");
   const r = await checkSource(data);
   revalidatePath("/parent/import");
   return r.error ? { error: `Saved, but the first check failed: ${r.error}` } : {};

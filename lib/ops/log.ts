@@ -5,8 +5,9 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { addToInbox } from "@/lib/inbox";
 import { APP_VERSION } from "@/lib/version";
+import { who } from "./who";
 
-export interface ErrorContext { familyId?: string | null; userId?: string | null; meta?: Record<string, unknown> }
+export interface ErrorContext { familyId?: string | null; userId?: string | null; ref?: string | null; meta?: Record<string, unknown> }
 
 /** Which deployment reported it: the two sites (main = live, v2 = beta) share this log. */
 export function siteTag(): { site: string; version: string } {
@@ -16,10 +17,14 @@ export function siteTag(): { site: string; version: string } {
 export async function logError(area: string, err: unknown, ctx: ErrorContext = {}): Promise<void> {
   const message = err instanceof Error ? err.message : String(err);
   const stack = err instanceof Error ? err.stack ?? null : null;
-  console.error(`[${area}]`, message);
+  // Who was on the phone, unless the caller knows better. Most failures used to be logged against nobody.
+  const seen = who();
+  const userId = ctx.userId ?? seen?.userId ?? null;
+  const familyId = ctx.familyId ?? seen?.familyId ?? null;
+  console.error(`[${area}]${ctx.ref ? ` ref=${ctx.ref}` : ""}`, message);
   try {
     const admin = createAdminClient();
-    await admin.from("app_errors").insert({ area, message: message.slice(0, 2000), stack: stack?.slice(0, 6000) ?? null, meta: { ...siteTag(), ...(ctx.meta ?? {}) }, family_id: ctx.familyId ?? null, user_id: ctx.userId ?? null });
+    await admin.from("app_errors").insert({ area, ref: ctx.ref ?? null, message: message.slice(0, 2000), stack: stack?.slice(0, 6000) ?? null, meta: { ...siteTag(), ...(ctx.meta ?? {}) }, family_id: familyId, user_id: userId });
     // Tell the administrator, at most once an hour per area.
     const { data: admins } = await admin.from("profiles").select("id, family_id").eq("is_admin", true);
     if (!admins?.length) return;

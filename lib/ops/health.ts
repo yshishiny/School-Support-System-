@@ -59,11 +59,11 @@ export async function jobChecks(): Promise<{ checks: Check[]; runs: CronRunRow[]
   return { checks, runs };
 }
 
-export interface ErrorRow { id: string; area: string; message: string; stack: string | null; meta: Record<string, unknown> | null; family_id: string | null; user_id: string | null; resolved_at: string | null; created_at: string; profiles?: { full_name: string } | null }
+export interface ErrorRow { id: string; area: string; ref: string | null; message: string; stack: string | null; meta: Record<string, unknown> | null; family_id: string | null; user_id: string | null; resolved_at: string | null; created_at: string; profiles?: { full_name: string } | null }
 
 export async function recentErrors(limit = 100): Promise<ErrorRow[]> {
   const admin = createAdminClient();
-  const { data } = await admin.from("app_errors").select("id, area, message, stack, meta, family_id, user_id, resolved_at, created_at, profiles(full_name)").order("created_at", { ascending: false }).limit(limit);
+  const { data } = await admin.from("app_errors").select("id, area, ref, message, stack, meta, family_id, user_id, resolved_at, created_at, profiles(full_name)").order("created_at", { ascending: false }).limit(limit);
   return (data ?? []) as unknown as ErrorRow[];
 }
 

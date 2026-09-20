@@ -15,6 +15,7 @@ export async function reportClientErrorAction(message: string, digest: string | 
     const { profile, family } = await requireSession();
     await logError("client", new Error(message.slice(0, 500)), { familyId: family.id, userId: profile.id, meta: extra });
   } catch {
+    // Deliberately silent: the only failure here is "nobody is signed in", and the report still lands.
     await logError("client", new Error(message.slice(0, 500)), { meta: { ...extra, anonymous: true } });
   }
 }

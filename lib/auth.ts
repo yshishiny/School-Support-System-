@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { rememberWho } from "@/lib/ops/who";
 import type { Family, Profile } from "@/lib/types";
 
 export interface Session {
@@ -20,6 +21,8 @@ export async function requireSession(): Promise<Session> {
   if (!profile) redirect("/login?error=no_profile");
   const { data: family } = await supabase.from("families").select("*").eq("id", profile.family_id).single();
   if (!family) redirect("/login?error=no_family");
+  // Anything that fails later in this request is logged against the person who hit it, with no extra plumbing.
+  rememberWho({ userId: user.id, familyId: profile.family_id, name: profile.full_name, role: profile.role });
   return { userId: user.id, profile: profile as Profile, family: family as Family };
 }
 

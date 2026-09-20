@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { failed } from "@/lib/ops/fault";
 import { createClient } from "@/lib/supabase/server";
 import { logAccess } from "@/lib/access/log";
 
@@ -13,7 +14,7 @@ export async function normalizeLogin(input: string): Promise<string> {
   return v.includes("@") ? v : `${v}@${CHILD_DOMAIN}`;
 }
 
-export async function loginAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function loginAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const email = await normalizeLogin(String(formData.get("login") ?? ""));
   const password = String(formData.get("password") ?? "");
   const supabase = await createClient();
@@ -26,7 +27,7 @@ export async function loginAction(_prev: { error?: string } | undefined, formDat
   redirect("/");
 }
 
-export async function signupAction(_prev: { error?: string; done?: boolean } | undefined, formData: FormData) {
+export async function signupAction(_prev: { error?: string; done?: boolean } | undefined, formData: FormData): Promise<{ error?: string; done?: boolean }> {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const fullName = String(formData.get("full_name") ?? "").trim();
@@ -42,7 +43,9 @@ export async function signupAction(_prev: { error?: string; done?: boolean } | u
     password,
     options: { data: { role: "parent", full_name: fullName, family_name: familyName, invite_token: inviteToken || undefined, parent_label: parentLabel || undefined } },
   });
-  if (error) return { error: /invite link/i.test(error.message) ? "This invite link is no longer valid. Ask for a new one." : error.message };
+  if (error) return /invite link/i.test(error.message)
+    ? { error: "This invite link is no longer valid. Ask for a new one." }
+    : failed("actions.auth.signUp", error, "Could not create the account.");
   if (data.session) redirect("/parent");
   return { done: true };
 }

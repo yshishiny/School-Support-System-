@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { failed, report } from "@/lib/ops/fault";
 import { presenterGenders, renderScript, videoEnabled, videoVoice } from "@/lib/video";
 import { requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -67,7 +68,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
         interests: profile.interests,
       });
     } catch (err) {
-      return { error: err instanceof Error ? err.message : "Could not write the lesson." };
+      return failed("actions.teach.startLesson", err, "Could not write the lesson.");
     }
     const { model, ...body } = script;
     // The words are enough to begin. Drawing every scene costs another minute of the strongest model, and the
@@ -78,7 +79,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
       .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: 0, visuals_started_at: new Date().toISOString() })
       .select("id")
       .single();
-    if (error || !row) return { error: error?.message ?? "Could not save the lesson." };
+    if (error || !row) return failed("actions.teach.startLesson", error, "Could not save the lesson.");
     scriptId = row.id;
     const newId = row.id as string;
     const ctx = { subject: topic?.subject ?? material?.subject ?? "School", topic: topic?.name ?? material?.title ?? "Lesson", language };
@@ -86,14 +87,16 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
       try {
         const beats = await enrichBeats(body.beats, ctx);
         await admin.from("lesson_scripts").update({ script: { beats, quiz: body.quiz }, visuals_version: VISUALS_VERSION }).eq("id", newId);
-      } catch {
-        // Leave it unclaimed so opening the lesson again picks the drawing up.
+      } catch (err) {
+        // Leave it unclaimed so opening the lesson again picks the drawing up — and say what went wrong,
+        // because a lesson that is never illustrated otherwise fails in complete silence.
+        await report("teach.enrichBeats", err, { meta: { scriptId: newId } });
         await admin.from("lesson_scripts").update({ visuals_version: null }).eq("id", newId);
       }
     });
   }
   const { data: session, error: sErr } = await admin.from("lesson_sessions").insert({ student_id: profile.id, family_id: family.id, script_id: scriptId, character_id: character.id }).select("id").single();
-  if (sErr || !session) return { error: sErr?.message ?? "Could not start the lesson." };
+  if (sErr || !session) return failed("actions.teach.startLesson", sErr, "Could not start the lesson.");
   // Presenter clips render in the background from the first line, so most are ready before the child reaches them.
   if (videoEnabled()) {
     const voice = videoVoice(character, language, null, (await presenterGenders())[character.id]);
@@ -135,7 +138,7 @@ export async function askTeacherAction(sessionId: string, beatIndex: number, que
     if (process.env.ANTHROPIC_API_KEY) classifyRisk(q).then((r) => { if (r.risk_level !== "none" && r.private_note) return admin.from("coach_notes").insert({ student_id: profile.id, note: r.private_note, source: "lesson" }); }).catch(() => null);
     return { answer };
   } catch (err) {
-    return { error: err instanceof Error ? err.message : "The teacher could not answer." };
+    return failed("actions.teach.askTeacher", err, "The teacher could not answer.");
   }
 }
 
@@ -156,7 +159,7 @@ export async function finishLessonAction(sessionId: string, seconds: number): Pr
     .insert({ student_id: profile.id, topic_id: row.lesson_scripts.topic_id, track: "school", title: `Lesson quiz: ${row.lesson_scripts.title}`, passage: null, difficulty: "medium", language: row.lesson_scripts.language === "ar" ? "ar" : "en", material_id: row.lesson_scripts.material_id })
     .select("id")
     .single();
-  if (error || !quiz) return { error: error?.message ?? "Could not create the quiz." };
+  if (error || !quiz) return failed("actions.teach.finishLesson", error, "Could not create the quiz.");
   const { data: rows } = await admin.from("quiz_questions").insert(qs.map((q, i) => ({ quiz_id: quiz.id, position: i + 1, prompt: q.prompt, choices: q.choices, skill_tag: q.skill_tag }))).select("id, position");
   if (rows?.length) await admin.from("quiz_answer_keys").insert(rows.map((r) => ({ question_id: r.id, correct_index: qs[r.position - 1].correct_index, explanation: qs[r.position - 1].explanation })));
   await admin.from("lesson_sessions").update({ finished_at: new Date().toISOString(), understanding, quiz_id: quiz.id, seconds: Math.max(0, Math.round(seconds)) }).eq("id", sessionId);

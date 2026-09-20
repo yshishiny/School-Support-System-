@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { failed } from "@/lib/ops/fault";
 import { requireAdmin } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
@@ -27,7 +28,7 @@ export async function uploadPresenterAction(characterId: string, form: FormData)
   const path = `${c.id}-${Date.now()}.${ext}`;
   const admin = createAdminClient();
   const { error } = await admin.storage.from(PRESENTER_BUCKET).upload(path, Buffer.from(await file.arrayBuffer()), { contentType: file.type || "image/jpeg", upsert: true });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.ops-video.uploadPresenter", error);
   await admin.from("ops_settings").upsert({ key: `presenter:${c.id}`, value: path, updated_at: new Date().toISOString() });
   revalidatePath("/parent/admin");
   return { ok: true };

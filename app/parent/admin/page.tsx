@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ErrorLog } from "@/components/ErrorLog";
 import { GrantCredits } from "@/components/AccessForms";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { todayIn } from "@/lib/dates";
@@ -78,11 +79,6 @@ export default async function AdminPage() {
     ...jobs.checks,
     google,
   ];
-  const byArea = new Map<string, number>();
-  openErrors.forEach((e) => byArea.set(e.area, (byArea.get(e.area) ?? 0) + 1));
-  const siteOf = (e: { meta: unknown }) => { const m = e.meta as { site?: string; version?: string } | null; return m?.site ? `${m.site === "main" ? "live" : m.site}${m.version ? ` ${m.version}` : ""}` : null; };
-  const bySite = new Map<string, number>();
-  openErrors.forEach((e) => { const k = siteOf(e) ?? "untagged"; bySite.set(k, (bySite.get(k) ?? 0) + 1); });
 
   return (
     <main className="space-y-4">
@@ -123,31 +119,7 @@ export default async function AdminPage() {
             </div>
           ) },
           { id: "errors", label: "Errors", emoji: "🐞", badge: openErrors.length || null, content: (
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2">
-                {[...bySite.entries()].map(([a, n]) => <span key={`s-${a}`} className="chip chip-on">🌐 {a} · {n}</span>)}
-                {[...byArea.entries()].map(([a, n]) => <span key={a} className="chip">{a} · {n}</span>)}
-                {openErrors.length > 0 && <form action={resolveErrorsAction.bind(null, null)} className="ml-auto"><button className="btn-ghost btn-sm">Mark all resolved</button></form>}
-              </div>
-              {errors.length === 0 && <p className="card muted text-sm">No errors recorded. Every caught failure (file reading, snap check, AI calls, nightly jobs, browser crashes) from both sites, live and beta, lands here, and you get one inbox note per area per hour.</p>}
-              {errors.map((e) => (
-                <details key={e.id} className={`card !py-2 text-sm ${e.resolved_at ? "opacity-60" : ""}`}>
-                  <summary className="cursor-pointer flex flex-wrap items-center gap-2">
-                    <span>{e.resolved_at ? "✅" : "🔴"}</span>
-                    <b>{e.area}</b>
-                    {siteOf(e) && <span className="badge !py-0 !px-2 text-[10px]">{siteOf(e)}</span>}
-                    <span className="flex-1 min-w-0 truncate">{e.message}</span>
-                    <span className="text-xs muted">{e.profiles?.full_name ? `${e.profiles.full_name.split(" ")[0]} · ` : ""}{when(e.created_at)}</span>
-                  </summary>
-                  <div className="mt-2 space-y-1 text-xs">
-                    <div className="whitespace-pre-wrap break-words rounded-xl bg-panel-2 p-2">{e.message}</div>
-                    {e.meta && <div className="muted break-words">meta: {JSON.stringify(e.meta).slice(0, 600)}</div>}
-                    {e.stack && <pre className="overflow-x-auto rounded-xl bg-panel-2 p-2 text-[10px] leading-tight max-h-48">{e.stack.slice(0, 2500)}</pre>}
-                    {!e.resolved_at && <form action={resolveErrorsAction.bind(null, e.id)}><button className="btn-ghost btn-sm">Resolved</button></form>}
-                  </div>
-                </details>
-              ))}
-            </div>
+            <ErrorLog rows={errors} />
           ) },
           { id: "jobs", label: "Jobs", emoji: "⏰", content: (
             <div className="space-y-3">

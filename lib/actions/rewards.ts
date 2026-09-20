@@ -2,12 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { creditWallet } from "./wallet";
+import { failed } from "@/lib/ops/fault";
 import { todayIn } from "@/lib/dates";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 
-export async function createRewardAction(_prev: { error?: string } | undefined, formData: FormData) {
+export async function createRewardAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { family } = await requireParent();
   const supabase = await createClient();
   const title = String(formData.get("title") ?? "").trim();
@@ -24,7 +25,7 @@ export async function createRewardAction(_prev: { error?: string } | undefined, 
     cash_amount_egp: kind === "cash" ? cash : null,
     emoji: String(formData.get("emoji") ?? "🎁").trim() || "🎁",
   });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.rewards.createReward", error);
   revalidatePath("/parent/rewards");
   revalidatePath("/rewards");
   return {};
@@ -41,7 +42,7 @@ export async function toggleRewardAction(formData: FormData) {
   revalidatePath("/rewards");
 }
 
-export async function redeemRewardAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData) {
+export async function redeemRewardAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
   const { profile } = await requireStudent();
   const supabase = await createClient();
   const rewardId = String(formData.get("reward_id"));
@@ -58,7 +59,7 @@ export async function redeemRewardAction(_prev: { error?: string; ok?: string } 
   const { error } = await supabase
     .from("redemptions")
     .insert({ student_id: profile.id, reward_id: rewardId, points_spent: reward.cost_points });
-  if (error) return { error: error.message };
+  if (error) return failed("actions.rewards.redeemReward", error);
   revalidatePath("/rewards");
   revalidatePath("/parent");
   return { ok: `Requested ${reward.title}. Waiting for approval.` };
