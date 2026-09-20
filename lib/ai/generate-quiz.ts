@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { LEVEL, type Level } from "@/lib/levels";
 import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
@@ -49,6 +50,8 @@ export interface QuizSpec {
   topic: string; // topic name, or "mixed" for an ACT section set
   actSection: string | null;
   difficulty: "easy" | "medium" | "hard";
+  /** The depth of the curriculum, which is not the same thing as the difficulty of one set. */
+  level?: Level;
   count: number;
   weakSkills: string[];
   avoidPrompts: string[]; // previously seen prompts, to reduce repeats
@@ -93,6 +96,8 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
     `Difficulty: ${spec.difficulty}${spec.difficulty === "hard" ? " (the student is strong here: stretch with multi-step and transfer questions)" : spec.difficulty === "easy" ? " (build foundations: one idea per question, scaffolded)" : ""}`,
     spec.interests ? `Student's interests: ${spec.interests}${spec.themeName ? ` (app theme: ${spec.themeName})` : ""}` : null,
     spec.learner ? `${spec.learner} Shape the explanations to this (length, tone), not the difficulty.` : null,
+    // Difficulty moves within a level; the level decides what kind of question is on the table at all.
+    `How to pitch the questions: ${LEVEL[spec.level ?? "basics"].quizBrief}`,
     spec.checkpoint ? `CHECKPOINT: this is a verification test, not practice. Write questions that only a student who actually attended and understood the listed lessons could answer (definitions in their own words, one-step applications, "which of these was covered"). Spread questions across the listed subjects in proportion to how many lessons each has. Prefix every skill_tag with the subject name exactly as it appears in the notes, before a colon (e.g. "Physics: Newton's second law"). Keep each question short.` : null,
     spec.sourceText ? `SOURCE FILE (write every question from this content only; do not bring in other topics; keep the teacher's instructions in mind):\n"""\n${spec.sourceText.slice(0, 20000)}\n"""` : null,
     `Number of questions: ${spec.count}`,

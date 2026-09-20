@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.1 — Every lesson at two depths, and here the depth is what credits buy (20 September 2026, `v2` branch)
+
+- **The same topic, taught shallow or deep.** Every topic now carries two lessons over the same curriculum: **The basics** — the rule, one worked example, enough to attempt tonight's homework — and **Go deeper** — why the rule holds, where it breaks, the multi-step example, and the trap an exam sets on it.
+- **The basics are free here too.** What a family buys is the depth and the teacher who performs it. A child without access sees the deep tab, is told plainly what is in it, and is never nagged; a child whose family has paid opens it.
+- **Practice follows the same line.** Easy, medium and hard move within a level; the level decides what kind of question exists at all. Paid sets combine topics, transfer the idea somewhere unfamiliar, and build the wrong answers out of the specific misunderstanding a student has there.
+- The gate is one small file — the only place the two sites differ on this — so every page above it is written once. A lookup that fails hands out the free lesson rather than the paid one, and is logged.
+
 ## 2.0.0-beta.27 — The mosque can be claimed afterwards (20 September 2026, `v2` branch)
 
 - **A prayer at the mosque logged later now counts as congregation.** The mosque buttons only existed inside the prayer's window, and almost nobody logs inside it — Fajr is prayed at five and entered at noon — so the 20-point day and the 25-point Fajr week were unreachable in practice. Filling in a past prayer now offers *🕌 On time, mosque* beside *On time, elsewhere*, on Today and on the Allowance catch-up list alike.

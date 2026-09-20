@@ -2,6 +2,7 @@
 
 import { useActionState, useCallback, useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import type { Level } from "@/lib/levels";
 import { runAction } from "@/lib/client-action";
 import { addResourcesAction, createQuizAction, explainTopicAction, prepareWeekAction } from "@/lib/actions/learning";
 import { Notice, SubmitButton } from "./ui";
@@ -20,7 +21,7 @@ export function PracticeButton({ topicId, actSection, recall = false, label = "P
   );
 }
 
-export function ExplainButton({ topicId }: { topicId: string }) {
+export function ExplainButton({ topicId, level = "basics" }: { topicId: string; level?: Level }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -30,19 +31,20 @@ export function ExplainButton({ topicId }: { topicId: string }) {
       setError(null);
       const fd = new FormData();
       fd.set("topic_id", topicId);
+      fd.set("level", level);
       const r = await runAction(() => explainTopicAction(undefined, fd), setError);
       if (!r) return;
       if (r.error) setError(r.error);
       else router.refresh();
     });
-  }, [topicId, router]);
+  }, [topicId, level, router]);
   useEffect(() => {
     // Arriving from "we haven't taken this yet": start writing the lesson at once.
     if (!auto && typeof window !== "undefined" && new URLSearchParams(window.location.search).get("explain") === "1") { setAuto(true); run(); }
   }, [auto, run]);
   return (
     <div className="space-y-2">
-      <button type="button" disabled={pending} className="btn-primary w-full" onClick={run}>{pending ? "Writing the lesson… up to 90 seconds, stay on this page" : "📖 Explain this topic to me"}</button>
+      <button type="button" disabled={pending} className="btn-primary w-full" onClick={run}>{pending ? "Writing the lesson… up to 90 seconds, stay on this page" : level === "advanced" ? "🎓 Write the deeper lesson" : "📖 Explain this topic to me"}</button>
       {error && <p className="text-sm text-bad">{error} <button type="button" className="underline" onClick={run}>Try again</button></p>}
     </div>
   );
