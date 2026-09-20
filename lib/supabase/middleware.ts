@@ -3,7 +3,10 @@ import { NextResponse, type NextFetchEvent, type NextRequest } from "next/server
 import { logAccess } from "@/lib/access/log";
 import { touchPresence } from "@/lib/access/presence";
 
-const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron", "/demo"];
+// /api/version answers "which build is serving?" and nothing else. It has to be public: the tab most likely to
+// ask is one left open for hours, whose session has quietly lapsed — and a redirect to /login there turns the
+// staleness check into a silent no, which is how a redeployed page came to be reported as a code fault.
+const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron", "/api/version", "/demo"];
 
 export async function updateSession(request: NextRequest, event?: NextFetchEvent) {
   let response = NextResponse.next({ request });
