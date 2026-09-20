@@ -5,6 +5,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { prettyDate, shiftDate, todayIn } from "@/lib/dates";
 import { SNAP_TEMPLATES, type HandwritingAnalysis } from "@/lib/snaps";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
+import { Tabs } from "@/components/Tabs";
 import { SnapReview } from "@/components/SnapReview";
 
 const VERDICT: Record<string, { icon: string; text: string }> = {
@@ -58,23 +59,12 @@ export default async function RaterSnapsPage() {
   const nameOf = (id: string) => siblings.find((s) => s.id === id)?.full_name.split(" ")[0] ?? "someone";
   const taskOf = (code: string) => tasks.find((t) => t.code === code) ?? SNAP_TEMPLATES.find((t) => t.code === code);
 
-  return (
-    <main className="space-y-3">
-      <header className="flex items-center gap-3">
-        <span className="text-3xl">🧐</span>
-        <div className="flex-1 min-w-0">
-          <h1 className="h1">Check their snaps</h1>
-          <p className="text-xs muted">Your brothers&apos; pictures. Say whether each one is done; your dad confirms it and the points follow.</p>
-        </div>
-        <Link href="/snaps" className="btn-ghost btn-sm">Mine</Link>
-      </header>
-
-      {pending.length === 0 ? (
-        <p className="card text-sm muted">Nothing waiting. Anything they send in the next few days turns up here.</p>
-      ) : (
-        <p className="text-xs muted px-1">{pending.length} waiting for you</p>
-      )}
-
+  // Three piles, one at a time: what she has to look at, what she has answered and is waiting on Dad, and what
+  // is finished. Stacked, the finished ones pushed the work she actually has to do off the screen.
+  const toCheck = pending.length === 0 ? (
+    <p className="card text-sm muted">Nothing waiting. Anything they send in the next few days turns up here.</p>
+  ) : (
+    <>
       {pending.map((s) => {
         const t = taskOf(s.task_code);
         const v = VERDICT[s.ai_verdict ?? "error"] ?? VERDICT.error;
@@ -98,36 +88,59 @@ export default async function RaterSnapsPage() {
           </article>
         );
       })}
+      <p className="text-[11px] muted px-1">Your answer is a recommendation: your dad makes the final call and the points move then.</p>
+    </>
+  );
 
-      {said.length > 0 && (
-        <section className="card !py-3 space-y-2">
-          <h2 className="h2">Waiting for your dad · {said.length}</h2>
-          {said.map((s) => (
-            <div key={s.id} className="flex items-center gap-2 text-sm">
-              <span>{s.rater_verdict === "approved" ? "👍" : "👎"}</span>
-              <span className="flex-1 min-w-0 truncate">{nameOf(s.student_id)} · {taskOf(s.task_code)?.label ?? s.task_code}</span>
-              <span className="text-[11px] muted">you said {s.rater_verdict === "approved" ? "done" : "not done"}</span>
-            </div>
-          ))}
-          <p className="text-[11px] muted">He sees your name on each one. Nothing is paid until he agrees.</p>
-        </section>
-      )}
+  const withDad = said.length === 0 ? (
+    <p className="card text-sm muted">Nothing of yours is waiting on him.</p>
+  ) : (
+    <section className="card !py-3 space-y-2">
+      {said.map((s) => (
+        <div key={s.id} className="flex items-center gap-2 text-sm">
+          <span>{s.rater_verdict === "approved" ? "👍" : "👎"}</span>
+          <span className="flex-1 min-w-0 truncate">{nameOf(s.student_id)} · {taskOf(s.task_code)?.label ?? s.task_code}</span>
+          <span className="text-[11px] muted">you said {s.rater_verdict === "approved" ? "done" : "not done"}</span>
+        </div>
+      ))}
+      <p className="text-[11px] muted">He sees your name on each one. Nothing is paid until he agrees.</p>
+    </section>
+  );
 
-      {decided.length > 0 && (
-        <details className="card !py-3">
-          <summary className="cursor-pointer font-bold" style={{ fontFamily: "var(--font-display)" }}>Already decided · {decided.length}</summary>
-          <ul className="mt-2 divide-y divide-line text-sm">
-            {decided.map((s) => (
-              <li key={s.id} className="flex items-center gap-2 py-1.5">
-                <span className="flex-1 min-w-0 truncate">{taskOf(s.task_code)?.emoji ?? "📷"} {nameOf(s.student_id)} · {taskOf(s.task_code)?.label ?? s.task_code}</span>
-                <span className={`badge ${s.status === "approved" ? "text-good" : "text-bad"}`}>{s.status === "approved" ? "approved" : "sent back"}</span>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
+  const finished = decided.length === 0 ? (
+    <p className="card text-sm muted">Nothing decided in the last week.</p>
+  ) : (
+    <section className="card !py-3">
+      <ul className="divide-y divide-line text-sm">
+        {decided.map((s) => (
+          <li key={s.id} className="flex items-center gap-2 py-1.5">
+            <span className="flex-1 min-w-0 truncate">{taskOf(s.task_code)?.emoji ?? "📷"} {nameOf(s.student_id)} · {taskOf(s.task_code)?.label ?? s.task_code}</span>
+            <span className={`badge ${s.status === "approved" ? "text-good" : "text-bad"}`}>{s.status === "approved" ? "approved" : "sent back"}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 
-      <p className="text-[11px] muted px-1">Your own pictures never appear here, and your answer is a recommendation: your dad makes the final call and the points move then.</p>
+  return (
+    <main className="space-y-3">
+      <header className="flex items-center gap-3">
+        <span className="text-3xl">🧐</span>
+        <div className="flex-1 min-w-0">
+          <h1 className="h1">Check their snaps</h1>
+          <p className="text-xs muted">Say whether each one is done; your dad confirms it and the points follow. Your own pictures never appear here.</p>
+        </div>
+        <Link href="/snaps" className="btn-ghost btn-sm">Mine</Link>
+      </header>
+
+      <Tabs
+        storageKey="snaps-review"
+        tabs={[
+          { id: "check", label: "To check", emoji: "🧐", badge: pending.length, content: toCheck },
+          { id: "dad", label: "With Dad", emoji: "⏳", badge: said.length, content: withDad },
+          { id: "done", label: "Decided", emoji: "✅", content: finished },
+        ]}
+      />
     </main>
   );
 }

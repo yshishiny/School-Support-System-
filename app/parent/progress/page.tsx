@@ -8,6 +8,7 @@ import { setProfessionalGuidanceAction } from "@/lib/actions/guidance";
 import type { Profile, Topic } from "@/lib/types";
 import { subjectEmoji, subjectLabel } from "@/lib/plan";
 import ReactMarkdown from "react-markdown";
+import { Tabs } from "@/components/Tabs";
 import { CoachButton } from "@/components/CoachButton";
 import type { CoachReport } from "@/lib/types";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -66,7 +67,7 @@ export default async function ProgressPage() {
         const exams = examsFor(s.target_exam, s.grade);
         const coach = coachByStudent.get(s.id) ?? null;
         const content = (
-          <section className="card space-y-4">
+          <section className="space-y-3">
             <div className="flex items-center gap-3">
               <div className="text-3xl">{s.avatar_emoji}</div>
               <div className="flex-1">
@@ -75,6 +76,15 @@ export default async function ProgressPage() {
               </div>
             </div>
 
+
+            {/* One child is eleven blocks of reading. Four tabs: how he is, how school is going, what the
+                coach found, and the settings you touch twice a year. */}
+            <Tabs
+              storageKey={`progress-${s.id}`}
+              size="sm"
+              tabs={[
+                { id: "now", label: "How he is", emoji: "🟢", content: (
+                  <>
             {(() => {
               const w = wellbeingByStudent.get(s.id)!;
               const light = w.band === "green" ? "🟢" : w.band === "amber" ? "🟡" : w.band === "red" ? "🔴" : "⚪";
@@ -84,37 +94,6 @@ export default async function ProgressPage() {
                   <div className="flex-1">
                     <div className="font-semibold">Wellbeing check-ins <span className="muted font-normal">· {w.checks} in the last 5 weeks</span></div>
                     <div className="muted text-xs">{w.note} You see this light only; his answers and his chat with the coach stay private unless there is danger.</div>
-                  </div>
-                </div>
-              );
-            })()}
-
-            <div className="rounded-xl border border-line p-3 text-sm space-y-2">
-              <div className="flex items-center gap-2"><span className="text-2xl">📊</span><div className="flex-1"><div className="font-semibold">Monthly grades sheet <span className="muted font-normal">· appraisal</span></div><div className="muted text-xs">He uploads a photo each month from Me → Grades; you can too. The AI transcribes and compares with last month.</div></div></div>
-              {gradesFor(s.id).length === 0 ? <p className="text-xs muted">No sheet yet.</p> : gradesFor(s.id).map((g) => (
-                <div key={g.month} className="text-xs space-y-0.5">
-                  <div className="font-semibold">{g.month.slice(0, 7)}{g.average !== null ? ` · average ${g.average}%` : ""}{g.previous_average !== null && g.average !== null ? ` (${Number(g.average) >= Number(g.previous_average) ? "▲" : "▼"} from ${g.previous_average}%)` : ""}{g.status !== "ready" ? ` · ${g.status}` : ""}</div>
-                  {g.items && g.items.length > 0 && <div className="muted">{g.items.map((i) => `${i.subject} ${i.grade}`).join(" · ")}</div>}
-                  {g.appraisal && <p className="muted">{g.appraisal}</p>}
-                </div>
-              ))}
-              <GradeSheetUploader familyId={family.id} studentId={s.id} month={today.slice(0, 7)} />
-            </div>
-
-            <CheckpointPanel studentId={s.id} firstName={s.full_name.split(" ")[0]} rows={checkpointsFor(s.id)} subjects={subjectsFor(s.id)} />
-
-            {(() => {
-              const rows = straightFor(s.id);
-              return (
-                <div className="rounded-xl border border-line p-3 text-sm flex items-center gap-3">
-                  <span className="text-2xl">🤝</span>
-                  <div className="flex-1">
-                    <div className="font-semibold">Straight talk <span className="muted font-normal">· weekly honesty check he knows you see</span></div>
-                    {rows.length === 0 ? <div className="muted text-xs">Not answered yet. It appears on his Coach page every week.</div> : (
-                      <ul className="text-xs space-y-0.5">
-                        {rows.map((r) => { const l = straightTalkLabels(r.answers); return <li key={r.taken_on}>{r.taken_on}: {l.length ? `admitted a slip on ${l.join(", ")}` : "nothing to admit"} {l.length ? <span className="muted">· thank him for saying so; no punishment that week</span> : "✅"}</li>; })}
-                      </ul>
-                    )}
                   </div>
                 </div>
               );
@@ -144,45 +123,23 @@ export default async function ProgressPage() {
               );
             })()}
 
-            <div className="rounded-xl border border-accent/40 p-3 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <span className="font-semibold">🦸 Coach&apos;s analysis</span>
-                <div className="flex items-center gap-2">
-                  <a href={`/parent/clinician/${s.id}`} className="text-xs muted underline" title="Summary for a psychiatrist or psychologist">For a professional</a>
-                  <CoachButton studentId={s.id} hasReport={!!coach} />
+                  </>
+                ) },
+                { id: "school", label: "School", emoji: "📚", content: (
+                  <>
+            <div className="rounded-xl border border-line p-3 text-sm space-y-2">
+              <div className="flex items-center gap-2"><span className="text-2xl">📊</span><div className="flex-1"><div className="font-semibold">Monthly grades sheet <span className="muted font-normal">· appraisal</span></div><div className="muted text-xs">He uploads a photo each month from Me → Grades; you can too. The AI transcribes and compares with last month.</div></div></div>
+              {gradesFor(s.id).length === 0 ? <p className="text-xs muted">No sheet yet.</p> : gradesFor(s.id).map((g) => (
+                <div key={g.month} className="text-xs space-y-0.5">
+                  <div className="font-semibold">{g.month.slice(0, 7)}{g.average !== null ? ` · average ${g.average}%` : ""}{g.previous_average !== null && g.average !== null ? ` (${Number(g.average) >= Number(g.previous_average) ? "▲" : "▼"} from ${g.previous_average}%)` : ""}{g.status !== "ready" ? ` · ${g.status}` : ""}</div>
+                  {g.items && g.items.length > 0 && <div className="muted">{g.items.map((i) => `${i.subject} ${i.grade}`).join(" · ")}</div>}
+                  {g.appraisal && <p className="muted">{g.appraisal}</p>}
                 </div>
-              </div>
-              {coach ? (
-                <>
-                  <p className="text-sm font-medium">{coach.headline}</p>
-                  <p className="text-[11px] muted">{coach.period_start} → {coach.period_end}</p>
-                  {coach.data.focus.length > 0 && (
-                    <ul className="text-sm space-y-1">
-                      {coach.data.focus.map((f) => (
-                        <li key={f.subject} className="rounded-lg bg-warn/10 border border-warn/30 p-2">
-                          <b>Needs practice: {subjectEmoji(f.subject)} {subjectLabel(f.subject)}</b> · {f.why}
-                          {f.foundation.length > 0 && <div className="text-xs muted mt-0.5">Foundations: {f.foundation.join(" · ")}</div>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                  {coach.data.accelerate.length > 0 && (
-                    <ul className="text-sm space-y-1">
-                      {coach.data.accelerate.map((a) => (
-                        <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2"><b>Push harder: {subjectEmoji(a.subject)} {subjectLabel(a.subject)}</b> · {a.plan}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <details className="text-sm">
-                    <summary className="cursor-pointer muted">Full report</summary>
-                    <div className="prose-lesson mt-2"><ReactMarkdown>{coach.parent_md}</ReactMarkdown></div>
-                    <div className="text-xs muted mt-2">Quiz levels now: {Object.entries(coach.levels).map(([k, v]) => `${subjectLabel(k)} ${v}`).join(" · ") || "medium everywhere"}</div>
-                  </details>
-                </>
-              ) : (
-                <p className="text-xs muted">Runs every week by itself once there is data. Press to get a first analysis now: which subjects need foundations, where to push harder, and a note for {s.full_name.split(" ")[0]}.</p>
-              )}
+              ))}
+              <GradeSheetUploader familyId={family.id} studentId={s.id} month={today.slice(0, 7)} />
             </div>
+
+            <CheckpointPanel studentId={s.id} firstName={s.full_name.split(" ")[0]} rows={checkpointsFor(s.id)} subjects={subjectsFor(s.id)} />
 
             {exams.map((exam) => (
               <div key={exam} className="rounded-xl border border-line p-3 space-y-2">
@@ -232,6 +189,71 @@ export default async function ProgressPage() {
               </div>
             )}
 
+                  </>
+                ) },
+                { id: "coach", label: "Coach", emoji: "🦸", content: (
+                  <>
+            <div className="rounded-xl border border-accent/40 p-3 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-semibold">🦸 Coach&apos;s analysis</span>
+                <div className="flex items-center gap-2">
+                  <a href={`/parent/clinician/${s.id}`} className="text-xs muted underline" title="Summary for a psychiatrist or psychologist">For a professional</a>
+                  <CoachButton studentId={s.id} hasReport={!!coach} />
+                </div>
+              </div>
+              {coach ? (
+                <>
+                  <p className="text-sm font-medium">{coach.headline}</p>
+                  <p className="text-[11px] muted">{coach.period_start} → {coach.period_end}</p>
+                  {coach.data.focus.length > 0 && (
+                    <ul className="text-sm space-y-1">
+                      {coach.data.focus.map((f) => (
+                        <li key={f.subject} className="rounded-lg bg-warn/10 border border-warn/30 p-2">
+                          <b>Needs practice: {subjectEmoji(f.subject)} {subjectLabel(f.subject)}</b> · {f.why}
+                          {f.foundation.length > 0 && <div className="text-xs muted mt-0.5">Foundations: {f.foundation.join(" · ")}</div>}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {coach.data.accelerate.length > 0 && (
+                    <ul className="text-sm space-y-1">
+                      {coach.data.accelerate.map((a) => (
+                        <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2"><b>Push harder: {subjectEmoji(a.subject)} {subjectLabel(a.subject)}</b> · {a.plan}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <details className="text-sm">
+                    <summary className="cursor-pointer muted">Full report</summary>
+                    <div className="prose-lesson mt-2"><ReactMarkdown>{coach.parent_md}</ReactMarkdown></div>
+                    <div className="text-xs muted mt-2">Quiz levels now: {Object.entries(coach.levels).map(([k, v]) => `${subjectLabel(k)} ${v}`).join(" · ") || "medium everywhere"}</div>
+                  </details>
+                </>
+              ) : (
+                <p className="text-xs muted">Runs every week by itself once there is data. Press to get a first analysis now: which subjects need foundations, where to push harder, and a note for {s.full_name.split(" ")[0]}.</p>
+              )}
+            </div>
+
+            {(() => {
+              const rows = straightFor(s.id);
+              return (
+                <div className="rounded-xl border border-line p-3 text-sm flex items-center gap-3">
+                  <span className="text-2xl">🤝</span>
+                  <div className="flex-1">
+                    <div className="font-semibold">Straight talk <span className="muted font-normal">· weekly honesty check he knows you see</span></div>
+                    {rows.length === 0 ? <div className="muted text-xs">Not answered yet. It appears on his Coach page every week.</div> : (
+                      <ul className="text-xs space-y-0.5">
+                        {rows.map((r) => { const l = straightTalkLabels(r.answers); return <li key={r.taken_on}>{r.taken_on}: {l.length ? `admitted a slip on ${l.join(", ")}` : "nothing to admit"} {l.length ? <span className="muted">· thank him for saying so; no punishment that week</span> : "✅"}</li>; })}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+
+                  </>
+                ) },
+                { id: "setup", label: "Setup", emoji: "⚙️", content: (
+                  <>
             <form action={setProfessionalGuidanceAction} className="rounded-xl border border-line p-3 space-y-2">
               <input type="hidden" name="student_id" value={s.id} />
               <div>
@@ -259,6 +281,10 @@ export default async function ProgressPage() {
               </div>
               <button className="btn-ghost btn-sm">Save</button>
             </form>
+                  </>
+                ) },
+              ]}
+            />
           </section>
         );
         return { id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(idx), sub: `Grade ${s.grade ?? "—"}`, content };

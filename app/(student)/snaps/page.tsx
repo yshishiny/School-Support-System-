@@ -6,6 +6,7 @@ import { todayIn, shiftDate, prettyDate } from "@/lib/dates";
 import { dueSnapTasks, handwritingScore, isRota, ownsTask, rotaTurnEnds, snapDaysDone, taskDayState, windowOpen, type DayState, type HandwritingAnalysis, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { weekFor } from "@/lib/allowance";
 import { loadSnapTasks, signSnapUrls } from "@/lib/snaps/server";
+import { Tabs } from "@/components/Tabs";
 import { SnapCapture } from "@/components/SnapCapture";
 
 export const maxDuration = 60;
@@ -62,44 +63,10 @@ export default async function SnapsPage() {
     ? await supabase.from("snaps").select("id", { count: "exact", head: true }).eq("family_id", family.id).neq("student_id", profile.id).eq("status", "pending")
     : { count: 0 };
 
-  return (
-    <main className="space-y-4">
-      <header className="flex items-center gap-3">
-        <span className="text-4xl sticker-still">📸</span>
-        <div className="flex-1">
-          <h1 className="h1">Show your win</h1>
-          <p className="text-sm muted">Snap it, the coach checks it, a parent ticks it. Counts toward your allowance.</p>
-        </div>
-        <Link href="/today" className="btn-ghost btn-sm">Today</Link>
-      </header>
-
-      {isRater && (
-        <Link href="/snaps/review" className={`card !py-3 flex items-center gap-3 ${toCheck ? "border-2 border-accent" : ""}`}>
-          <span className="text-3xl">🧐</span>
-          <div className="flex-1 min-w-0">
-            <div className="font-bold">Check your brothers&apos; snaps</div>
-            <div className="text-xs muted">{toCheck ? `${toCheck} waiting for your tick` : "Nothing waiting just now"}</div>
-          </div>
-          <span className="text-muted">›</span>
-        </Link>
-      )}
-
-      {tasks.length === 0 && <p className="card muted text-sm">No snap tasks yet. Ask a parent to switch some on under Snaps → Tasks.</p>}
-
-      {meter.length > 0 && (
-        <section className={`card space-y-2 ${openNow.length ? "border-2 border-accent" : ""}`}>
-          <div className="flex items-center justify-between gap-2">
-            <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{openNow.length ? `${openNow.length} to snap now` : "Nothing open right now"}</div>
-            <span className="text-xs muted">This week {weekDone}/{weekDue}{pendingCount ? ` · ${pendingCount} waiting for a tick` : ""}</span>
-          </div>
-          <div className="h-2 rounded-full bg-panel-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${weekDue ? Math.round((weekDone / weekDue) * 100) : 0}%` }} /></div>
-          <div className="flex flex-wrap gap-1.5 text-xs">
-            {meter.map((m) => <span key={m.t.id} className={`chip ${m.done >= m.due ? "text-good" : ""}`}>{m.t.emoji} {m.done}/{m.due}</span>)}
-          </div>
-          <p className="text-xs muted">{family.snap_ai_check === false ? "A parent or your rater checks each picture and ticks it." : "The coach has a first look in seconds; a parent gives the final tick."} Every due day you snap keeps the allowance meter full.</p>
-        </section>
-      )}
-
+  // The meter answers "what do I owe right now"; everything else waits behind a tab. Eight cards down a phone
+  // meant the handwriting corner was never reached.
+  const todayTab = (
+    <>
       {rotaLines.length > 0 && (
         <section className="space-y-2">
           {rotaLines.map((r) => (
@@ -115,9 +82,8 @@ export default async function SnapsPage() {
         </section>
       )}
 
-      {dailyTasks.length > 0 && (
+      {dailyTasks.length > 0 ? (
         <section className="space-y-2">
-          <h2 className="h2">Today · {prettyDate(today)}</h2>
           {dailyTasks.map((t) => {
             const state = taskDayState(t, snaps, today, hhmm);
             const open = windowOpen(t, hhmm);
@@ -141,34 +107,87 @@ export default async function SnapsPage() {
             );
           })}
         </section>
-      )}
-
-      {hwTask && (
-        <section className="card space-y-3">
-          <div className="flex items-center gap-3">
-            <span className="text-3xl">✍️</span>
-            <div className="flex-1">
-              <h2 className="h2">Handwriting corner</h2>
-              <p className="text-xs muted">{hwDueToday ? "Due today: " : "Any day: "}write 4–6 lines (English or Arabic), photograph them straight on. The coach scores it and gives you one line to practise.</p>
-            </div>
-          </div>
-          {lastHw?.ai_detail && (
-            <div className="tile space-y-1 text-sm">
-              <div className="flex items-center gap-2"><span className="font-bold text-lg" style={{ fontFamily: "var(--font-display)" }}>{lastHw.ai_detail.score}/100</span><span className="muted text-xs">last sample · {prettyDate(lastHw.taken_on)}{hwSamples.length > 1 ? ` · before: ${hwSamples[hwSamples.length - 2].ai_detail?.score ?? handwritingScore(hwSamples[hwSamples.length - 2].ai_detail as HandwritingAnalysis)}` : ""}</span></div>
-              {(lastHw.ai_detail.strengths?.length ?? 0) > 0 && <div>👍 {lastHw.ai_detail.strengths!.join(" · ")}</div>}
-              {(lastHw.ai_detail.focus?.length ?? 0) > 0 && <div>🎯 Work on: {lastHw.ai_detail.focus!.join(" · ")}</div>}
-              {lastHw.ai_detail.practice_line && <div>Copy five times, then snap again:<br /><b className="text-lg" style={{ fontFamily: "var(--font-arabic), var(--font-display)" }} dir="auto">{lastHw.ai_detail.practice_line}</b></div>}
-              {hwUrls.get(lastHw.id) && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={hwUrls.get(lastHw.id)} alt="" className="rounded-xl max-h-40 object-cover w-full mt-1" />
-              )}
-            </div>
-          )}
-          <SnapCapture familyId={family.id} studentId={profile.id} taskId={hwTask.id} label="handwriting" done={!!lastHw && lastHw.taken_on === today} />
-        </section>
+      ) : (
+        <p className="card muted text-sm">Nothing to snap today.</p>
       )}
 
       <p className="text-xs muted">Rules: no people in the pictures. Pictures stay inside the family and are deleted after 30 days (handwriting samples are kept to show progress).</p>
+    </>
+  );
+
+  const handwriting = hwTask ? (
+    <section className="card space-y-3">
+      <div className="flex items-center gap-3">
+        <span className="text-3xl">✍️</span>
+        <div className="flex-1">
+          <h2 className="h2">Handwriting corner</h2>
+          <p className="text-xs muted">{hwDueToday ? "Due today: " : "Any day: "}write 4–6 lines (English or Arabic), photograph them straight on. The coach scores it and gives you one line to practise.</p>
+        </div>
+      </div>
+      {lastHw?.ai_detail && (
+        <div className="tile space-y-1 text-sm">
+          <div className="flex items-center gap-2"><span className="font-bold text-lg" style={{ fontFamily: "var(--font-display)" }}>{lastHw.ai_detail.score}/100</span><span className="muted text-xs">last sample · {prettyDate(lastHw.taken_on)}{hwSamples.length > 1 ? ` · before: ${hwSamples[hwSamples.length - 2].ai_detail?.score ?? handwritingScore(hwSamples[hwSamples.length - 2].ai_detail as HandwritingAnalysis)}` : ""}</span></div>
+          {(lastHw.ai_detail.strengths?.length ?? 0) > 0 && <div>👍 {lastHw.ai_detail.strengths!.join(" · ")}</div>}
+          {(lastHw.ai_detail.focus?.length ?? 0) > 0 && <div>🎯 Work on: {lastHw.ai_detail.focus!.join(" · ")}</div>}
+          {lastHw.ai_detail.practice_line && <div>Copy five times, then snap again:<br /><b className="text-lg" style={{ fontFamily: "var(--font-arabic), var(--font-display)" }} dir="auto">{lastHw.ai_detail.practice_line}</b></div>}
+          {hwUrls.get(lastHw.id) && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={hwUrls.get(lastHw.id)} alt="" className="rounded-xl max-h-40 object-cover w-full mt-1" />
+          )}
+        </div>
+      )}
+      <SnapCapture familyId={family.id} studentId={profile.id} taskId={hwTask.id} label="handwriting" done={!!lastHw && lastHw.taken_on === today} />
+    </section>
+  ) : null;
+
+  return (
+    <main className="space-y-3">
+      <header className="flex items-center gap-3">
+        <span className="text-4xl sticker-still">📸</span>
+        <div className="flex-1 min-w-0">
+          <h1 className="h1">Show your win</h1>
+          <p className="text-sm muted">Snap it, the coach checks it, a parent ticks it.</p>
+        </div>
+        <Link href="/today" className="btn-ghost btn-sm">Today</Link>
+      </header>
+
+      {isRater && (
+        <Link href="/snaps/review" className={`card !py-2.5 flex items-center gap-3 ${toCheck ? "border-2 border-accent" : ""}`}>
+          <span className="text-2xl">🧐</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-bold text-sm">Check your brothers&apos; snaps</div>
+            <div className="text-xs muted">{toCheck ? `${toCheck} waiting for your tick` : "Nothing waiting just now"}</div>
+          </div>
+          <span className="text-muted">›</span>
+        </Link>
+      )}
+
+      {tasks.length === 0 && <p className="card muted text-sm">No snap tasks yet. Ask a parent to switch some on under Snaps → Tasks.</p>}
+
+      {meter.length > 0 && (
+        <section className={`card !py-3 space-y-2 ${openNow.length ? "border-2 border-accent" : ""}`}>
+          <div className="flex items-center justify-between gap-2">
+            <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>{openNow.length ? `${openNow.length} to snap now` : "Nothing open right now"}</div>
+            <span className="text-xs muted">This week {weekDone}/{weekDue}{pendingCount ? ` · ${pendingCount} waiting` : ""}</span>
+          </div>
+          <div className="h-2 rounded-full bg-panel-2 overflow-hidden"><div className="h-full bg-gradient-to-r from-accent to-accent-2" style={{ width: `${weekDue ? Math.round((weekDone / weekDue) * 100) : 0}%` }} /></div>
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            {meter.map((m) => <span key={m.t.id} className={`chip ${m.done >= m.due ? "text-good" : ""}`}>{m.t.emoji} {m.done}/{m.due}</span>)}
+          </div>
+        </section>
+      )}
+
+      {handwriting ? (
+        <Tabs
+          storageKey="snaps"
+          tabs={[
+            { id: "today", label: "Today", emoji: "📸", badge: openNow.length, content: todayTab },
+            { id: "handwriting", label: "Handwriting", emoji: "✍️", badge: hwDueToday ? 1 : null, content: handwriting },
+          ]}
+        />
+      ) : (
+        <div className="space-y-3">{todayTab}</div>
+      )}
     </main>
   );
 }

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.0.0-beta.25 — The last three long pages (20 September 2026, `v2` branch)
+
+- **Snaps** stacked eight blocks down a phone, so the handwriting corner sat below everything and was never reached. The meter — what is open now, and the week so far — stays on screen; *Today* and *Handwriting* are tabs.
+- **Snaps → check their snaps** put the finished pile underneath the work, pushing what a sister actually has to look at off the screen. Three tabs now: *To check*, *With Dad*, *Decided*, each with its count.
+- **Parent → Progress** already had one tab per child, but each child's panel was eleven blocks in a single card. Inside each child: *How he is* (wellbeing light, early signals), *School* (grades sheet, checkpoints, exam readiness, the topic grid, flagged attempts), *Coach* (the analysis and straight talk), *Setup* (professional guidance, target exam).
+- With these, every page in the beta that ran long now opens on its summary and keeps the rest a tap away. A sweep of all 52 pages found the rest were already tabbed, already short, or a single form. Parents keep the side menu (a strip on phones) and children the bottom bar; neither changed.
+
 ## 2.0.0-beta.24 — The overnight lesson writing actually runs (20 September 2026, `v2` branch)
 
 - **Fixed: the lesson warming shipped in beta.22 never ran anywhere.** It lives on the beta, and the beta's nightly jobs are switched off so the two sites do not both do the shared work and pay for it twice — but the live site does not have the virtual teacher at all, so nobody was preparing lessons. The teacher's overnight work now runs on the beta even with the rest of the nightly job off: its lessons live in tables the live site never touches, so there is nothing to collide with. Tonight it has eight of Omar's topics to write.
