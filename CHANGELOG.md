@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.7.0 — Show me what you wrote (20 September 2026)
+
+- **The model has never seen a child's own work.** It writes lessons blind and marks multiple choice, which tells you whether he picked the right letter and nothing about where his method breaks. Under a lesson there is now **Check my working**: photograph what you wrote, and be told which line first goes wrong.
+- **It stops short of the answer, deliberately.** He gets the first wrong line, what the mistake is, and a nudge at the method — never the corrected line, never the next step, never the result. The attempt belongs to the child; that is the delegation rule from the teaching model, and this is the first screen where it is enforced rather than described.
+- **One mistake is reported as one mistake.** Lines that are only wrong because they inherit an earlier error are marked fine. Telling a child six lines are wrong when he made one slip is the fastest way to make him stop trying.
+- **It says when it cannot read the photo** — closer, flatter, more light — rather than guessing at the numbers.
+- **The photograph is not kept.** What is kept is that he tried, on what, and where he got stuck. Until now the app could tell you he *opened* a lesson and nothing about whether he could do it: the teaching model calls the child the unit of success and had no measure of that unit. `working_checks` is the first one, and the whole family can read it.
+
 ## 2.6.0 — The app can listen (20 September 2026)
 
 - **The teacher talked and nothing listened.** Azure reads lessons aloud in Egyptian Arabic, and there was no speech *input* anywhere in the codebase. `memorize_items` has never held a single row, and this is why: the feature asked a child to hide the text and mark himself, which is the one thing a child memorising cannot do — **he cannot hear his own mistake.**
