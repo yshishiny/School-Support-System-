@@ -9,6 +9,9 @@ import { allowanceWeekStatus } from "@/lib/allowance/week";
 import { assignConsequenceAction, closeConsequenceAction, markAllowancePaidAction, saveAllowanceSettingsAction } from "@/lib/actions/allowance";
 import { AllowanceMeter } from "@/components/AllowanceMeter";
 import { prettyDate, todayIn } from "@/lib/dates";
+import { ClaimDecision, ParentWalletForms } from "@/components/WalletForms";
+import { loadWallet } from "@/lib/actions/wallet";
+import { balances, categoryLabel, type WalletEntry } from "@/lib/wallet";
 import type { Consequence, Profile } from "@/lib/types";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -24,6 +27,11 @@ export default async function AllowancePage() {
   ]);
   const students = (kids ?? []) as Profile[];
   const statuses = await Promise.all(students.map((s) => allowanceWeekStatus(s.id, family)));
+  const wallets = await Promise.all(students.map(async (s) => {
+    const entries = await loadWallet(s.id);
+    return { id: s.id, name: s.full_name.split(" ")[0], b: balances(entries), claims: entries.filter((e) => e.claim_status === "requested") as WalletEntry[] };
+  }));
+  const claimCount = wallets.reduce((n, w) => n + w.claims.length, 0);
   const kpis = mergeKpis(family.allowance_kpis);
   const enabledPractices = PRACTICES.filter((p) => family.practices_enabled.includes(p.code));
   const open = (cons ?? []) as Consequence[];
@@ -45,6 +53,46 @@ export default async function AllowancePage() {
           { id: "kids", label: "This week", emoji: "💵", content: (<>
       <SideTabs storageKey="allowance-kids" tabs={students.map((s, i) => ({ id: s.id, label: s.full_name.split(" ")[0], emoji: s.avatar_emoji, color: kidColor(i), sub: `${statuses[i].amount} EGP · ${statuses[i].score}`, content: <AllowanceMeter status={statuses[i]} /> }))} />
           </>) },
+          { id: "wallets", label: "Wallets", emoji: "👛", badge: claimCount || null, content: (
+      <section className="card space-y-4">
+        <div>
+          <h2 className="h2">What each of them is owed</h2>
+          <p className="text-xs muted">A paid allowance week and a cash reward land here and stay held until you hand the money over. Say when you do, and his wallet shows it as taken on that day — so he learns a balance that has two sides.</p>
+        </div>
+        {wallets.map((w) => (
+          <div key={w.id} className="tile space-y-2">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
+              <span className="font-bold">{w.name}</span>
+              <span>held <b className="text-good">{w.b.withDad} EGP</b></span>
+              <span className="muted">in his pocket {w.b.inPocket}</span>
+              <span className="muted">spent {w.b.spent}</span>
+              <span className="muted">owns {w.b.net}</span>
+            </div>
+            <ParentWalletForms studentId={w.id} name={w.name} today={today} />
+            {w.claims.length > 0 && (
+              <div className="space-y-2 rounded-xl bg-panel/60 p-2">
+                <div className="text-xs font-bold">Asking to be paid back</div>
+                {w.claims.map((c) => (
+                  <div key={c.id} className="space-y-1 border-b border-line pb-2 last:border-0 last:pb-0">
+                    <div className="flex items-baseline gap-2 text-sm">
+                      <span>{categoryLabel(c.category).emoji}</span>
+                      <span className="flex-1 min-w-0 truncate font-semibold">{c.label}</span>
+                      <span className="font-bold tabular-nums">{c.amount_egp} EGP</span>
+                    </div>
+                    <div className="text-[11px] muted">
+                      {prettyDate(c.occurred_on)} · {c.claim_purpose === "school" ? "🏫 for school" : "🏠 for the family"} ·{" "}
+                      {c.asked_permission ? <span className="text-good">asked first</span> : <span className="text-warn">did not ask first</span>}
+                    </div>
+                    {c.claim_reason && <p className="text-xs">“{c.claim_reason}”</p>}
+                    <ClaimDecision entryId={c.id} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </section>
+          ) },
           { id: "history", label: "History", emoji: "🗓️", badge: (weeks ?? []).filter((w) => !w.paid_at && w.claimed_at).length || null, content: (<>
       <section className="card space-y-3">
         <h2 className="h2">History</h2>

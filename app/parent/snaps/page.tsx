@@ -18,7 +18,7 @@ const VERDICT: Record<string, { icon: string; text: string }> = {
   error: { icon: "⚪", text: "AI could not check" },
 };
 
-type SnapRow = { id: string; student_id: string; task_code: string; kind: string; path: string; taken_on: string; status: "pending" | "approved" | "rejected"; ai_verdict: string | null; ai_score: number | null; ai_note: string | null; ai_detail: (Partial<HandwritingAnalysis> & { score?: number; subject_guess?: string | null; matches_today?: boolean | null; filled_fraction?: number }) | null; review_note: string | null; created_at: string };
+type SnapRow = { id: string; student_id: string; task_code: string; kind: string; path: string; taken_on: string; status: "pending" | "approved" | "rejected"; ai_verdict: string | null; ai_score: number | null; ai_note: string | null; ai_detail: (Partial<HandwritingAnalysis> & { score?: number; subject_guess?: string | null; matches_today?: boolean | null; filled_fraction?: number }) | null; review_note: string | null; created_at: string; rater_verdict: "approved" | "rejected" | null; rater_id: string | null; rater_note: string | null };
 
 /** The parent's photo feed: pending snaps first, one tap each, then recent history and the task settings. */
 export default async function ParentSnapsPage() {
@@ -28,14 +28,16 @@ export default async function ParentSnapsPage() {
   const [{ data: kids }, tasks, { data: snapRows }] = await Promise.all([
     supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
     loadSnapTasks(family.id, family.timezone),
-    supabase.from("snaps").select("id, student_id, task_code, kind, path, taken_on, status, ai_verdict, ai_score, ai_note, ai_detail, review_note, created_at").eq("family_id", family.id).gte("taken_on", shiftDate(today, -14)).order("created_at", { ascending: false }).limit(120),
+    supabase.from("snaps").select("id, student_id, task_code, kind, path, taken_on, status, ai_verdict, ai_score, ai_note, ai_detail, review_note, created_at, rater_verdict, rater_id, rater_note").eq("family_id", family.id).gte("taken_on", shiftDate(today, -14)).order("created_at", { ascending: false }).limit(120),
   ]);
   const students = (kids ?? []) as Profile[];
   const snaps = (snapRows ?? []) as SnapRow[];
-  const pending = snaps.filter((s) => s.status === "pending");
+  // What a sister has already looked at comes first: you are confirming, not starting from scratch.
+  const pending = snaps.filter((s) => s.status === "pending").sort((a, b) => Number(!!b.rater_verdict) - Number(!!a.rater_verdict));
   const recent = snaps.filter((s) => s.status !== "pending").slice(0, 30);
   const urls = await signSnapUrls([...pending, ...recent].map((s) => ({ id: s.id, path: s.path })));
   const nameOf = (id: string) => students.find((s) => s.id === id)?.full_name.split(" ")[0] ?? "?";
+  const raterName = (id: string | null) => (id ? students.find((s) => s.id === id)?.full_name.split(" ")[0] ?? "a sibling" : "a sibling");
   const taskOf = (code: string) => tasks.find((t) => t.code === code) ?? SNAP_TEMPLATES.find((t) => t.code === code);
   const hwByKid = students.map((s) => ({ s, samples: snaps.filter((x) => x.student_id === s.id && x.kind === "handwriting" && x.ai_detail?.score !== undefined).slice(0, 6) }));
 
@@ -53,6 +55,13 @@ export default async function ParentSnapsPage() {
         {url && (
           // eslint-disable-next-line @next/next/no-img-element
           <a href={url} target="_blank" rel="noreferrer"><img src={url} alt="" className="w-full max-h-72 object-contain rounded-xl bg-panel-2" /></a>
+        )}
+        {s.rater_verdict && (
+          <div className={`rounded-xl px-2 py-1.5 text-xs ${s.rater_verdict === "approved" ? "bg-good/15 text-good" : "bg-bad/15 text-bad"}`}>
+            {s.rater_verdict === "approved" ? "👍" : "👎"} {raterName(s.rater_id)} {s.rater_verdict === "approved" ? "says this is done" : "sent it back"}
+            {s.rater_note ? ` · “${s.rater_note}”` : ""}
+            {s.status === "pending" ? " · waiting for you" : ""}
+          </div>
         )}
         <div className="text-xs">
           <div>{v.icon} {v.text}{s.ai_score !== null ? ` (${Math.round(Number(s.ai_score) * 100)}%)` : ""}{s.ai_note ? ` · ${s.ai_note}` : ""}</div>

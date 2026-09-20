@@ -25,6 +25,8 @@ export function AppShell() {
     window.addEventListener("appinstalled", () => { window.__installPrompt = null; window.dispatchEvent(new Event("install-done")); });
     (async () => {
       try {
+        // Signed-out pages: the action would redirect the whole page to /login.
+        if (/^\/(login|signup|join|demo)(\/|$)/.test(location.pathname)) return;
         if (sessionStorage.getItem("device-reported")) return;
         const nav = navigator as Navigator & { getBattery?: () => Promise<{ level: number; charging: boolean }>; connection?: { effectiveType?: string; type?: string }; standalone?: boolean };
         const bat = nav.getBattery ? await nav.getBattery().catch(() => null) : null;

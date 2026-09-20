@@ -117,20 +117,35 @@ async function awardSnapPoints(studentId: string, snapId: string, label: string,
   return earned;
 }
 
-/** One tap by a parent, or by an older sibling the parent marked as a rater (never on his own snaps). */
+/**
+ * One tap on somebody else's snap. A parent decides: the snap is approved or sent back, and the points move.
+ * An older sibling marked as a rater recommends: the snap stays waiting, her name is on it, and no points move
+ * until a parent confirms. Neither may act on their own picture.
+ */
 export async function reviewSnapAction(snapId: string, status: "approved" | "rejected", note?: string): Promise<void> {
   const { family, profile } = await requireSession();
+  const isParent = profile.role === "parent";
   const isRater = profile.role === "student" && !!(profile as { rater?: boolean }).rater;
-  if (profile.role !== "parent" && !isRater) return;
+  if (!isParent && !isRater) return;
   const admin = createAdminClient();
   const { data: snap } = await admin.from("snaps").select("id, student_id, task_code, kind, taken_on, status").eq("id", snapId).eq("family_id", family.id).maybeSingle();
   if (!snap || snap.student_id === profile.id) return;
-  await admin.from("snaps").update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString(), review_note: (note ?? "").trim().slice(0, 200) || null }).eq("id", snapId);
+  const clean = (note ?? "").trim().slice(0, 200) || null;
+
+  if (!isParent) {
+    // A recommendation only. Changing her mind before a parent looks simply overwrites it.
+    if (snap.status !== "pending") return;
+    await admin.from("snaps").update({ rater_verdict: status, rater_id: profile.id, rater_at: new Date().toISOString(), rater_note: clean }).eq("id", snapId);
+    [...STUDENT_PATHS, ...PARENT_PATHS, "/me", "/snaps/review"].forEach((p) => revalidatePath(p));
+    return;
+  }
+
+  await admin.from("snaps").update({ status, reviewed_by: profile.id, reviewed_at: new Date().toISOString(), review_note: clean }).eq("id", snapId);
   if (status === "approved") {
     const { data: task } = await admin.from("snap_tasks").select("label").eq("family_id", family.id).eq("code", snap.task_code).maybeSingle();
     await awardSnapPoints(snap.student_id, snap.id, task?.label ?? snap.task_code, snap.kind, snap.taken_on);
   }
-  [...STUDENT_PATHS, ...PARENT_PATHS, "/me"].forEach((p) => revalidatePath(p));
+  [...STUDENT_PATHS, ...PARENT_PATHS, "/me", "/snaps/review"].forEach((p) => revalidatePath(p));
 }
 
 /** Parent: the daily screen-time limit the screenshot is compared with. */

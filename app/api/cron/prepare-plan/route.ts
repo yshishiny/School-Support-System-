@@ -19,6 +19,7 @@ export const maxDuration = 300;
 
 const TIME_BUDGET_MS = 230_000; // leave headroom under maxDuration for the last generation to finish
 
+
 /** Called nightly by Vercel Cron: fills any missing quizzes in every student's 7-day plan, a few per run. */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
@@ -27,6 +28,8 @@ export async function GET(request: Request) {
   }
   const started = Date.now();
   const admin = createAdminClient();
+  // The beta shares this database: its crons stay off (CRON_DISABLED=1) so nothing runs twice.
+  if (process.env.CRON_DISABLED === "1") return NextResponse.json({ ok: true, skipped: "crons disabled on this deployment" });
   const { data: students } = await admin.from("profiles").select("id, full_name, family_id").eq("role", "student");
   const results: Record<string, string[]> = {};
   const pending = new Set((students ?? []).map((s) => s.id));

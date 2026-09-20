@@ -86,3 +86,27 @@ describe("shared chores on a rota", () => {
     expect(rotaTurn({ ...base, rota_student_ids: ["omar"], rota_period: "week", rota_since: "2026-09-19" }, "2026-09-20")).toBeNull();
   });
 });
+
+describe("an older sister's opinion while a parent has not looked", () => {
+  const s = (over: Partial<Parameters<typeof snapCounts>[0]> = {}) =>
+    snapCounts({ status: "pending", ai_verdict: null, ...over });
+
+  it("counts what she says is done, without paying for it", () => {
+    expect(s({ rater_verdict: "approved" })).toBe(true);
+    expect(s({ rater_verdict: "approved", ai_verdict: "not_it" })).toBe(true);
+  });
+
+  it("does not count what she sent back, even when the coach liked it", () => {
+    expect(s({ rater_verdict: "rejected", ai_verdict: "looks_good" })).toBe(false);
+  });
+
+  it("falls back to the coach when she has not looked", () => {
+    expect(s({ ai_verdict: "looks_good" })).toBe(true);
+    expect(s({ ai_verdict: "unclear" })).toBe(false);
+  });
+
+  it("a parent's decision always wins", () => {
+    expect(snapCounts({ status: "approved", ai_verdict: "not_it", rater_verdict: "rejected" })).toBe(true);
+    expect(snapCounts({ status: "rejected", ai_verdict: "looks_good", rater_verdict: "approved" })).toBe(false);
+  });
+});

@@ -20,7 +20,33 @@ export const PRAYER_POINTS = {
   LATE: 1,
   MISSED_HONEST: 1, // saying "I missed it" still counts for honesty
   ALL_ON_TIME_BONUS: 10,
+  /** Five prayers in congregation at the mosque in one day. */
+  ALL_AT_MOSQUE_BONUS: 20,
+  /** Seven days running with Fajr at the mosque, the hardest of the five. */
+  FAJR_MOSQUE_WEEK_BONUS: 25,
 } as const;
+
+/** How many days in a row, counting back from `upTo`, Fajr was prayed at the mosque. */
+export function fajrMosqueStreak(logs: { log_date: string; prayer: string; at_mosque: boolean }[], upTo: string): number {
+  const days = new Set(logs.filter((l) => l.prayer === "fajr" && l.at_mosque).map((l) => l.log_date));
+  let n = 0;
+  for (let d = upTo; days.has(d); d = addDays(d, -1)) n += 1;
+  return n;
+}
+
+/** True when every one of the five was prayed at the mosque on that day. */
+export function allAtMosque(logs: { log_date: string; prayer: string; at_mosque: boolean }[], day: string): boolean {
+  const at = new Set(logs.filter((l) => l.log_date === day && l.at_mosque).map((l) => l.prayer));
+  return PRAYERS.every((p) => at.has(p));
+}
+
+/**
+ * A completed week of Fajr at the mosque is rewarded once per week, not once per day after the first seven:
+ * the bonus lands on day 7, 14, 21 and so on.
+ */
+export function fajrWeekEarned(streak: number): boolean {
+  return streak > 0 && streak % 7 === 0;
+}
 
 export interface PrayerWindow {
   prayer: PrayerName;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { prayerWindows, prayerState, prayerLogDate, prayerPoints } from "./prayers";
+import { prayerWindows, prayerState, prayerLogDate, prayerPoints, allAtMosque, fajrMosqueStreak, fajrWeekEarned, PRAYERS } from "./prayers";
 
 const CAIRO = { lat: 30.0444, lng: 31.2357, tz: "Africa/Cairo" };
 
@@ -34,5 +34,33 @@ describe("prayerPoints", () => {
   it("pays more for on time", () => {
     expect(prayerPoints("on_time")).toBe(3);
     expect(prayerPoints("late")).toBe(1);
+  });
+});
+
+describe("praying in congregation", () => {
+  const l = (log_date: string, prayer: string, at_mosque = true) => ({ log_date, prayer, at_mosque });
+
+  it("counts a day only when all five were at the mosque", () => {
+    const day = PRAYERS.map((p) => l("2026-09-19", p));
+    expect(allAtMosque(day, "2026-09-19")).toBe(true);
+    expect(allAtMosque(day.slice(0, 4), "2026-09-19")).toBe(false);
+    expect(allAtMosque([...day.slice(0, 4), l("2026-09-19", "isha", false)], "2026-09-19")).toBe(false);
+    expect(allAtMosque(day, "2026-09-18")).toBe(false);
+  });
+
+  it("counts the Fajr streak back from today and stops at the first gap", () => {
+    const days = ["2026-09-13", "2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19"];
+    const logs = days.map((d) => l(d, "fajr"));
+    expect(fajrMosqueStreak(logs, "2026-09-19")).toBe(7);
+    expect(fajrMosqueStreak(logs.filter((x) => x.log_date !== "2026-09-16"), "2026-09-19")).toBe(3);
+    expect(fajrMosqueStreak([], "2026-09-19")).toBe(0);
+    // Fajr at home does not extend it.
+    expect(fajrMosqueStreak([...logs.slice(0, 6), l("2026-09-19", "fajr", false)], "2026-09-19")).toBe(0);
+  });
+
+  it("pays the week bonus once a week, not every day after the first seven", () => {
+    expect([0, 1, 6].map(fajrWeekEarned)).toEqual([false, false, false]);
+    expect([7, 14, 21].map(fajrWeekEarned)).toEqual([true, true, true]);
+    expect([8, 9, 13].map(fajrWeekEarned)).toEqual([false, false, false]);
   });
 });

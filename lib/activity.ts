@@ -31,8 +31,6 @@ export function describePath(path: string | null | undefined): string {
   if (!path) return "in the app";
   if (path.startsWith("/quiz/")) return "doing a quiz";
   if (path.startsWith("/checkin")) return "doing the check-in";
-  if (path.startsWith("/teach/")) return "in a lesson";
-  if (path.startsWith("/teach")) return "with the teacher";
   if (path.startsWith("/learn")) return "on Learn";
   if (path.startsWith("/coach")) return "with the coach";
   if (path.startsWith("/snaps")) return "on snaps";

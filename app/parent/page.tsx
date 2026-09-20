@@ -29,6 +29,7 @@ import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
+import { APP_VERSION } from "@/lib/version";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -306,7 +307,23 @@ export default async function ParentHome() {
     kpiToday: kpis.filter((k) => k.enabled && k.source === "parent").map((k) => ({ label: k.label, emoji: k.emoji, code: k.code })),
   };
   const layout = (profile as { home_layout?: string }).home_layout ?? "b";
-  if (layout === "a") return <ParentLayoutA d={data} />;
-  if (layout === "c") return <ParentLayoutC d={data} />;
-  return <ParentLayoutB d={data} />;
+  const isV2 = APP_VERSION.startsWith("2.");
+  const layoutNode = layout === "a" ? <ParentLayoutA d={data} /> : layout === "c" ? <ParentLayoutC d={data} /> : <ParentLayoutB d={data} />;
+
+  if (isV2) {
+    return (
+      <div className="[perspective:1000px]" style={{ perspective: "1000px" }}>
+        <style>{`
+          .v2-3d-card { transition: transform 0.2s ease; transform: rotateX(0deg) rotateY(0deg); }
+          .v2-3d-card:hover { transform: rotateX(2deg) rotateY(-2deg) translateZ(4px); box-shadow: 0 20px 40px rgba(0,0,0,0.2); }
+          .v2-3d-icon { display: inline-block; transition: transform 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55); }
+          .v2-3d-icon:hover { transform: rotateY(360deg) scale(1.1); }
+        `}</style>
+        <div className="[&_.card]:v2-3d-card [&_.btn]:v2-3d-card [&_.tile]:v2-3d-card">
+          {layoutNode}
+        </div>
+      </div>
+    );
+  }
+  return layoutNode;
 }

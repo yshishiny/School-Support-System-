@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { ErrorLog } from "@/components/ErrorLog";
+import { createAdminClient } from "@/lib/supabase/admin";
+import { todayIn } from "@/lib/dates";
 import { requireAdmin } from "@/lib/auth";
 import { Tabs } from "@/components/Tabs";
 import { configChecks, databaseChecks, githubCommits, googleStatus, jobChecks, recentErrors, supabaseStatus, vercelDeployments, type Check } from "@/lib/ops/health";
+import { resolveErrorsAction } from "@/lib/actions/ops";
 import { schedulerStatus } from "@/lib/actions/ops-scheduler";
 import { SchedulerSwitch } from "@/components/SchedulerSwitch";
 

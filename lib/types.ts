@@ -69,6 +69,7 @@ export interface Profile {
   telegram_chat_id: string | null;
   whatsapp: string | null;
   parent_label: string | null; // "Dad", "Mum"…
+  character_id?: string | null; // V2: the child's virtual teacher
   birth_date?: string | null;
   stage?: "school" | "university" | "postgraduate" | "adult";
   gender?: "boy" | "girl" | "other" | null;

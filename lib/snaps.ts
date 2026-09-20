@@ -34,6 +34,8 @@ export interface SnapLite {
   taken_on: string;
   status: SnapStatus;
   ai_verdict: SnapVerdict | null;
+  /** What an older sibling recommended while it waits for a parent. */
+  rater_verdict?: "approved" | "rejected" | null;
 }
 
 export interface SnapTemplate {
@@ -61,6 +63,8 @@ export const SNAP_TEMPLATES: SnapTemplate[] = [
   { code: "sandwich", kind: "photo", label: "Sandwich ready for school", emoji: "🥪", prompt: "A prepared sandwich or lunch, wrapped or in a lunch box, ready to take to school.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The night before or in the morning. Part of the morning routine." },
   { code: "bag", kind: "bag", label: "Bag packed for tomorrow", emoji: "🎒", prompt: "An open school bag with the books and notebooks for the next school day visible.", days: [6, 0, 1, 2, 3, 4], window_start: "18:00", window_end: "07:45", weight: 5, hint: "The AI reads the book labels it can see and compares with the next day's timetable." },
   { code: "petwaste", kind: "photo", label: "Cat litter cleaned", emoji: "🐾", prompt: "A cat litter tray that has just been cleaned: the litter raked flat and free of clumps, no waste in or beside the tray, and the tied waste bag in the bin. No cat needs to be in the picture.", days: ALL_DAYS, window_start: "16:00", window_end: "22:00", weight: 10, hint: "Whoever's turn it is this week. One picture of the clean tray and the tied bag." },
+  { code: "petfeed_am", kind: "photo", label: "Cats fed, morning", emoji: "🐈", prompt: "A cat bowl freshly filled with food and a clean bowl of fresh water beside it, on the floor where the cats eat. The cat itself does not need to be in the picture.", days: ALL_DAYS, window_start: "06:00", window_end: "10:00", weight: 5, hint: "Before school, whoever's turn it is. Food and fresh water in the picture." },
+  { code: "petfeed_pm", kind: "photo", label: "Cats fed, evening", emoji: "🐈‍⬛", prompt: "A cat bowl freshly filled with food and a clean bowl of fresh water beside it, on the floor where the cats eat. The cat itself does not need to be in the picture.", days: ALL_DAYS, window_start: "16:00", window_end: "21:00", weight: 5, hint: "Late afternoon, whoever's turn it is. Food and fresh water in the picture." },
   { code: "screentime", kind: "screentime", label: "Screen time screenshot", emoji: "⏱️", prompt: "A screenshot of today's Digital Wellbeing (Android) or Screen Time (iPhone) summary: total time and the top apps.", days: ALL_DAYS, window_start: "19:00", window_end: "23:59", weight: 10, hint: "Every evening. The AI reads the total; over the family limit it becomes a question, not a punishment." },
 ];
 
@@ -116,10 +120,14 @@ export function taskDueDates(t: SnapTask, studentId: string, dates: string[]): s
   return dates.filter((d) => t.days.includes(weekdayOf(d)) && ownsTask(t, studentId, d));
 }
 
-/** A snap counts as done when approved, or still pending but the AI found it plausible (benefit of the doubt until reviewed). */
-export function snapCounts(s: Pick<SnapLite, "status" | "ai_verdict">): boolean {
+/**
+ * A snap counts as done when a parent approved it, or while it waits if someone who looked at it thought it was
+ * fine. A sister's opinion outranks the AI's, in both directions; points still wait for the parent.
+ */
+export function snapCounts(s: Pick<SnapLite, "status" | "ai_verdict" | "rater_verdict">): boolean {
   if (s.status === "approved") return true;
   if (s.status === "rejected") return false;
+  if (s.rater_verdict) return s.rater_verdict === "approved";
   return s.ai_verdict === "looks_good";
 }
 

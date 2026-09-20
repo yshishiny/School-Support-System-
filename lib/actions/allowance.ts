@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { creditWallet, withdrawFromWallet } from "./wallet";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { pingParents } from "@/lib/notify";
@@ -46,10 +47,18 @@ export async function tickKpiAction(studentId: string, code: string, value: bool
 }
 
 export async function markAllowancePaidAction(weekId: string): Promise<void> {
-  const { family } = await requireParent();
+  const { profile, family } = await requireParent();
   const supabase = await createClient();
+  const { data: week } = await supabase.from("allowance_weeks").select("id, student_id, amount, week_start, week_end").eq("id", weekId).eq("family_id", family.id).maybeSingle();
   await supabase.from("allowance_weeks").update({ paid_at: new Date().toISOString() }).eq("id", weekId).eq("family_id", family.id);
-  PATHS.forEach((p) => revalidatePath(p));
+  // Marking it paid means the notes changed hands: the wallet records the money earned (if the week closed before
+  // wallets existed) and then the hand-over, so what you still hold for him drops by exactly that amount.
+  if (week?.amount) {
+    const amount = Number(week.amount);
+    await creditWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance week ${week.week_start}`, on: week.week_end as string, refType: "allowance_week", refId: week.id as string, by: profile.id }).catch(() => null);
+    await withdrawFromWallet({ studentId: week.student_id as string, familyId: family.id, amount, label: `Allowance for ${week.week_start} handed over`, on: todayIn(family.timezone), refType: "allowance_paid", refId: week.id as string, by: profile.id }).catch(() => null);
+  }
+  [...PATHS, "/wallet"].forEach((p) => revalidatePath(p));
 }
 
 export async function assignConsequenceAction(formData: FormData): Promise<void> {

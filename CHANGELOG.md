@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.0.0 — The same app as the beta, without the virtual teacher (20 September 2026)
+
+Everything built on the beta over the past week now runs here. The virtual teacher stays on the beta; so does the credits, invitations and ambassador system, which exists only to sell lessons. The two sites keep their own colour and icon so you can still tell them apart at a glance.
+
+- **Prayer at the mosque.** Claiming a prayer inside its window now offers two buttons — at the mosque, or at home. All five in congregation on one day pays 20 points; seven days running with Fajr there pays 25, and again at fourteen, twenty-one and so on. This is the thing you could not find: it had never been on this site.
+- **A wallet for each child**, kept as a balance sheet: what was earned, what a parent added, what was spent, and what is left — with where that money is right now, Dad's side and the pocket, adding back up to the same total. Every line carries its date and the balance after it. Money spent on the family or on school can be claimed back, with the reason and whether permission was asked, for you to approve.
+- **A sister's tick is a recommendation.** A grown daughter marked as a rater gets her brothers' pictures to check, with her own page for the queue. Her answer is recorded with her name; nothing is paid until you confirm it.
+- **The cats.** Waste cleaning and feeding on a weekly rota between the two boys, with a photograph as proof, counted in the allowance like any other chore.
+- **Every failure says where it happened** — carried over in 1.16.0 — and **no page a child has to scroll**, from 1.17.0.
+- **The planner reads the timetable**, so a week with no typed-in homework is no longer blank.
+- A badge in the corner of every screen says which of the two sites you are on.
+
 ## 1.17.0 — No page a child has to scroll (20 September 2026)
 
 - **Me** was nine cards down a phone, so the grades sheet and the reminders were below everything. It opens on who you are and how you learn; *Me* (pictures, theme, layout, interests), *Progress* (the fortnight, grades sheet, how points work), *Family* (rate your siblings, their snaps to check) and *More* (reminders, install, the tour, sign out) are tabs.

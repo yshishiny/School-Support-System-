@@ -5,6 +5,7 @@ import { shiftDate, todayIn } from "@/lib/dates";
 import { isRota, snapCounts, taskDueDates, type SnapLite, type SnapTask } from "@/lib/snaps";
 import { classLogCoverage, missingLine, type ClassLogRow } from "@/lib/class-log";
 import { compensatedRefs } from "@/lib/compensation";
+import { creditWallet } from "@/lib/actions/wallet";
 import { materialsKpi, materialStages, nextStage } from "@/lib/materials/study";
 import type { Family } from "@/lib/types";
 
@@ -31,14 +32,15 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     .map((t) => (isRota(t)
       ? { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind, rota: true, dates: taskDueDates(t, studentId, weekDates) }
       : { code: t.code, label: t.label, emoji: t.emoji, weight: t.weight, enabled: t.enabled, days: t.days, kind: t.kind }));
-  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks);
+  const { data: who } = await admin.from("profiles").select("stage").eq("id", studentId).maybeSingle();
+  const kpis = mergeKpis(family.allowance_kpis as KpiOverride[] | null, snapTasks, (who?.stage as string | null) ?? "school");
   const [{ data: ticks }, { data: prayers }, { data: checkins }, { data: planned }, { data: wb }, { data: snapRows }] = await Promise.all([
     admin.from("kpi_ticks").select("tick_date, code, value").eq("student_id", studentId).gte("tick_date", start).lte("tick_date", end),
     admin.from("prayer_logs").select("log_date, prayer, status, entered_late").eq("student_id", studentId).gte("log_date", start).lte("log_date", end),
     admin.from("checkins").select("checkin_date, entered_late").eq("student_id", studentId).gte("checkin_date", start).lte("checkin_date", end),
     admin.from("quizzes").select("scheduled_for, attempts(submitted_at)").eq("student_id", studentId).not("scheduled_for", "is", null).gte("scheduled_for", start).lte("scheduled_for", today < end ? today : end),
     admin.from("wellbeing_checks").select("instrument, taken_on, band, score").eq("student_id", studentId).gte("taken_on", shiftDate(start, -60)).order("taken_on", { ascending: false }),
-    admin.from("snaps").select("task_code, taken_on, status, ai_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
+    admin.from("snaps").select("task_code, taken_on, status, ai_verdict, rater_verdict").eq("student_id", studentId).gte("taken_on", start).lte("taken_on", end),
   ]);
   const lastDay = today < end ? today : end;
   const [{ data: ttRows }, { data: logRows }, { data: offRows }] = await Promise.all([
@@ -126,6 +128,11 @@ export async function closeAllowanceWeek(studentId: string, family: Pick<Family,
     .insert({ student_id: studentId, family_id: family.id, week_start: status.start, week_end: status.end, score: status.score, band: status.band, amount: status.amount, breakdown: status.results })
     .select("*")
     .single();
+  // The moment a week closes with money in it, that money is owed: it goes into his wallet as held, and stays
+  // held until a parent records handing the notes over.
+  if (data && status.amount > 0) {
+    await creditWallet({ studentId, familyId: family.id, amount: status.amount, label: `Allowance week ${status.start}`, on: status.end, refType: "allowance_week", refId: data.id as string }).catch(() => null);
+  }
   // Discipline rule: a week that closes with classes never logged gets the automatic practice (no way to skip it).
   const gap = status.results.find((r) => r.code === "classlog");
   if (gap && gap.fraction < 1) {

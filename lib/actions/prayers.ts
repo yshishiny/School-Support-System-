@@ -1,6 +1,6 @@
 "use server";
 
-import { failed } from "@/lib/ops/fault";
+import { failed, report } from "@/lib/ops/fault";
 import { weekFor } from "@/lib/allowance";
 import { openCompensation } from "@/lib/compensation/run";
 
@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { after } from "next/server";
 import { requireStudent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { PRAYERS, PRAYER_POINTS, pastPrayerPoints, prayerLogDate, prayerPoints, prayerState, prayerWindows, schoolSpan, windowAtSchool, type PastClaim, type PrayerName } from "@/lib/prayers";
+import { PRAYERS, PRAYER_POINTS, allAtMosque, fajrMosqueStreak, fajrWeekEarned, pastPrayerPoints, prayerLogDate, prayerPoints, prayerState, prayerWindows, schoolSpan, windowAtSchool, type PastClaim, type PrayerName } from "@/lib/prayers";
 import { shiftDate, todayIn } from "@/lib/dates";
 
 export interface PrayerResult {
@@ -18,7 +18,37 @@ export interface PrayerResult {
 }
 
 /** The student taps "Prayed": the server decides on time vs late from real prayer times. */
-export async function logPrayerAction(prayer: PrayerName): Promise<PrayerResult> {
+/**
+ * The congregation bonuses, paid once each by a deterministic reference: five at the mosque in a day, and every
+ * completed week of Fajr at the mosque. Never throws; a bonus that cannot be written leaves the prayer saved.
+ */
+async function awardMosqueBonuses(studentId: string, logDate: string): Promise<number> {
+  const admin = createAdminClient();
+  let earned = 0;
+  try {
+    const { data: rows } = await admin.from("prayer_logs").select("id, log_date, prayer, at_mosque").eq("student_id", studentId).gte("log_date", shiftDate(logDate, -40)).lte("log_date", logDate);
+    const logs = (rows ?? []) as { id: string; log_date: string; prayer: string; at_mosque: boolean }[];
+    if (allAtMosque(logs, logDate)) {
+      const anchor = logs.filter((l) => l.log_date === logDate && l.at_mosque).map((l) => l.id).sort()[0];
+      const { error } = await admin.from("points_ledger").insert({ student_id: studentId, delta: PRAYER_POINTS.ALL_AT_MOSQUE_BONUS, reason: `All five prayers at the mosque on ${logDate}`, ref_type: "prayer_mosque_day", ref_id: anchor });
+      if (!error) earned += PRAYER_POINTS.ALL_AT_MOSQUE_BONUS;
+    }
+    const streak = fajrMosqueStreak(logs, logDate);
+    if (fajrWeekEarned(streak)) {
+      const anchor = logs.find((l) => l.log_date === logDate && l.prayer === "fajr" && l.at_mosque)?.id;
+      if (anchor) {
+        const { error } = await admin.from("points_ledger").insert({ student_id: studentId, delta: PRAYER_POINTS.FAJR_MOSQUE_WEEK_BONUS, reason: `${streak / 7} week${streak === 7 ? "" : "s"} of Fajr at the mosque`, ref_type: "prayer_fajr_week", ref_id: anchor });
+        if (!error) earned += PRAYER_POINTS.FAJR_MOSQUE_WEEK_BONUS;
+      }
+    }
+  } catch (err) {
+    // The prayer is saved; a bonus is not worth failing the tap, but a bonus that never paid is worth knowing.
+    await report("prayers.mosqueBonus", err, { userId: studentId, meta: { logDate } });
+  }
+  return earned;
+}
+
+export async function logPrayerAction(prayer: PrayerName, atMosque = false): Promise<PrayerResult> {
   const { profile, family } = await requireStudent();
   if (!PRAYERS.includes(prayer)) return { error: "Unknown prayer." };
   const now = new Date();
@@ -33,7 +63,9 @@ export async function logPrayerAction(prayer: PrayerName): Promise<PrayerResult>
   const admin = createAdminClient();
   const { data: existing } = await admin.from("prayer_logs").select("id").eq("student_id", profile.id).eq("log_date", logDate).eq("prayer", prayer).maybeSingle();
   if (existing) return { error: "Already logged." };
-  const { data: row, error } = await admin.from("prayer_logs").insert({ student_id: profile.id, log_date: logDate, prayer, status, logged_at: now.toISOString() }).select("id").single();
+  // Congregation only counts when he was there for it: a prayer already missed cannot become a mosque prayer.
+  const mosque = atMosque && status === "on_time";
+  const { data: row, error } = await admin.from("prayer_logs").insert({ student_id: profile.id, log_date: logDate, prayer, status, logged_at: now.toISOString(), at_mosque: mosque }).select("id").single();
   if (error || !row) return failed("actions.prayers.logPrayer", error, "Could not save.");
 
   let earned = 0;
@@ -59,6 +91,7 @@ export async function logPrayerAction(prayer: PrayerName): Promise<PrayerResult>
     });
     if (!bErr) earned += PRAYER_POINTS.ALL_ON_TIME_BONUS;
   }
+  if (mosque) earned += await awardMosqueBonuses(profile.id, logDate);
   revalidatePath("/today");
   revalidatePath("/parent");
   return { status, earned };
