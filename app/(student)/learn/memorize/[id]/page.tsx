@@ -5,6 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { MemorizeTrainer } from "@/components/MemorizeTrainer";
 import { deleteMemorizeItemAction } from "@/lib/actions/memorize";
 import type { MemorizeItem } from "@/lib/types";
+import { Recite } from "@/components/Recite";
+import { sttEnabled } from "@/lib/stt";
 
 export default async function MemorizeItemPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -24,6 +26,9 @@ export default async function MemorizeItemPage({ params }: { params: Promise<{ i
         {item.reference && <p className="text-xs muted" dir="ltr">{item.reference}</p>}
       </header>
       <MemorizeTrainer item={item} />
+      {/* Hiding the text and marking yourself is the one thing a child memorising cannot do: he cannot hear his
+          own mistake. This is the other half. */}
+      {sttEnabled() && <Recite itemId={item.id} label={item.title} />}
     </main>
   );
 }
