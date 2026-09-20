@@ -20,16 +20,53 @@ export const maxDuration = 300;
 
 const TIME_BUDGET_MS = 230_000; // leave headroom under maxDuration for the last generation to finish
 
+type Admin = ReturnType<typeof createAdminClient>;
+
+/**
+ * The virtual teacher's overnight work: hand back anything left half-drawn when a background job died with its
+ * instance, then write and illustrate the topics each class actually covered, so tapping a topic in the morning
+ * opens it at once instead of waiting a minute for the AI.
+ */
+async function prepareTeacherLessons(admin: Admin, started: number, results: Record<string, string[]>): Promise<void> {
+  try {
+    const n = await releaseStuckVisuals();
+    if (n) results.visuals = [`released ${n} stuck`];
+  } catch (err) {
+    results.visuals = [`release error: ${err instanceof Error ? err.message : String(err)}`];
+  }
+  const { data: students } = await admin.from("profiles").select("id").eq("role", "student");
+  for (const s of students ?? []) {
+    if (Date.now() - started >= TIME_BUDGET_MS) break;
+    try {
+      const names = await warmLessonScripts(s.id, Math.max(0, TIME_BUDGET_MS - (Date.now() - started)));
+      if (names.length) (results[s.id] ??= []).push(`lessons written: ${names.join("; ")}`);
+    } catch (err) {
+      (results[s.id] ??= []).push(`lesson warm error: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+}
+
 /** Called nightly by Vercel Cron: fills any missing quizzes in every student's 7-day plan, a few per run. */
 export async function GET(request: Request) {
   const auth = request.headers.get("authorization");
   if (!process.env.CRON_SECRET || auth !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401 });
   }
-  // The beta site shares the live database: its crons stay off (CRON_DISABLED=1) so nothing runs twice.
-  if (process.env.CRON_DISABLED === "1") return NextResponse.json({ ok: true, skipped: "crons disabled on this deployment" });
   const started = Date.now();
   const admin = createAdminClient();
+  // The beta shares the live database, so everything below that writes shared tables stays off here
+  // (CRON_DISABLED=1) and runs on the live site only — otherwise both would do it and pay twice.
+  //
+  // The virtual teacher is the exception. Its lessons live in tables the live site's code never touches, so
+  // there is nothing for it to collide with, and the live site cannot prepare them because it does not have
+  // the teacher at all. Without this the overnight lesson writing would simply never run anywhere.
+  if (process.env.CRON_DISABLED === "1") {
+    const betaResults: Record<string, string[]> = {};
+    await prepareTeacherLessons(admin, started, betaResults);
+    console.log("[prepare-plan] beta-only results", JSON.stringify(betaResults));
+    await recordCronRun("prepare-plan-beta", started, betaResults);
+    return NextResponse.json({ ok: true, betaOnly: true, seconds: Math.round((Date.now() - started) / 1000), results: betaResults });
+  }
   const { data: students } = await admin.from("profiles").select("id, full_name, family_id").eq("role", "student");
   const results: Record<string, string[]> = {};
   const pending = new Set((students ?? []).map((s) => s.id));
@@ -146,24 +183,7 @@ export async function GET(request: Request) {
   } catch (err) {
     results.snaps = [`prune error: ${err instanceof Error ? err.message : String(err)}`];
   }
-  // Lessons left half-drawn by a background job that died with its instance: hand them back to be retried.
-  try {
-    const n = await releaseStuckVisuals();
-    if (n) results.visuals = [`released ${n} stuck`];
-  } catch (err) {
-    results.visuals = [`release error: ${err instanceof Error ? err.message : String(err)}`];
-  }
-  // The teacher's own lesson, written and drawn overnight for the topics the class covered, so tapping a
-  // topic in the morning opens it at once instead of waiting a minute for the AI.
-  for (const s of students ?? []) {
-    if (Date.now() - started >= TIME_BUDGET_MS) break;
-    try {
-      const names = await warmLessonScripts(s.id, Math.max(0, TIME_BUDGET_MS - (Date.now() - started)));
-      if (names.length) (results[s.id] ??= []).push(`lessons written: ${names.join("; ")}`);
-    } catch (err) {
-      (results[s.id] ??= []).push(`lesson warm error: ${err instanceof Error ? err.message : String(err)}`);
-    }
-  }
+  await prepareTeacherLessons(admin, started, results);
   console.log("[prepare-plan] cron results", JSON.stringify(results));
   await recordCronRun("prepare-plan", started, results);
   return NextResponse.json({ ok: true, seconds: Math.round((Date.now() - started) / 1000), results });

@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.0.0-beta.24 — The overnight lesson writing actually runs (20 September 2026, `v2` branch)
+
+- **Fixed: the lesson warming shipped in beta.22 never ran anywhere.** It lives on the beta, and the beta's nightly jobs are switched off so the two sites do not both do the shared work and pay for it twice — but the live site does not have the virtual teacher at all, so nobody was preparing lessons. The teacher's overnight work now runs on the beta even with the rest of the nightly job off: its lessons live in tables the live site never touches, so there is nothing to collide with. Tonight it has eight of Omar's topics to write.
+- The in-lesson speed-up from beta.22 was never affected: tapping a topic still opens the words at once and draws the pictures behind them.
+
 ## 2.0.0-beta.23 — Every failure says where it happened (20 September 2026, `v2` branch)
 
 - **A child can now report a fault.** Anything that genuinely breaks hands back a plain sentence and a six-character reference: *“That is already saved. (ref k3f9a2)”*. The same reference is on the log row, next to the exact function it happened in, so “it said k3f9a2” finds one row instead of a haystack. The characters avoid everything that is misread aloud — no 0, O, 1, l or i.
