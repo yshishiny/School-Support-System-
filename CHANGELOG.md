@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0-beta.11 — A reminder can finally reach a child (20 September 2026, `v2` branch)
+
+- **Not one child has ever received a notification.** There is a single push subscription in the whole database and it belongs to a parent. Omar and Youssef installed the app on 17 September and were never asked. The nudge job has run every hour for days — 16 to 24 times a day, reporting success every time — and sent nothing, because `sendDueNudges` filters to children who have a device or Telegram and correctly finds none. It was not broken. It had nobody to send to.
+- **The switch existed, three taps deep.** Me → the *More* tab → below the fold. A child was never going to find it, and the browser only offers the permission prompt **once per install** — a no is permanent until somebody digs through browser settings — so the one chance was being spent on a screen nobody opened.
+- **The ask now sits on Today**, the only page a child opens without being sent there, and it says what it will actually do for him: before a prayer window closes, when a snap is still owed, before the week closes so he does not lose the allowance. One tap, dismissible, and it hides itself when there is nothing to offer — already on, already refused, or a browser that cannot.
+- **It proves itself.** Granting permission sends a test notification immediately, so the child sees it arrive and the log records that the pipeline works, instead of everyone assuming.
+- **iPhone gets the truth rather than a dead button:** Safari cannot send these until the app is on the home screen, so that is what it says.
+- **You can see who is reachable.** Kids → a child → Profile opens with *Reminders reach him* or *No reminder can reach him*. A silent child and a child nobody ever asked look identical from the parent's side, and they are not the same thing.
+- The subscribe logic moves to `lib/push/client.ts` so the settings toggle and the new prompt are one tested path, not two.
+
 ## 2.1.0-beta.10 — The parent's half of the contract has somewhere to happen (20 September 2026, `v2` branch)
 
 - **Parent → Progress opens with *Lessons to check*.** Until now the gate was real but silent: a bad lesson was genuinely stopped, and you had no way to know it. Two things appear there, and they are deliberately worded differently. A **stopped** lesson failed a blocking check and was never stored, so no child saw it — you are being told. A **flagged** lesson passed every blocking check and is being read now, with one thing the checker was unsure about — there you are being asked, and your answer is the only thing that can settle it.

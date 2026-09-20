@@ -37,6 +37,10 @@ export default async function ChildrenPage() {
   ]);
   const avatarUrls = await signHeroUrls((heroRows ?? []) as { id: string; path: string }[]);
   // The catalogue is the same for every child on the page, so it is read once.
+  const { data: pushRows } = ids.length
+    ? await createAdminClient().from("push_subscriptions").select("user_id").in("user_id", ids)
+    : { data: [] };
+  const reachable = new Set(((pushRows ?? []) as { user_id: string }[]).map((r) => r.user_id));
   const curricula = await listCurricula();
   const levelsByCurriculum: Record<string, Level[]> = Object.fromEntries(
     await Promise.all(curricula.map(async (c) => [c.id, await levelsOf(c.id)] as const)),
@@ -130,6 +134,22 @@ export default async function ChildrenPage() {
                 <HeroUploader familyId={family.id} studentId={s.id} />
               </div>
             );
+            const canBeReached = reachable.has(s.id) || !!s.telegram_chat_id;
+            const remindersTab = (
+              <div className="card !py-3 flex items-start gap-3">
+                <span className="text-2xl leading-none">{canBeReached ? "🔔" : "🔕"}</span>
+                <div className="min-w-0 flex-1 text-sm">
+                  <div className="font-bold" style={{ fontFamily: "var(--font-display)" }}>
+                    {canBeReached ? "Reminders reach him" : "No reminder can reach him"}
+                  </div>
+                  <p className="text-xs muted mt-0.5">
+                    {canBeReached
+                      ? "Notifications are on for at least one of his devices."
+                      : "He has never allowed notifications, so every reminder the app sends him goes nowhere. He is asked on his own Today page; it can only be asked once per phone, so it is not asked repeatedly."}
+                  </p>
+                </div>
+              </div>
+            );
             const curriculumTab = (
               <CurriculumPicker
                 studentId={s.id}
@@ -166,7 +186,7 @@ export default async function ChildrenPage() {
                   storageKey={`kid-${s.id}`}
                   size="sm"
                   tabs={[
-                    { id: "profile", label: "Profile", emoji: "🪪", content: <>{curriculumTab}{profileTab}</> },
+                    { id: "profile", label: "Profile", emoji: "🪪", content: <>{remindersTab}{curriculumTab}{profileTab}</> },
                     { id: "subjects", label: "Subjects", emoji: "📚", badge: subs.length || null, content: subjectsTab },
                     { id: "timetable", label: "Timetable", emoji: "🗓️", badge: tt.length || null, content: timetableTab },
                     { id: "pictures", label: "Pictures", emoji: "🖼️", content: picturesTab },
