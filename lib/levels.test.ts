@@ -38,3 +38,26 @@ describe("the two depths of a lesson", () => {
     expect(LEVEL.advanced.lessonBrief).toMatch(/do not repeat it/);
   });
 });
+
+describe("the depth briefs, as the writers receive them", () => {
+  // The whole paid difference is that these two briefs ask for different lessons. If they ever converge — the
+  // deep one re-teaching the rule, or the plain one wandering into proofs — a family is paying for nothing.
+  it("keeps the plain lesson out of the deep material", () => {
+    const b = LEVEL.basics.lessonBrief.toLowerCase();
+    expect(b).toMatch(/missed the class|did not follow/);
+    expect(b).toMatch(/do not digress/);
+    expect(b).not.toMatch(/exam sets|boundary cases/);
+  });
+
+  it("keeps the deep lesson from repeating the plain one", () => {
+    const a = LEVEL.advanced.lessonBrief.toLowerCase();
+    expect(a).toMatch(/why the rule is true/);
+    expect(a).toMatch(/boundary cases|fails/);
+    expect(a).toMatch(/trap an exam sets/);
+  });
+
+  it("asks for genuinely different questions at each depth", () => {
+    expect(LEVEL.basics.quizBrief.toLowerCase()).toMatch(/one idea per question/);
+    expect(LEVEL.advanced.quizBrief.toLowerCase()).toMatch(/multi-step|transfer/);
+  });
+});

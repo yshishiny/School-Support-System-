@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { after } from "next/server";
+import { defaultLevel } from "@/lib/entitlement";
 import { failed, report } from "@/lib/ops/fault";
 import { presenterGenders, renderScript, videoEnabled, videoVoice } from "@/lib/video";
 import { requireStudent } from "@/lib/auth";
@@ -36,19 +37,21 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
   let language: "en" | "ar" = "en";
   let topic: Topic | null = null;
   let material: { id: string; title: string; subject: string | null; digest: string | null; language: string | null } | null = null;
+  // The teacher performs at the depth this child is entitled to; the two are cached and fetched separately.
+  const level = await defaultLevel(profile.id, family.id);
   if (source.topicId) {
     const { data } = await admin.from("topics").select("*").eq("id", source.topicId).maybeSingle();
     topic = data as Topic | null;
     if (!topic) return { error: "Topic not found." };
     language = topic.language ?? "en";
-    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("topic_id", topic.id).eq("character_id", character.id).eq("language", language).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
+    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("topic_id", topic.id).eq("character_id", character.id).eq("language", language).eq("level", level).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
     scriptId = cached?.id ?? null;
   } else if (source.materialId) {
     const { data } = await admin.from("materials").select("id, title, subject, digest, language").eq("id", source.materialId).eq("student_id", profile.id).maybeSingle();
     material = data;
     if (!material?.digest) return { error: "This file has not been read yet." };
     language = material.language === "arabic" ? "ar" : "en";
-    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("material_id", material.id).eq("character_id", character.id).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
+    const { data: cached } = await admin.from("lesson_scripts").select("id").eq("material_id", material.id).eq("character_id", character.id).eq("level", level).is("flagged_at", null).gte("version", SCRIPT_VERSION).order("version", { ascending: false }).limit(1).maybeSingle();
     scriptId = cached?.id ?? null;
   } else {
     return { error: "Pick a topic or a file." };
@@ -66,6 +69,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
         sourceText: material?.digest ?? null,
         learner: learnerPromptLine(profile.learner_profile),
         interests: profile.interests,
+        level,
       });
     } catch (err) {
       return failed("actions.teach.startLesson", err, "Could not write the lesson.");
@@ -76,7 +80,7 @@ export async function startLessonAction(source: { topicId?: string; materialId?:
     // visuals_version 0 means "being drawn": the stage shows "pictures coming" and does not start a second pass.
     const { data: row, error } = await admin
       .from("lesson_scripts")
-      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: 0, visuals_started_at: new Date().toISOString() })
+      .insert({ topic_id: topic?.id ?? null, material_id: material?.id ?? null, character_id: character.id, language, level, grade: topic?.grade ?? profile.grade, title: body.title, minutes: body.minutes, script: { beats: body.beats, quiz: body.quiz }, model, version: SCRIPT_VERSION, visuals_version: 0, visuals_started_at: new Date().toISOString() })
       .select("id")
       .single();
     if (error || !row) return failed("actions.teach.startLesson", error, "Could not save the lesson.");

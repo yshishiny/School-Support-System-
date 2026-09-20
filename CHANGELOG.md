@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.2 — The teacher performs at both depths (20 September 2026, `v2` branch)
+
+- **The teacher now teaches at the level the child is entitled to**, not one lesson for everybody. At the plain depth he states the rule, works it twice with every step spoken, names the mistake most students make, and stops — six to eight beats. At the deep one he says *why* the rule is true, gives the case where it fails, connects it to what it is built on and what comes next year, works an example of several linked steps, and names the trap an exam sets on that topic — ten to twelve beats, with checks that need two ideas held at once.
+- The deep performance does not re-teach the plain one. That is the point: a family paying for it should get the lesson a good private tutor gives a student who *already has* the basics.
+- Both depths are cached separately per teacher and language, so neither overwrites the other. Every script written until now keeps its place as the plain version, and a deeper one is written beside it the first time it is asked for.
+- The overnight writing warms the depth each child will actually be served, so the morning still opens at once.
+
 ## 2.1.0-beta.1 — Every lesson at two depths, and here the depth is what credits buy (20 September 2026, `v2` branch)
 
 - **The same topic, taught shallow or deep.** Every topic now carries two lessons over the same curriculum: **The basics** — the rule, one worked example, enough to attempt tonight's homework — and **Go deeper** — why the rule holds, where it breaks, the multi-step example, and the trap an exam sets on it.

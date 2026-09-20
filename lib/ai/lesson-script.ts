@@ -2,6 +2,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { effortFor, modelFor } from "./models";
+import type { Level } from "@/lib/levels";
 import { normaliseQuestions } from "./generate-quiz";
 import type { Character } from "@/lib/characters";
 
@@ -70,7 +71,11 @@ Rules:
 - Checks test the idea just taught. Hints do not give the answer away.
 - The teacher is animated: give each beat a gesture and a mood that fit (wave for the hook, point or write when the board carries content, think for checks, celebrate for the recap; surprised for a twist, encourage after a hard idea).
 - The final quiz has exactly 3 questions on the whole lesson; prefix each skill_tag with the subject name and a colon.
-- Arabic lessons: everything in clear Modern Standard Arabic (Egyptian Ministry textbooks style), including the visuals.`;
+- Arabic lessons: everything in clear Modern Standard Arabic (Egyptian Ministry textbooks style), including the visuals.
+
+DEPTH. The request names the depth to teach at, and it changes the lesson, not only the wording:
+- basics: for a student who missed the class or did not follow it. State the rule, show it working twice with every step spoken, name the mistake most students make, and stop. Six to eight beats, checks that a student who followed the lesson will get right. Do not digress into why the rule is true or into anything beyond the grade.
+- advanced: for a student who already has the basics and is being taught by a strong private tutor. Say why the rule is true, not only what it is. Give the case where it fails and why. Connect it to what it is built on and what it leads to next year. One worked example that takes several linked steps. Name the trap an exam sets on this topic and show how to see it coming. Ten to twelve beats, and checks that need two ideas held at once. Assume the plain version has been taught; do not spend beats re-teaching it.`;
 
 export interface LessonSpec {
   subject: string;
@@ -82,6 +87,8 @@ export interface LessonSpec {
   sourceText?: string | null; // a school file's digest
   learner?: string | null;
   interests?: string | null;
+  /** Which depth to perform. The same topic taught shallow or deep — never a different topic. */
+  level?: Level;
 }
 
 export async function generateLessonScript(spec: LessonSpec): Promise<LessonScript & { model: string }> {
@@ -92,6 +99,7 @@ export async function generateLessonScript(spec: LessonSpec): Promise<LessonScri
     `Topic: ${spec.topic}`,
     spec.grade ? `Grade: ${spec.grade}` : null,
     `Language: ${spec.language === "ar" ? "Arabic" : "English"}`,
+    `Depth: ${spec.level ?? "basics"}`,
     `Teacher character: ${spec.character.name}. Manner: ${spec.character.style} Catchphrase (use at most once, in the hook or recap): "${spec.character.catchphrase}"`,
     spec.learner ? `${spec.learner} Shape the explanations to this.` : null,
     spec.interests ? `Student's interests, for one or two examples only: ${spec.interests}` : null,

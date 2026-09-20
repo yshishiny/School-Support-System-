@@ -1,3 +1,4 @@
+import { defaultLevel } from "@/lib/entitlement";
 import { report } from "@/lib/ops/fault";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { characterById } from "@/lib/characters";
@@ -25,6 +26,8 @@ export async function warmLessonScripts(studentId: string, budgetMs: number): Pr
   if (!row) return done;
   const profile = row as Profile;
   const character = characterById(profile.character_id);
+  // Warm the depth this child will actually be served, or the morning still waits for the AI.
+  const level = await defaultLevel(profile.id, profile.family_id);
 
   // What the class actually did in the last fortnight, most recent first.
   const { data: logs } = await admin
@@ -46,6 +49,7 @@ export async function warmLessonScripts(studentId: string, budgetMs: number): Pr
     .select("topic_id")
     .in("topic_id", topicIds)
     .eq("character_id", character.id)
+    .eq("level", level)
     .is("flagged_at", null)
     .gte("version", SCRIPT_VERSION);
   const have = new Set(((cached ?? []) as { topic_id: string | null }[]).map((c) => c.topic_id));
@@ -67,6 +71,7 @@ export async function warmLessonScripts(studentId: string, budgetMs: number): Pr
         sourceText: null,
         learner: learnerPromptLine(profile.learner_profile),
         interests: profile.interests,
+        level,
       });
       const { model, ...body } = script;
       const beats = await enrichBeats(body.beats, { subject: topic.subject, topic: topic.name, language }).catch(() => body.beats);
@@ -75,6 +80,7 @@ export async function warmLessonScripts(studentId: string, budgetMs: number): Pr
         material_id: null,
         character_id: character.id,
         language,
+        level,
         grade: topic.grade ?? profile.grade,
         title: body.title,
         minutes: body.minutes,
