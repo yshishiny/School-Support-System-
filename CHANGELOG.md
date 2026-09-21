@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.14 — A stopped lesson is not an error (21 September 2026, `v2` branch)
+
+- **The gate fired for real overnight**, twice, on مصر في عصر الولاة: the reviewer was not confident every fact in it was true, so the lesson was never stored and no child read it. That is exactly what it is for.
+- **And it reported itself as a disaster.** One correct decision produced three red rows on the Admin page — the hold, the week-preparation step that counted it, and the cron run that found the word "error" in its own results — plus a note in the parent's inbox. An error log that shouts about the system working correctly teaches an administrator to ignore red, which is the one thing an error log must never do.
+- **Held lessons now live in their own table** and the review queue reads them there. `app_errors` is for faults again. The two already recorded have been carried across and retired, so Admin is clear: **0 open errors, 2 waiting in Lessons to check.**
+- **A run that holds a lesson is a successful run.** The nightly preparation reports held topics separately from errors, so it stops marking itself failed for doing its job.
+- **A good lesson clears the hold.** When a later attempt on the same topic and depth passes, any hold standing against it is closed — the queue stops asking a parent about something that has since been written properly.
+
 ## 2.1.0-beta.13 — Show me what you wrote (20 September 2026, `v2` branch)
 
 - **The model has never seen a child's own work.** It writes lessons blind and marks multiple choice, which tells you whether he picked the right letter and nothing about where his method breaks. Under a lesson there is now **Check my working**: photograph what you wrote, and be told which line first goes wrong.

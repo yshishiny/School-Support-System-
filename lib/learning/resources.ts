@@ -7,7 +7,6 @@
 import { createAdminClient } from "@/lib/supabase/admin";
 import { explainTopic } from "@/lib/ai/explain-topic";
 import { reviewLesson } from "@/lib/teaching/review";
-import { report } from "@/lib/ops/fault";
 import { drawTopicVisuals } from "@/lib/ai/topic-visuals";
 import { findVideos, type VideoLesson } from "@/lib/videos";
 import { shiftDate, todayIn } from "@/lib/dates";
@@ -102,18 +101,26 @@ export async function ensureLesson(t: Topic, grade: number | null, learner: stri
     content,
   );
   if (!review.release) {
-    // Held, not stored. The next attempt writes a fresh lesson rather than serving this one, and the reference
-    // says which checks stopped it.
-    const ref = await report("learning.lessonHeld", new Error(`Lesson held: ${review.blocking.join(", ")}`), {
-      meta: { topicId: t.id, topic: t.name, level, blocking: review.blocking, results: review.results },
+    // Held, not stored: the next attempt writes a fresh lesson rather than serving this one.
+    //
+    // Recorded in its own table and NOT in the error log. A held lesson is the system working, and logging it as a
+    // fault put three red rows on the Admin page and a note in the parent's inbox for one correct decision — which
+    // is how an administrator learns to ignore red.
+    await admin.from("held_lessons").insert({
+      topic_id: t.id, level, grade, blocking: review.blocking, results: review.results,
     });
-    return { status: "held", excerpt: null, failed: [...review.blocking, `ref:${ref}`] };
+    return { status: "held", excerpt: null, failed: review.blocking };
   }
 
   await admin.from("lessons").upsert({
     topic_id: t.id, grade, level, content_md: content, model,
     checked_at: new Date().toISOString(), failed_checks: review.warnings, review_model: review.model,
   }, { onConflict: "topic_id,grade,level" });
+  // A good lesson for this topic and depth answers every hold standing against it, so the queue does not keep
+  // asking a parent about something that has since been written properly.
+  await admin.from("held_lessons")
+    .update({ cleared_at: new Date().toISOString() })
+    .eq("topic_id", t.id).eq("level", level).is("cleared_at", null);
   return { status: "made", excerpt: content.slice(0, 1500), failed: review.warnings };
 }
 
@@ -129,10 +136,10 @@ export async function ensureTopicMaterial(t: Topic, grade: number | null, learne
 }
 
 /** Gets this week's topics ready for one student, a few at a time, within a time budget. */
-export async function prepareWeekMaterial(studentId: string, opts: { limit?: number; budgetMs?: number } = {}): Promise<{ prepared: number; remaining: number; errors: string[] }> {
+export async function prepareWeekMaterial(studentId: string, opts: { limit?: number; budgetMs?: number } = {}): Promise<{ prepared: number; remaining: number; errors: string[]; held?: string[] }> {
   const admin = createAdminClient();
   const { data: profile } = await admin.from("profiles").select("grade, learner_profile, families(timezone)").eq("id", studentId).single();
-  if (!profile) return { prepared: 0, remaining: 0, errors: ["no profile"] };
+  if (!profile) return { prepared: 0, remaining: 0, errors: ["no profile"], held: [] };
   const fam = profile.families as unknown as { timezone: string } | null;
   const { learnerPromptLine } = await import("@/lib/learner");
   const learner = learnerPromptLine(profile.learner_profile);
@@ -143,13 +150,16 @@ export async function prepareWeekMaterial(studentId: string, opts: { limit?: num
   const todo = week.filter((w) => !w.hasLesson || !w.hasResources);
   let prepared = 0;
   const errors: string[] = [];
+  // Kept apart from errors on purpose: the cron marks a run failed when its results mention one.
+  const held: string[] = [];
   for (const w of todo) {
     if (prepared >= limit || Date.now() - started > budget) break;
     try {
       const made = await ensureTopicMaterial(w.topic, w.grade, learner);
       if (made.lesson === "held") {
-        // Not prepared, and not an error either: it will be attempted again tomorrow with a fresh lesson.
-        errors.push(`${w.topic.name}: held (${(made.failed ?? []).join(", ")})`);
+        // Not prepared, and emphatically not an error: it is reported on its own so a run that held a lesson is
+        // still a successful run, and is attempted again tomorrow with a freshly written one.
+        held.push(`${w.topic.name} (${(made.failed ?? []).join(", ")})`);
         continue;
       }
       prepared += 1;
@@ -157,5 +167,5 @@ export async function prepareWeekMaterial(studentId: string, opts: { limit?: num
       errors.push(`${w.topic.name}: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
-  return { prepared, remaining: Math.max(0, todo.length - prepared - errors.length), errors };
+  return { prepared, remaining: Math.max(0, todo.length - prepared - errors.length - held.length), errors, held };
 }
