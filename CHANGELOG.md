@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.13.0 — Every title on a child's page is a door (21 September 2026)
+
+- **Each section heading is now the link**, not a small grey button at the foot of the card, and it opens that subject's own page **already on this child** — Academic → Progress, Practice → the quiz plan, Money → the allowance meter, and so on, each carrying `?tab=<child>` so the side menu lands where you meant. Each heading also carries a line saying what is through the door, so a tap is never a guess.
+- **Six sections that were missing are there now**, each with its own door and enough on the card to decide whether to open it: **Tasks and homework** (open, overdue, due this week, the next five), **Practice and revision** (reviews waiting and the week's planned quizzes), **Extra practice from school files**, **Curriculum** (which one he sits in, his stream, the subjects he logged), **Coach** (the headline, and the full read behind a fold), and **Reports**. **Rewards** joins them beside the money.
+- **Prayers points at the week table below rather than inventing a page**, because there isn't one — a heading that looks like a link and goes nowhere is the complaint that started all of this.
+- **A dead link can no longer ship.** `lib/parent-links.test.ts` walks the app directory for the routes that really exist, pulls every `href` out of the child page, the chooser, the parent home and the parent menu — reducing `${...}` to a matchable segment so dynamic links are checked too — and fails on any that resolves to nothing. It carries its own negative case, so the check is proven to bite.
+
 ## 2.12.0 — The version on screen is the version running (21 September 2026)
 
 - **The version was written down twice and the two copies had drifted fifteen releases apart.** `package.json` said `2.11.0`; every screen in the app said `2.1.0`, because `lib/version.ts` carried its own literal that nobody remembered to bump. The beta had drifted the same way: package `2.1.0-beta.18`, app `2.1.0-beta.3`.
