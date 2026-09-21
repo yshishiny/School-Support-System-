@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.25 — Nobody scrolls a kilometre (21 September 2026, `v2` branch)
+
+- **Learn → Subjects was 2.8 phone screens for one subject, measured.** Chemistry alone listed 52 topics in a single run, and there are seventeen subjects. The units now collapse: ten headings with a count and how many you have practised, one tap to open the one you want. Same screen, 52 topics still reachable, nothing removed.
+- **Files and This week show a few, then say how many more.** Six worksheet cards became two plus "4 more files". The disclosure sits under what it opened rather than in the middle of the list.
+- **Nothing is hidden, only stacked.** Every list that could grow without limit now has a floor and a labelled way past it — a child can see where they are instead of where the scroll ends.
+- **Built on `<details>`, not state**: it works before the page hydrates, a screen reader already knows what it is, and searching the page still finds text inside a closed one.
+
 ## 2.1.0-beta.24 — The curriculum, and what has actually been made for it (21 September 2026, `v2` branch)
 
 - **New: Learning → 📚 Lessons.** The catalogue holds 1,711 topics and thirty of them have a lesson. Nothing in the app said so: material is written the night before a child needs it, so "not written yet" and "written and fine" looked identical from every other screen — a fine way to run a cache and a poor way to run a curriculum.
