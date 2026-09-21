@@ -163,14 +163,18 @@ export default async function ParentHome() {
     const card = (
       <section className="card space-y-3">
         <div className="flex items-center gap-3">
-          <Link href="/parent/children" className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
+          {/* The face and the name both open his own page, because that is what tapping a child means. */}
+          <Link href={`/parent/trace/${s.id}`} className="h-14 w-14 shrink-0 rounded-full overflow-hidden border-2 border-accent bg-panel-2 flex items-center justify-center text-2xl">
             {avatar ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={avatar} alt="" className="h-full w-full object-cover" />
             ) : s.avatar_emoji}
           </Link>
           <div className="flex-1 min-w-0">
-            <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>{s.full_name.split(" ")[0]} <span className="muted font-normal text-sm">· Grade {s.grade}</span></div>
+            <div className="font-bold text-lg leading-tight" style={{ fontFamily: "var(--font-display)" }}>
+              <Link href={`/parent/trace/${s.id}`} className="hover:text-accent-2">{s.full_name.split(" ")[0]}</Link>
+              <span className="muted font-normal text-sm"> · Grade {s.grade}</span>
+            </div>
             <div className="text-xs muted">{pr.label ? <span className={pr.online ? "text-good" : ""}>{pr.online ? "🟢 " : ""}{pr.label} · </span> : null}{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
             {(() => { const d = daysToBirthday(s.birth_date, today); return d !== null && d <= 7 ? <div className="text-xs text-warn">🎂 {d === 0 ? `Birthday today, turns ${ageOn(s.birth_date, today)}!` : `Birthday in ${d} day${d === 1 ? "" : "s"}`}</div> : null; })()}
           </div>
