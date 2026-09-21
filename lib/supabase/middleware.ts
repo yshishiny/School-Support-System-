@@ -6,7 +6,9 @@ import { touchPresence } from "@/lib/access/presence";
 // /api/version answers "which build is serving?" and nothing else. It has to be public: the tab most likely to
 // ask is one left open for hours, whose session has quietly lapsed — and a redirect to /login there turns the
 // staleness check into a silent no, which is how a redeployed page came to be reported as a code fault.
-const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron", "/api/version", "/demo"];
+// The matcher already keeps the browser's own files out; this is the belt to that pair of braces, so a change
+// to one of the two lists cannot quietly put the service worker back behind a login.
+const PUBLIC_PATHS = ["/login", "/signup", "/join", "/api/cron", "/api/version", "/demo", "/sw.js", "/manifest.webmanifest"];
 
 export async function updateSession(request: NextRequest, event?: NextFetchEvent) {
   let response = NextResponse.next({ request });

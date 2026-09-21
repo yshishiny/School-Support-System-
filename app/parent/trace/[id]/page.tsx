@@ -14,6 +14,8 @@ import { GradeSheetUploader } from "@/components/GradeSheetUploader";
 import { CoachButton } from "@/components/CoachButton";
 import { setTargetExamAction } from "@/lib/actions/learning";
 import { setProfessionalGuidanceAction } from "@/lib/actions/guidance";
+import { ChildReminders } from "@/components/ChildReminders";
+import { WeeklyChart } from "@/components/charts/WeeklyChart";
 import ReactMarkdown from "react-markdown";
 import { prettyDate, todayIn } from "@/lib/dates";
 
@@ -281,6 +283,48 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         <GradeSheetUploader familyId={family.id} studentId={t.id} month={today.slice(0, 7)} />
       </Section>
 
+      {/* ── Twelve weeks, four measures, one x-axis ───────────────────────── */}
+      <Section id="trend" title="📈 Over time">
+        <p className="text-xs muted -mt-1">
+          The last twelve weeks. A gap is a week with nothing to measure, which is not the same as a week he
+          scored nothing — where the measure was taken and the answer was zero, the bar is drawn at zero.
+        </p>
+        <div className="grid sm:grid-cols-2 gap-x-6 gap-y-5 pt-1">
+          <WeeklyChart
+            title="Allowance score"
+            note="out of 100, on the week it closed"
+            unit="points"
+            kind="bar"
+            axisMax={100}
+            reference={{ at: 50, label: "pays from 50" }}
+            points={t.trend.score}
+          />
+          <WeeklyChart
+            title="Points earned"
+            note="everything he was credited that week"
+            unit="⭐"
+            kind="bar"
+            points={t.trend.points}
+          />
+          <WeeklyChart
+            title="Quiz accuracy"
+            note="of every question he answered that week"
+            unit="% right"
+            kind="line"
+            axisMax={100}
+            points={t.trend.accuracy}
+          />
+          <WeeklyChart
+            title="Prayers kept"
+            note="days with four or more logged"
+            unit="days"
+            kind="bar"
+            axisMax={7}
+            points={t.trend.prayers}
+          />
+        </div>
+      </Section>
+
       {/* ── The rest of his learning, each with its own door ──────────────── */}
       <Section id="tasks" title="📝 Tasks and homework" href={`/parent/assignments?tab=${t.id}`} hint="set, chase, mark done">
         {t.tasks.open === 0 ? (
@@ -389,6 +433,16 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
             foundations, where to push harder, and a note for {t.name}.
           </p>
         )}
+      </Section>
+
+      <Section id="reminders" title="🔔 Can he be reached?" hint="browser notifications and Telegram">
+        <ChildReminders
+          studentId={t.id}
+          firstName={t.name}
+          push={t.reach.push}
+          telegram={t.reach.telegram}
+          botUsername={process.env.TELEGRAM_BOT_USERNAME || null}
+        />
       </Section>
 
       <Section id="reports" title="📨 Reports" href="/parent/reports" hint="the nightly study report">

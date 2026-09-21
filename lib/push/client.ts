@@ -1,6 +1,6 @@
 "use client";
 
-import { removePushSubscriptionAction, savePushSubscriptionAction } from "@/lib/actions/push";
+import { removePushSubscriptionAction, reportPushFaultAction, savePushSubscriptionAction } from "@/lib/actions/push";
 
 /**
  * Turning notifications on, from the browser.
@@ -17,7 +17,8 @@ export type PushState =
   | "blocked"       // said no once; only the browser's own settings can undo that
   | "off"
   | "on"
-  | "not-configured";
+  | "not-configured"
+  | "broken";       // the browser can do this, but registering the worker failed — a fault, not a refusal
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
@@ -42,8 +43,12 @@ export async function pushState(): Promise<PushState> {
     const reg = await navigator.serviceWorker.register("/sw.js");
     const sub = await reg.pushManager.getSubscription();
     return sub ? "on" : "off";
-  } catch {
-    return "unsupported";
+  } catch (err) {
+    // This used to return "unsupported", which the card reads as "nothing to offer" and renders nothing. A
+    // browser that supports push but could not register the worker is a fault on our side — most likely the
+    // script answering with something that is not JavaScript — and it has to be visible, not swallowed.
+    void reportPushFaultAction(err instanceof Error ? err.message : String(err));
+    return "broken";
   }
 }
 

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.1.0-beta.22 — Reminders that arrive, and twelve weeks you can see (21 September 2026, `v2` branch)
+
+**Why no reminder ever reached a child.** Browser push was configured correctly and the hourly job ran for days reporting success — with nobody to send to. Not one child had ever been subscribed, and no screen in the app said so.
+
+- **`/sw.js` was being served through the login check.** The middleware's exclusion list named the icons and the manifest but not the service worker, so any request without a session answered with a redirect instead of JavaScript. A registration that fails throws, and the code turned every throw into "this browser cannot do notifications" — which hides the offer **without a word**. Both lists now exclude it, and a registration failure is recorded as a fault with the browser's own message instead of being swallowed.
+- **A parent can now connect a child's Telegram**, which is the channel that actually survives: browser push can only be *asked for* once per install and a "no" is permanent, while Telegram works on any phone and survives a reinstall. The send path for a child already existed — only the linking was missing. He taps Start in the bot, you press Connect.
+- **New on his page: “🔔 Can he be reached?”** — whether push is on, whether Telegram is linked, and **Send a test now**, which proves the channel end to end rather than trusting that it is configured. If nothing can reach him it says so in red, because that is the fact that went unnoticed for a week.
+
+**New: 📈 Over time.** Twelve weeks of **allowance score** (with the line where it starts paying), **points earned**, **quiz accuracy** and **prayers kept** — one shared x-axis, so they read together.
+
+- **A gap is not a zero.** A week with no quiz in it leaves a gap in the line rather than a point at zero; a week that was measured and came to nothing draws a mark on the baseline. The two look different on purpose — it is the same distinction the score and the prayers page now make, and a chart that blurred it would undo both.
+- Every value is in a table under each chart, so nothing is reachable only by hovering. The series colour was checked against the card it sits on for contrast and colour-vision separation rather than picked by eye, and the charts were rendered and looked at on a laptop and at phone width before shipping.
+
 ## 2.1.0-beta.21 — A prayers page, and Progress folded away (21 September 2026, `v2` branch)
 
 - **New: one child's prayers, over 7, 30 or 90 days.** Which of the five he keeps and which he keeps dropping — each of the five rated as a share of the days, so they are comparable, with the weakest named outright. A grid of every day and every prayer, days fully accounted for in a row, Fajr at the mosque, and the prayers he filled in after the fact rather than at the time.

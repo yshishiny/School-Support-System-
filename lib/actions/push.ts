@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { failed } from "@/lib/ops/fault";
+import { failed, report } from "@/lib/ops/fault";
 import { requireSession } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { sendPush } from "@/lib/push/server";
@@ -34,6 +34,18 @@ export async function testPushAction(): Promise<{ error?: string; sent?: number 
   const { profile } = await requireSession();
   const r = await sendPush(profile.id, { title: "Study Portal 👋", body: `Notifications work, ${profile.full_name.split(" ")[0]}. Reminders will arrive here.`, url: profile.role === "parent" ? "/parent" : "/today", tag: "test" });
   return r.error && !r.sent ? { error: r.error } : { sent: r.sent };
+}
+
+/**
+ * The browser could do notifications but the service worker would not register.
+ *
+ * Recorded rather than swallowed. This is the failure that hid the whole feature: a registration that throws
+ * used to be reported to the child as "your browser cannot do this", so he was never asked and no fault was
+ * ever logged. Now it reaches the Admin page like any other, with the browser's own words.
+ */
+export async function reportPushFaultAction(message: string): Promise<void> {
+  const { profile } = await requireSession();
+  await report("push.register", new Error(message.slice(0, 300)), { userId: profile.id });
 }
 
 /** Which reminders the child wants. */
