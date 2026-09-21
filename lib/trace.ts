@@ -80,3 +80,35 @@ export interface DayEvidence {
 export function weekIsEmpty(days: DayEvidence[]): boolean {
   return days.every((d) => !d.checkedIn && d.prayers === 0 && d.classesLogged === 0 && d.quizzesDone === 0 && d.snaps === 0);
 }
+
+/**
+ * The counts behind this week's score, read back out of the KPI lines.
+ *
+ * The evaluation needs "13 of 17 classes" as two numbers, and the honest place to get them is the very lines the
+ * score was built from — recomputing them from raw rows invites a page that states two different figures for the
+ * same fact. The coupling to those wordings is real, so it is pinned by a test against live scoreWeek output
+ * rather than left to be discovered when a label changes.
+ */
+export interface WeekCounts {
+  classesDue: number; classesLogged: number;
+  quizzesPlanned: number; quizzesAttempted: number;
+  homeworkDue: number; homeworkOnTime: number;
+  snapsDue: number; snapsDone: number;
+}
+
+export function weekCounts(results: { code: string; detail: string }[]): WeekCounts {
+  const pair = (code: string, re: RegExp): [number, number] => {
+    const m = (results.find((r) => r.code === code)?.detail ?? "").match(re);
+    return m ? [Number(m[1]), Number(m[2])] : [0, 0];
+  };
+  let snapsDue = 0;
+  let snapsDone = 0;
+  for (const r of results.filter((x) => x.code.startsWith("snap:"))) {
+    const m = r.detail.match(/^(\d+) of (\d+) days? snapped/);
+    if (m) { snapsDone += Number(m[1]); snapsDue += Number(m[2]); }
+  }
+  const [classesLogged, classesDue] = pair("classlog", /^(\d+) of (\d+) classes logged/);
+  const [quizzesAttempted, quizzesPlanned] = pair("quizzes", /^(\d+) of (\d+) attempted/);
+  const [homeworkOnTime, homeworkDue] = pair("homework", /^(\d+) of (\d+) done on time/);
+  return { classesDue, classesLogged, quizzesPlanned, quizzesAttempted, homeworkDue, homeworkOnTime, snapsDue, snapsDone };
+}

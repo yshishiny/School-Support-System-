@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0-beta.18 — One boy, every discipline, one page (21 September 2026, `v2` branch)
+
+- **New: an evaluation of each child across everything the app can see** — academic, manners, home duties, prayers, how he is in himself, and money. Each line carries a verdict, the one number it rests on, the evidence under it, and opens the detail that proves it. It leads the child's page, before any figure.
+- **"Nothing measured" is its own verdict, and it reads like bad news**, because for a parent it is: it means he cannot see. A dimension with no evidence never reads as fine — the rule that the whole of this week turned on, now enforced across all six. Manners says outright *"You have not judged a single day out of 7. Nobody but you can measure this one."*
+- **Progress is folded into the child's page.** Weakest and strongest topics, recent quizzes one by one, the school grades sheet and its appraisal, what the coach makes of him, reviews waiting — all under Academic, on the same page as his manners, his chores and his money. A parent does not think of "his learning" and "his money" as two destinations; they are two things about the same boy.
+- **His siblings are small faces in the corner**, so switching child never means going back out.
+- **The home page is now "what happened".** What is waiting on a decision, your children as faces and nothing else, today's taps, and then the feed of what actually occurred — each entry with its time and a way in. The three older arrangements stay in Settings for anyone who prefers one.
+- The counts behind the evaluation are read back out of the very KPI lines the score was built from, rather than recomputed, so the page can never state two different figures for the same fact — pinned by a test against live `scoreWeek` output.
+
 ## 2.1.0-beta.17 — One child, the whole page (21 September 2026, `v2` branch)
 
 - **Choosing a child now opens his own page.** Money and proof was one page holding every child at once behind a strip of tabs: tapping "Youssef" left three quarters of the screen showing his brothers and sisters and a column of fifteen other destinations. `/parent/trace` is now a chooser and nothing else — one wide row per child with the amount, whether he was active this week, and anything waiting — and `/parent/trace/<child>` is his account in full.

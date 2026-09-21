@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { owed, timeline, verdict, weekIsEmpty, type ClosedWeek, type DayEvidence, type PointEntry } from "./trace";
+import { owed, timeline, verdict, weekCounts, weekIsEmpty, type ClosedWeek, type DayEvidence, type PointEntry } from "./trace";
+import { mergeKpis, scoreWeek } from "./allowance";
 import type { WalletEntry } from "./wallet";
 
 const w = (id: string, kind: WalletEntry["kind"], amount: number, on: string, label: string): WalletEntry =>
@@ -69,5 +70,63 @@ describe("weekIsEmpty", () => {
   });
   it("is false on a single prayer", () => {
     expect(weekIsEmpty([blank("2026-09-12"), { ...blank("2026-09-13"), prayers: 1 }])).toBe(false);
+  });
+});
+
+describe("weekCounts", () => {
+  // Pinned against real scoreWeek output, not against strings written from memory: this is the one place the
+  // evaluation depends on how a KPI happens to word itself.
+  const snapTask = (code: string, label: string, weight: number, days: number[]) =>
+    ({ code, label, emoji: "📸", weight, enabled: true, days, kind: "chore" });
+
+  const real = scoreWeek({
+    kpis: mergeKpis(null, [snapTask("bed", "Bed made", 10, [0, 1, 2, 3, 4, 5, 6]), snapTask("desk", "Desk tidy", 10, [0, 1, 2, 3, 4, 5, 6])]),
+    start: "2026-09-12",
+    end: "2026-09-18",
+    today: "2026-09-18",
+    ticks: [],
+    prayerDays: {},
+    checkinDates: [],
+    plannedTotal: 6,
+    plannedAttempted: 4,
+    wellbeingDue: false,
+    wellbeingDone: false,
+    classLog: { due: 17, done: 13, missingLine: null },
+    homework: { due: 3, doneOnTime: 2, open: 1 },
+    snapDays: { "snap:bed": ["2026-09-12", "2026-09-13"] },
+  });
+
+  it("reads every count back out of the lines the score was built from", () => {
+    expect(weekCounts(real.results)).toEqual({
+      classesDue: 17, classesLogged: 13,
+      quizzesPlanned: 6, quizzesAttempted: 4,
+      homeworkDue: 3, homeworkOnTime: 2,
+      snapsDue: 14, snapsDone: 2,
+    });
+  });
+
+  it("agrees with the no-photo gate about how many snaps were due", () => {
+    const c = weekCounts(real.results);
+    expect(c.snapsDue).toBeGreaterThan(0);
+    expect(real.blocked).toBeNull(); // two snaps taken, so the gate is lifted
+    const none = scoreWeek({
+      kpis: mergeKpis(null, [snapTask("bed", "Bed made", 10, [0, 1, 2, 3, 4, 5, 6])]),
+      start: "2026-09-12", end: "2026-09-18", today: "2026-09-18",
+      ticks: [], prayerDays: {}, checkinDates: [], plannedTotal: 0, plannedAttempted: 0,
+      wellbeingDue: false, wellbeingDone: false, snapDays: {},
+    });
+    expect(none.blocked).toBe(`no photo proof at all: 0 of ${weekCounts(none.results).snapsDue} snaps due this week`);
+  });
+
+  it("reports zero rather than guessing when a KPI had nothing to say", () => {
+    const quiet = scoreWeek({
+      kpis: mergeKpis(null), start: "2026-09-12", end: "2026-09-18", today: "2026-09-18",
+      ticks: [], prayerDays: {}, checkinDates: [], plannedTotal: 0, plannedAttempted: 0,
+      wellbeingDue: false, wellbeingDone: false,
+    });
+    expect(weekCounts(quiet.results)).toEqual({
+      classesDue: 0, classesLogged: 0, quizzesPlanned: 0, quizzesAttempted: 0,
+      homeworkDue: 0, homeworkOnTime: 0, snapsDue: 0, snapsDone: 0,
+    });
   });
 });
