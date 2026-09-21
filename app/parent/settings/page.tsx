@@ -14,6 +14,8 @@ import { createClient } from "@/lib/supabase/server";
 import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
+import { AccountSecurity } from "@/components/AccountSecurity";
+import { myAccount } from "@/lib/accounts/me";
 
 const HOME_LAYOUTS: { id: "a" | "b" | "c" | "d"; title: string; emoji: string; blurb: string }[] = [
   { id: "d", title: "What happened", emoji: "📰", blurb: "What you need to know, what is waiting on a decision, and your children as faces. Everything about a child lives on his own page." },
@@ -44,6 +46,7 @@ function HomeLayoutChooser({ current }: { current: string }) {
 
 export default async function SettingsPage() {
   const { family, profile } = await requireParent();
+  const account = await myAccount();
   const supabase = await createClient();
   const today = todayIn(family.timezone);
   const [{ data: places }, { data: kids }, { data: parents }, { data: invites }, { data: overrides }] = await Promise.all([
@@ -82,6 +85,15 @@ export default async function SettingsPage() {
         <InstallCard compact />
         <PushToggle />
       </section>
+      <AccountSecurity
+        firstName={profile.full_name.split(" ")[0]}
+        email={account.email}
+        pendingEmail={account.pendingEmail}
+        verified={account.verified}
+        placeholder={account.placeholder}
+        username={account.username}
+      />
+
       <TelegramSettings chatId={(profile as Profile).telegram_chat_id} botUsername={process.env.TELEGRAM_BOT_USERNAME || null} />
           </>) },
           { id: "parents", label: "Parents", emoji: "👨‍👩‍👦", content: (<>

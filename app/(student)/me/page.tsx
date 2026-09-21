@@ -15,6 +15,8 @@ import { mergeKpis } from "@/lib/allowance";
 import { todayIn } from "@/lib/dates";
 import { APP_VERSION } from "@/lib/version";
 import { brand } from "@/lib/brand";
+import { AccountSecurity } from "@/components/AccountSecurity";
+import { myAccount } from "@/lib/accounts/me";
 import { DEFAULT_NUDGES, type NudgeSettings } from "@/lib/nudges";
 import { HeroUploader } from "@/components/HeroUploader";
 import { HeroGallery } from "@/components/HeroGallery";
@@ -139,8 +141,17 @@ export default async function MePage() {
     </>
   );
 
+  const account = await myAccount();
   const more = (
     <>
+      <AccountSecurity
+        firstName={profile.full_name.split(" ")[0]}
+        email={account.email}
+        pendingEmail={account.pendingEmail}
+        verified={account.verified}
+        placeholder={account.placeholder}
+        username={account.username}
+      />
       <InstallCard compact />
       <RemindersCard settings={{ ...DEFAULT_NUDGES, ...(((profile as { nudges?: Partial<NudgeSettings> }).nudges) ?? {}) }} />
 
