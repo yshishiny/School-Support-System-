@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.1.0-beta.26 — A reward can be corrected, not just hidden (21 September 2026, `v2` branch)
+
+- **Rewards can now be edited.** There was no update: only add, hide and redeem. So the advice printed under a reward whose title was lying read "hide it and add it again" — which is not a repair, because redemptions point at the reward's id and a replacement row orphans every request a child ever made for it.
+- **A title that contradicts the amount is now refused at the point of typing**, on adding and on editing, instead of being reported after a child has already seen it. The form says what the reward pays while you type the title, so the two are never out of sight of each other.
+- **Rejecting a request never fixed anything.** "500 EGP" pays 100; it was requested twice and rejected twice, and the card in the shop still said 500 both times. A rejection answers one request; the title goes on promising.
+
 ## 2.1.0-beta.25 — Nobody scrolls a kilometre (21 September 2026, `v2` branch)
 
 - **Learn → Subjects was 2.8 phone screens for one subject, measured.** Chemistry alone listed 52 topics in a single run, and there are seventeen subjects. The units now collapse: ten headings with a count and how many you have practised, one tap to open the one you want. Same screen, 52 topics still reachable, nothing removed.
