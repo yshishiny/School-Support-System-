@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddRewardForm } from "@/components/AddRewardForm";
+import { EditRewardForm } from "@/components/EditRewardForm";
 import { Tabs } from "@/components/Tabs";
 import { adjustPointsAction, decideRedemptionAction, enableRewardTemplateAction, toggleRewardAction } from "@/lib/actions/rewards";
 import { REWARD_TEMPLATES, TEMPLATE_GROUPS } from "@/lib/reward-templates";
@@ -92,18 +93,21 @@ export default async function ParentRewardsPage() {
         <h2 className="h2 mb-2">Catalog</h2>
         <ul className="divide-y divide-line">
           {((rewards ?? []) as Reward[]).map((r) => (
-            <li key={r.id} className={`py-2 flex items-center gap-2 ${r.active ? "" : "opacity-50"}`}>
+            <li key={r.id} className={`py-2 flex flex-wrap items-center gap-2 ${r.active ? "" : "opacity-50"}`}>
               <span className="text-2xl">{r.emoji}</span>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="font-medium">{r.title}</div>
                 <div className="text-xs muted">{r.kind}{r.cash_amount_egp ? ` · pays ${Number(r.cash_amount_egp)} EGP` : ""} · {r.cost_points} pts</div>
-                {mismatchLine(r.title, r.cash_amount_egp) && <div className="text-xs text-bad">⚠️ {mismatchLine(r.title, r.cash_amount_egp)} Hide it and add it again with a title that matches.</div>}
+                {mismatchLine(r.title, r.cash_amount_egp) && (
+                  <div className="text-xs text-bad">⚠️ {mismatchLine(r.title, r.cash_amount_egp)} Edit it — a child reads the title first.</div>
+                )}
               </div>
               <form action={toggleRewardAction}>
                 <input type="hidden" name="id" value={r.id} />
                 <input type="hidden" name="active" value={r.active ? "false" : "true"} />
                 <button className="btn-ghost btn-sm">{r.active ? "Hide" : "Show"}</button>
               </form>
+              <EditRewardForm r={{ id: r.id, title: r.title, emoji: r.emoji, kind: r.kind, cost_points: r.cost_points, cash_amount_egp: r.cash_amount_egp }} />
             </li>
           ))}
           {(rewards ?? []).length === 0 && <li className="muted text-sm">No rewards yet. Mix cash (e.g. 500 EGP for 1500 pts) with privileges (game time, a night out) and things they want.</li>}
@@ -116,7 +120,7 @@ export default async function ParentRewardsPage() {
           { id: "ideas", label: "Ideas", emoji: "💡", content: (<>
       <section className="card space-y-2">
         <h2 className="h2">Ideas, off by default</h2>
-        <p className="text-xs muted">Tap Enable to add one to the catalog. Prices are suggestions; edit after enabling by hiding and re-adding.</p>
+        <p className="text-xs muted">Tap Enable to add one to the catalog. Prices are suggestions — change any of them with Edit in the Catalog tab.</p>
         {(Object.keys(TEMPLATE_GROUPS) as (keyof typeof TEMPLATE_GROUPS)[]).map((g) => (
           <div key={g}>
             <div className="text-xs font-bold muted mt-2 mb-1">{TEMPLATE_GROUPS[g]}</div>

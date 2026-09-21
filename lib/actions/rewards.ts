@@ -8,6 +8,7 @@ import { todayIn } from "@/lib/dates";
 import { requireParent, requireSession, requireStudent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { mismatchLine } from "@/lib/rewards/money";
 
 export async function createRewardAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { family } = await requireParent();
@@ -17,6 +18,10 @@ export async function createRewardAction(_prev: { error?: string } | undefined, 
   const kind = String(formData.get("kind") ?? "privilege");
   const cash = Number(formData.get("cash_amount_egp") ?? 0) || null;
   if (!title || !(cost > 0)) return { error: "Title and a positive points cost are required." };
+  // A title that names a different figure from the one the reward pays is the one mistake here that reaches a
+  // child as a promise, so it is refused at the point of typing rather than reported afterwards.
+  const lie = mismatchLine(title, kind === "cash" ? cash : null);
+  if (lie) return { error: `${lie} Put the same number in both, or leave the number out of the title.` };
   const { error } = await supabase.from("rewards").insert({
     family_id: family.id,
     title,
@@ -30,6 +35,44 @@ export async function createRewardAction(_prev: { error?: string } | undefined, 
   revalidatePath("/parent/rewards");
   revalidatePath("/rewards");
   return {};
+}
+
+/**
+ * Corrects a reward in place.
+ *
+ * Until now the only repair was "hide it and add it again", which is not a repair: redemptions point at the
+ * reward id, so a replacement row orphans every request a child ever made for it — and the advice was printed
+ * directly under a reward whose title was lying, which is how "500 EGP" stayed on a card paying 100 for days
+ * while the requests were simply rejected over and over.
+ */
+export async function updateRewardAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { family } = await requireParent();
+  const supabase = await createClient();
+  const id = String(formData.get("id") ?? "");
+  const title = String(formData.get("title") ?? "").trim();
+  const cost = Number(formData.get("cost_points") ?? 0);
+  const kind = String(formData.get("kind") ?? "privilege");
+  const cash = Number(formData.get("cash_amount_egp") ?? 0) || null;
+  if (!id) return { error: "No such reward." };
+  if (!title || !(cost > 0)) return { error: "Title and a positive points cost are required." };
+  const lie = mismatchLine(title, kind === "cash" ? cash : null);
+  if (lie) return { error: `${lie} Put the same number in both, or leave the number out of the title.` };
+
+  const { error } = await supabase
+    .from("rewards")
+    .update({
+      title,
+      kind,
+      cost_points: cost,
+      cash_amount_egp: kind === "cash" ? cash : null,
+      emoji: String(formData.get("emoji") ?? "🎁").trim() || "🎁",
+    })
+    .eq("id", id)
+    .eq("family_id", family.id);
+  if (error) return failed("actions.rewards.updateReward", error);
+  revalidatePath("/parent/rewards");
+  revalidatePath("/rewards");
+  return { ok: "Saved." };
 }
 
 export async function toggleRewardAction(formData: FormData) {
