@@ -21,6 +21,12 @@ export async function requireSession(): Promise<Session> {
   if (!profile) redirect("/login?error=no_profile");
   const { data: family } = await supabase.from("families").select("*").eq("id", profile.family_id).single();
   if (!family) redirect("/login?error=no_family");
+  // A switched-off account stops working now, not when its token next expires. Banning in the auth service
+  // refuses the *next* sign-in; without this a child who is already signed in carries on for another hour.
+  if ((profile as { disabled_at?: string | null }).disabled_at) {
+    await supabase.auth.signOut();
+    redirect("/login?error=disabled");
+  }
   // Anything that fails later in this request is logged against the person who hit it, with no extra plumbing.
   rememberWho({ userId: user.id, familyId: profile.family_id, name: profile.full_name, role: profile.role });
   return { userId: user.id, profile: profile as Profile, family: family as Family };

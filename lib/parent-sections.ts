@@ -26,6 +26,7 @@ export const PARENT_SECTIONS: ParentSection[] = [
   { href: "/parent/snaps", label: "Snaps", emoji: "📸", group: "Fairness" },
   { href: "/parent/rewards", label: "Rewards", emoji: "🎁", group: "Fairness" },
   { href: "/parent/reports", label: "Reports", emoji: "📨", group: "Family" },
+  { href: "/parent/people", label: "Accounts", emoji: "🔑", group: "Family" },
   { href: "/parent/guide", label: "Guide", emoji: "❓", group: "Family" },
   { href: "/parent/settings", label: "More", emoji: "⚙️", group: "Family" },
 ];

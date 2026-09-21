@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.23 — Accounts belong to the people who use them (21 September 2026, `v2` branch)
+
+- **Everyone can now change their own password**, parent and child alike, on their own page — and it asks for the current one. A session only proves this browser was left signed in, which in a house with a shared laptop is not the same as proving who is typing.
+- **Everyone can add and verify a real email.** Children sign in with a made-up `@study.local` address, which means a forgotten password has always needed a parent. A real address fixes that. Nothing changes until the link in the new inbox is opened, so a typo cannot lock anybody out — and a stand-in address is never reported as "verified", because it was confirmed at creation and proves nothing.
+- **New: Family → 🔑 Accounts.** Set a password, add or change an email, switch an account off and on, hand the family over to the other parent, grant administrator rights. A parent sees their own family; an administrator sees every family. Every act is written to an audit trail, **including the ones that were refused**, and the page shows it.
+- **Who may do what is one tested module**, not scattered `if`s: a child administers nobody; families are sealed unless you are an administrator; only the main parent may administer the other parent; nobody may disable or demote themselves; and the last administrator and the last family owner cannot be removed. Twenty-five rules, each with a test.
+- **Switching an account off ends the session that is already open**, not just the next sign-in — the profile carries the fact and every request reads it. Banning in the auth service alone would have left a child working for another hour. Being bounced to the login page now says why.
+
 ## 2.1.0-beta.22 — Reminders that arrive, and twelve weeks you can see (21 September 2026, `v2` branch)
 
 **Why no reminder ever reached a child.** Browser push was configured correctly and the hourly job ran for days reporting success — with nobody to send to. Not one child had ever been subscribed, and no screen in the app said so.
