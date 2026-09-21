@@ -52,8 +52,11 @@ export default async function AllowancePage() {
   for (let d = status.start; d < today; d = shiftDate(d, 1)) if (!(checkinRows ?? []).some((c) => c.checkin_date === d)) checkinMissed.push(d);
   const toBalance = compensations.filter((c) => !c.correct);
   const plan = allowancePlan(status);
-  const now = bandFor(status.score);
-  const best = bandFor(status.maxScore);
+  // Both read from the gated bands, not from the raw score: with no snap in the week the honest answer to
+  // "what am I heading for" is nothing, and "Some of it · score 51" over a 0 EGP figure is how a child learns
+  // the number on his own page cannot be trusted.
+  const now = BANDS.find((x) => x.band === status.band) ?? bandFor(status.score);
+  const best = BANDS.find((x) => x.band === status.bestBand) ?? bandFor(status.maxScore);
   const daysLeft = status.totalDays - status.elapsedDays;
   const color = status.band === "full" ? "bg-good" : status.band === "most" ? "bg-accent" : status.band === "some" ? "bg-warn" : "bg-bad";
   const todoPoints = Math.round(plan.todo.reduce((s, p) => s + p.atStake, 0));

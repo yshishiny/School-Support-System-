@@ -3,7 +3,7 @@ import { allowancePlan, whyThisAmount, type WeekResult } from "./allowance";
 
 const base: WeekResult = {
   score: 62, band: "some", elapsedDays: 4, totalDays: 7, maxScore: 91, bestBand: "full",
-  measuredScore: 51, defaultScore: 11, measurable: 89,
+  measuredScore: 51, defaultScore: 11, measurable: 89, blocked: null, blockedForGood: false,
   hints: ["No more ✗ on “manners: respectful, no shouting”", "Fill in 3 classes in the check-in (Mon: Math, Chem)", "Log at least 4 prayers today", "Snap “bed made” today"],
   results: [
     { code: "dish", label: "Cleared his dish and his space", emoji: "🍽️", weight: 20, fraction: 1, earned: 20, detail: "no ✗ so far", basis: "measured" as const },

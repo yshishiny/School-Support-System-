@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.9.0 — Silence is not a ✓, and no photo means no pay (21 September 2026)
+
+Two rules on top of the score, both asked for after the evidence showed a week that paid 100 EGP on almost nothing.
+
+- **A basic nobody ever tapped now pays half, not full.** "No ✗ so far" used to pay 20 of 20 on a column nobody had ever looked at. Dish, manners and phone are 50 of the 215 points in a full week, so a child none of whose days were ever judged started from a quarter of the score. Half keeps the original intention — a day nobody marked is not a day he failed — without paying for the parent forgetting. **An explicit ✓ still pays in full, on however few days it was tapped**; only silence is discounted, and a parent can still tick past days and recover the whole mark.
+- **A week with no snap at all pays nothing.** The snaps are the only measure a child cannot satisfy by leaving something alone: a bed is made or it is not, and the picture says which. This is a gate, not a weight — it does not touch the score, it decides whether the score is allowed to pay. **One picture on one day lifts it.** While a snap is still due before pay day the child is told it can be lifted; once none is, he is told the week is settled.
+- **What this does to the week just gone.** Rebuilt from the stored breakdown, Youssef's 12–18 September scored 51 and paid 100. Under the new rules: the snap gate alone takes it to 0 (0 of 46 snaps due), and even with the gate lifted the half-marks rule brings 51 down to **40** — under the paying line on its own. Tapping the three columns daily *and* taking one photograph puts it back to 52, which pays 100. All four figures are asserted in the tests.
+- **Weeks already closed are untouched.** The rules apply from the running week forward; a stored week keeps the score, band and amount it closed with, so nothing anyone was already owed is taken back.
+- The meter, the child's allowance page and Money and proof all state the gate in plain words, and the band shown is the one that will actually pay rather than the one the raw score reaches.
+
 ## 2.8.0 — A title is not an amount (21 September 2026)
 
 - **"Youssef claims 500 EGP" was a reward called "500 EGP" that pays 100.** It was set up on the 14th, priced at 200 points, with its cash amount left at 100 — the title and the field that actually moves money were never the same number. Youssef had 214 points, saw a card that said 500, and pressed the button. The approval row a parent then reads showed the title and the points and *never the amount*, so both sides read 500 and neither of them was lying.

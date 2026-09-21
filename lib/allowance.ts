@@ -80,6 +80,31 @@ export function bandFor(score: number): (typeof BANDS)[number] {
   return BANDS.find((b) => score >= b.min) ?? BANDS[BANDS.length - 1];
 }
 
+/**
+ * What an untouched parent tick is worth.
+ *
+ * It used to be worth full marks: "no ✗ so far" paid 20 of 20 on a column nobody had ever tapped. Three of those
+ * columns are 50 of the 215 points in a full week, so a child none of whose days were ever judged started from a
+ * quarter of the score, and one who never opened the app at all could not score below the high thirties. Half
+ * keeps the original intention — a day nobody marked is not a day he failed — without paying him for the parent
+ * forgetting. An explicit ✓ still pays in full; only silence is discounted.
+ */
+export const UNTICKED_SHARE = 0.5;
+
+/**
+ * The floor under the whole week: no photo proof at all pays nothing.
+ *
+ * The snaps are the only measure in the system a child cannot satisfy by leaving something alone — a bed is made
+ * or it is not, and the picture says which. A week with a good score and not one photograph in seven days is not
+ * a good week, it is an unobserved one, and paying for it teaches exactly the wrong thing. This is a gate, not a
+ * weight: it does not change the score, it decides whether the score is allowed to pay. One snap on one day
+ * lifts it — the rule is against nothing at all, not against falling short.
+ */
+export function snapGate(due: number, done: number): string | null {
+  if (due === 0 || done > 0) return null;
+  return `no photo proof at all: 0 of ${due} snap${due === 1 ? "" : "s"} due this week`;
+}
+
 export interface WeekInput {
   kpis: KpiDef[];
   start: string;
@@ -129,6 +154,10 @@ export interface WeekResult {
   measuredScore: number; // the part of score backed by evidence
   defaultScore: number;  // the part given because nothing was due or ticked
   measurable: number;    // share of the week, 0-100, that had anything to measure at all
+  /** Why the week pays nothing whatever the score says, or null when nothing blocks it. */
+  blocked: string | null;
+  /** True once the block can no longer be lifted: no snap is still due before pay day. */
+  blockedForGood: boolean;
 }
 
 function daysBetween(a: string, b: string): number {
@@ -147,6 +176,10 @@ export function scoreWeek(i: WeekInput): WeekResult {
   const remaining = totalDays - elapsedDays;
   const maxByCode = new Map<string, number>();
   const hintByCode = new Map<string, string>();
+  // Totals for the gate below, filled in as the snap KPIs are scored.
+  let snapDue = 0;
+  let snapDone = 0;
+  let snapAhead = 0;
   const results: KpiResult[] = active.map((k) => {
     let fraction = 1;
     let detail = "";
@@ -156,9 +189,12 @@ export function scoreWeek(i: WeekInput): WeekResult {
       const ticked = i.ticks.filter((t) => t.code === k.code && days.includes(t.tick_date)).length;
       const bad = i.ticks.filter((t) => t.code === k.code && !t.value && days.includes(t.tick_date)).length;
       if (ticked === 0) basis = "default";
-      fraction = Math.max(0, 1 - bad / elapsedDays);
+      // Never tapped: half, not full. Tapped at all: judged on the ✗ marks as before.
+      fraction = ticked === 0 ? UNTICKED_SHARE : Math.max(0, 1 - bad / elapsedDays);
+      // Still fully reachable: a parent can tick the days already gone as well as the ones ahead.
       maxFraction = Math.max(0, 1 - bad / totalDays);
-      detail = bad ? `${bad} day${bad === 1 ? "" : "s"} marked ✗` : ticked ? `${ticked} day${ticked === 1 ? "" : "s"} marked ✓` : "never ticked either way";
+      detail = bad ? `${bad} day${bad === 1 ? "" : "s"} marked ✗` : ticked ? `${ticked} day${ticked === 1 ? "" : "s"} marked ✓` : "never ticked either way — half marks";
+      if (ticked === 0) hintByCode.set(k.code, `Ask a parent to tick “${k.label.toLowerCase()}”: untapped it only pays half`);
       if (bad) hintByCode.set(k.code, `No more ✗ on “${k.label.toLowerCase()}”`);
     } else if (k.code === "prayers") {
       const good = days.filter((d) => (i.prayerDays[d] ?? 0) >= 4).length;
@@ -226,6 +262,9 @@ export function scoreWeek(i: WeekInput): WeekResult {
       const dueDays = days.filter(owes);
       const doneDays = (i.snapDays?.[k.code] ?? []).filter((d) => dueDays.includes(d)).length;
       const remainingDue = Array.from({ length: remaining }, (_, n) => shiftDate(lastDay, n + 1)).filter(owes).length;
+      snapDue += dueDays.length;
+      snapDone += doneDays;
+      snapAhead += remainingDue;
       if (dueDays.length === 0) {
         fraction = 1;
         maxFraction = 1;
@@ -260,14 +299,24 @@ export function scoreWeek(i: WeekInput): WeekResult {
   const part = (b: "measured" | "default") => results.filter((r) => r.basis === b).reduce((s, r) => s + r.earned, 0);
   const measuredScore = Math.round((part("measured") / totalWeight) * 100);
   const measurable = Math.round((results.filter((r) => r.basis === "measured").reduce((s, r) => s + r.weight, 0) / totalWeight) * 100);
+  // The gate. It leaves the score alone — 51 is still 51, and saying so is the point — and only decides whether
+  // that score is allowed to pay. While a snap is still due it can be lifted by taking one.
+  const blocked = snapGate(snapDue, snapDone);
+  const blockedForGood = blocked !== null && snapAhead === 0;
   return {
-    score, band: bandFor(score).band, results, elapsedDays, totalDays,
-    maxScore, bestBand: bandFor(maxScore).band, hints,
+    score,
+    band: blocked ? "none" : bandFor(score).band,
+    results, elapsedDays, totalDays,
+    maxScore,
+    bestBand: blockedForGood ? "none" : bandFor(maxScore).band,
+    hints: blocked ? ["Snap at least one chore today — with no photo at all the week pays nothing", ...hints.filter((h) => !h.startsWith("Snap "))] : hints,
     measuredScore, defaultScore: score - measuredScore, measurable,
+    blocked, blockedForGood,
   };
 }
 
-export function amountFor(score: number, allowance: number): number {
+export function amountFor(score: number, allowance: number, blocked?: string | null): number {
+  if (blocked) return 0;
   return Math.round(allowance * bandFor(score).share);
 }
 
@@ -299,6 +348,11 @@ export function practiceByCode(code: string): PracticeDef | undefined {
 
 /** One sentence about eligibility, for the child: where he stands and what is still reachable. */
 export function eligibilityHint(r: WeekResult, allowance: number): { tone: "good" | "warn" | "bad"; text: string } {
+  if (r.blocked) {
+    return r.blockedForGood
+      ? { tone: "bad", text: `This week pays nothing: ${r.blocked}. The score was ${r.score}, and it does not count without a single picture. Next week starts fresh.` }
+      : { tone: "bad", text: `This week pays nothing so far: ${r.blocked}. One snap on one day lifts it and your score of ${r.score} starts counting again.` };
+  }
   const now = bandFor(r.score);
   const best = bandFor(r.maxScore);
   const nowEgp = Math.round(allowance * now.share);
@@ -370,6 +424,10 @@ export function allowancePlan(r: WeekResult): { todo: PlanItem[]; protect: PlanI
 
 /** The child's "why this amount" in plain words. */
 export function whyThisAmount(r: WeekResult, allowance: number): string {
+  if (r.blocked) {
+    const lift = r.blockedForGood ? "No snap is due before pay day any more, so this week ends at 0 EGP." : "Take one snap and the score starts counting again.";
+    return `Your score is ${r.score} out of 100, but the week pays 0 EGP: ${r.blocked}. A week with no picture in it is not measured, whatever the rest says. ${lift}`;
+  }
   const now = bandFor(r.score);
   const best = bandFor(r.maxScore);
   const nowEgp = Math.round(allowance * now.share);
