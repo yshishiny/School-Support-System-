@@ -11,6 +11,7 @@ import { fileEmoji } from "@/lib/materials/files";
 import { materialStages, nextStage } from "@/lib/materials/study";
 import { loadRevisions } from "@/lib/revision/run";
 import { Tabs } from "@/components/Tabs";
+import { Group, MoreList } from "@/components/MoreList";
 import { Seated } from "@/components/Seated";
 import { hasCurriculum, topicsFor } from "@/lib/curriculum";
 import { MaterialUploader } from "@/components/MaterialUploader";
@@ -134,11 +135,13 @@ export default async function LearnPage() {
                 <h2 className="h2">{subjectEmoji(subject)} {subjectLabel(subject)}</h2>
                 <span className="text-xs muted">{scores.length}/{list.length} practised{avg !== null ? ` · avg ${avg}%` : ""}</span>
               </div>
-              {units.map((unit) => (
-                <div key={unit} className="mb-2">
-                  {unit && units.length > 1 && <div className="text-xs font-bold muted mt-2 mb-1">{unit}</div>}
+              {/* Units are closed to start. Chemistry alone is 52 topics, which is three phone screens of list
+                  before a child reaches the second subject — the headings are what you navigate by anyway. */}
+              {units.map((unit) => {
+                const inUnit = list.filter((t) => (t.unit ?? "") === unit);
+                const rows = (
                   <ul className="divide-y divide-line">
-                    {list.filter((t) => (t.unit ?? "") === unit).map((t) => (
+                    {inUnit.map((t) => (
                       <li key={t.id}>
                         <Link href={`/learn/topic/${t.id}`} className="py-2 flex items-center gap-3 hover:text-accent-2">
                           <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${masteryColor(mastery.get(t.id))}`} />
@@ -148,8 +151,21 @@ export default async function LearnPage() {
                       </li>
                     ))}
                   </ul>
-                </div>
-              ))}
+                );
+                if (!unit || units.length === 1) return <div key={unit} className="mb-2">{rows}</div>;
+                const doneHere = inUnit.filter((t) => mastery.has(t.id)).length;
+                return (
+                  <Group
+                    key={unit}
+                    title={unit}
+                    count={inUnit.length}
+                    note={doneHere > 0 ? `${doneHere} practised` : undefined}
+                    dir={isArabicSubject(subject) ? "rtl" : undefined}
+                  >
+                    {rows}
+                  </Group>
+                );
+              })}
             </section>
           ),
         };
@@ -246,6 +262,7 @@ export default async function LearnPage() {
           </ul>
         </section>
       )}
+      <MoreList show={2} noun="more file" className="space-y-3">
       {materials.map((m) => (
         <section key={m.id} className="card space-y-2">
           <div className="flex items-start gap-2">
@@ -273,6 +290,7 @@ export default async function LearnPage() {
           {m.status === "ready" ? <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} /> : <ReadAgainButton materialId={m.id} />}
         </section>
       ))}
+      </MoreList>
       {materials.length === 0 && <p className="card text-sm muted">No files yet. When the teacher drops a PDF in the group, save it and add it here: the coach reads it and writes practice questions from it.</p>}
       <MaterialUploader familyId={family.id} students={[{ id: profile.id, full_name: profile.full_name }]} subjects={[...new Set((mySubjects ?? []).map((x) => x.name))].sort()} fixedStudentId={profile.id} />
     </div>
@@ -290,9 +308,9 @@ export default async function LearnPage() {
         <>
           <p className="text-xs muted">What you took at school this week and what is planned next: each topic with a written lesson, diagrams to see it, and the same idea explained by different teachers on video.</p>
           {weekMissing > 0 && <PrepareWeekButton missing={weekMissing} />}
-          <ul className="space-y-2">
+          <MoreList show={4} noun="more topic" className="space-y-2">
             {week.map((w) => (
-              <li key={w.topic.id}>
+              <div key={w.topic.id}>
                 <Link href={`/learn/topic/${w.topic.id}?tab=lesson`} className="card !py-3 flex items-center gap-3 hover:border-accent/60" dir={w.topic.language === "ar" ? "rtl" : undefined}>
                   <span className="text-3xl">{subjectEmoji(w.topic.subject)}</span>
                   <div className="flex-1 min-w-0">
@@ -305,9 +323,9 @@ export default async function LearnPage() {
                     <span className={w.hasResources ? "" : "opacity-25"}>▶️</span>
                   </div>
                 </Link>
-              </li>
+              </div>
             ))}
-          </ul>
+          </MoreList>
         </>
       )}
     </div>
