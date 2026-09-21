@@ -29,7 +29,7 @@ import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
-import { APP_VERSION } from "@/lib/version";
+import { isBeta } from "@/lib/brand";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -323,7 +323,9 @@ export default async function ParentHome() {
   // "What happened, and the children as faces" is the default. The older arrangements stay reachable for anyone
   // who chose one, but a parent who has never picked gets the page that answers "what do I need to know?".
   const layout = (profile as { home_layout?: string }).home_layout ?? "d";
-  const isV2 = APP_VERSION.startsWith("2.");
+  // Which *site* this is, not which version number it carries. This read `APP_VERSION.startsWith("2.")`, and
+  // once the live site reached 2.x it started serving the beta-only treatment to everyone.
+  const isV2 = isBeta();
   const layoutNode = layout === "a" ? <ParentLayoutA d={data} /> : layout === "b" ? <ParentLayoutB d={data} /> : layout === "c" ? <ParentLayoutC d={data} /> : <ParentLayoutD d={data} />;
 
   if (isV2) {

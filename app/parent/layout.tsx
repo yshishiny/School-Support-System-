@@ -14,7 +14,7 @@ export default async function ParentLayout({ children }: { children: React.React
   const openErrors = isAdmin ? (await createAdminClient().from("app_errors").select("id", { count: "exact", head: true }).is("resolved_at", null)).count ?? 0 : 0;
   return (
     <div className="mx-auto max-w-6xl px-4 pt-3 pb-24 sm:pb-10 overflow-x-clip">
-      <SiteBadge />
+      <SiteBadge href="/parent/about" />
       <ParentShell menu={<ParentMenu unread={unread} isAdmin={isAdmin} openErrors={openErrors} />}>
         {children}
       </ParentShell>

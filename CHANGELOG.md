@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.12.0 — The version on screen is the version running (21 September 2026)
+
+- **The version was written down twice and the two copies had drifted fifteen releases apart.** `package.json` said `2.11.0`; every screen in the app said `2.1.0`, because `lib/version.ts` carried its own literal that nobody remembered to bump. The beta had drifted the same way: package `2.1.0-beta.18`, app `2.1.0-beta.3`.
+- **It is now written in one place — package.json — and read from there at build time.** `next.config.ts` injects it; `lib/version.ts` no longer contains a number at all. A test refuses a version-shaped literal on that line, checks the config reads the package, and keeps the newest changelog heading in step, so the two cannot silently part again.
+- **A live-site bug that came straight out of the drift.** The parent home decided which site it was on with `APP_VERSION.startsWith("2.")`. Once the live site reached 2.x that was true there too, so the beta-only treatment was being served to everyone. It asks `isBeta()` now, which reads the deployed branch.
+- **The badge says which site you are on, in words, on every screen of both apps.** `LIVE v2.12.0` or `🧪 BETA v2.1.0-beta.19`, bigger, and a link: tapping it opens About, where the build's commit is written out. Children see it too, and their Me page names the app, the version and whether it is the beta.
+- **`/api/version` now returns `version` and `site`** alongside the deployment id, so which build each of the two sites is running can be checked from a browser without logging into either.
+
 ## 2.11.0 — One boy, every discipline, one page (21 September 2026)
 
 - **New: an evaluation of each child across everything the app can see** — academic, manners, home duties, prayers, how he is in himself, and money. Each line carries a verdict, the one number it rests on, the evidence under it, and opens the detail that proves it. It leads the child's page, before any figure.
