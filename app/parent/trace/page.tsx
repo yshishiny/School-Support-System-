@@ -185,6 +185,12 @@ export default async function TracePage() {
             Score {st.score}/100 → <b>{st.amount} EGP</b> ·{" "}
             <b className={st.measuredScore > 0 ? "text-good" : "text-bad"}>{st.measuredScore} earned</b>, <b>{st.defaultScore} given</b> for what had nothing to measure.
           </div>
+          {st.blocked && (
+            <p className="text-xs text-bad">
+              📸 <b>Pays nothing this week:</b> {st.blocked}. The score stands at {st.score}, but no photo proof means no
+              money — {st.blockedForGood ? "and nothing is due before pay day, so this week is settled at 0." : "one snap on one day lifts it."}
+            </p>
+          )}
           {empty && (
             <p className="text-xs text-bad">
               Nothing at all is recorded for {first} this week, yet the score is {st.score}. That is the app being generous with

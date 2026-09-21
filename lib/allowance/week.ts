@@ -109,7 +109,7 @@ export async function allowanceWeekStatus(studentId: string, family: Pick<Family
     gradesSheet,
     materials: materialsInput,
   });
-  return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount), allowance: family.allowance_amount, enabled: family.allowance_enabled };
+  return { ...result, start, end, amount: amountFor(result.score, family.allowance_amount, result.blocked), allowance: family.allowance_amount, enabled: family.allowance_enabled };
 }
 
 /** Closes a finished week (the day after pay day or later): stores the result once. Returns the row or null when nothing to close. */
