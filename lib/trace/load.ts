@@ -69,6 +69,12 @@ export interface ChildTrace extends ChildSummary {
     reviewsDue: number;
   };
   wellbeing: { band: "green" | "amber" | "red" | null; note: string; checks: number; signals: number };
+  /** Open work, so the Tasks section says something rather than only linking away. */
+  tasks: { open: number; overdue: number; soon: number; next: { title: string; kind: string; due: string | null }[] };
+  /** Which curriculum he is on, resolved to a name a parent recognises. */
+  curriculum: { name: string | null; stream: string | null; grade: number | null };
+  /** The family's most recent daily report, for the Reports section. */
+  lastReport: { date: string; status: string } | null;
   /** Who else is in the family, for the row of small faces that switches child. */
   siblings: { id: string; name: string; emoji: string; avatar: string | null }[];
 }
@@ -219,6 +225,18 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     computeAttention(s.id).catch(() => ({ today, score: 0, tier: "none" as const, signals: [] })),
   ]);
 
+  // Open work, the curriculum he sits in, and the last report the family was sent: one more round trip, so the
+  // sections that link away can still say something before a parent decides to follow the link.
+  const [{ data: taskRows }, { data: curriculumRows }, { data: reportRow }] = await Promise.all([
+    supabase.from("assignments").select("title, kind, due_date, status").eq("student_id", s.id).eq("status", "open").order("due_date", { nullsFirst: false }).limit(50),
+    (s as Profile & { curriculum_id?: string | null }).curriculum_id
+      ? supabase.from("curricula").select("id, name").eq("id", (s as Profile & { curriculum_id?: string | null }).curriculum_id!)
+      : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+    supabase.from("daily_reports").select("report_date, status").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1),
+  ]);
+  const tasksOpen = (taskRows ?? []) as { title: string; kind: string; due_date: string | null; status: string }[];
+  const weekAhead = shiftDate(today, 7);
+
   const topics = (topicRows ?? []) as Topic[];
   const attempts = (attemptRows ?? []) as AttemptWithQuiz[];
   const mastery = masteryOf(attempts, topics);
@@ -297,6 +315,20 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
       reviewsDue: (dueRows ?? []).length,
     },
     wellbeing: { band: wb.band, note: wb.note, checks: wb.checks, signals: attention.signals.length },
+    tasks: {
+      open: tasksOpen.length,
+      overdue: tasksOpen.filter((a) => a.due_date && a.due_date < today).length,
+      soon: tasksOpen.filter((a) => a.due_date && a.due_date >= today && a.due_date <= weekAhead).length,
+      next: tasksOpen.slice(0, 5).map((a) => ({ title: a.title, kind: a.kind, due: a.due_date })),
+    },
+    curriculum: {
+      name: ((curriculumRows ?? []) as { name: string }[])[0]?.name ?? null,
+      stream: (s as Profile & { stream?: string | null }).stream ?? null,
+      grade: s.grade,
+    },
+    lastReport: ((reportRow ?? []) as { report_date: string; status: string }[])[0]
+      ? { date: (reportRow as { report_date: string; status: string }[])[0].report_date, status: (reportRow as { report_date: string; status: string }[])[0].status }
+      : null,
     siblings: kids.filter((k) => k.id !== s.id).map((k) => ({
       id: k.id,
       name: k.full_name.split(" ")[0],

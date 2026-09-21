@@ -68,10 +68,26 @@ function Row({ d }: { d: Dimension }) {
   );
 }
 
-function Section({ id, title, children }: { id: string; title: string; children: React.ReactNode }) {
+/**
+ * A section whose heading is the way in.
+ *
+ * Every title on this page names something that has a real page of its own, and a parent reading about his son's
+ * academics wants to open his academics — not hunt for a small grey button at the bottom of the card. The
+ * heading carries the link, scoped to this child wherever the destination can take a child (`?tab=<id>` is what
+ * the side menus on those pages read). `hint` says what is through the door, so the tap is never a guess.
+ */
+function Section({ id, title, href, hint, children }: { id: string; title: string; href?: string; hint?: string; children: React.ReactNode }) {
   return (
     <section id={id} className="card space-y-2 scroll-mt-4">
-      <h2 className="h2">{title}</h2>
+      {href ? (
+        <Link href={href} className="group flex items-baseline gap-2 -mx-1 px-1 rounded-lg hover:bg-panel-2/50 transition">
+          <h2 className="h2 group-hover:text-accent-2 transition">{title}</h2>
+          {hint && <span className="text-xs muted hidden sm:inline truncate">{hint}</span>}
+          <span className="ml-auto shrink-0 muted text-lg leading-none transition group-hover:text-accent-2" aria-hidden>›</span>
+        </Link>
+      ) : (
+        <h2 className="h2">{title}</h2>
+      )}
       {children}
     </section>
   );
@@ -131,7 +147,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
       </section>
 
       {/* ── Academic ──────────────────────────────────────────────────────── */}
-      <Section id="academic" title="📚 Academic">
+      <Section id="academic" title="📚 Academic" href={`/parent/progress?tab=${t.id}`} hint="mastery, checkpoints, grade sheets">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-1">
           <Figure value={`${st.results.find((r) => r.code === "classlog")?.detail.match(/^(\d+)/)?.[1] ?? 0}`} label="Classes written up" />
           <Figure value={t.learning.recentQuizzes.length} label="Recent quizzes" />
@@ -201,14 +217,81 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
           </details>
         )}
 
-        <div className="flex gap-2 pt-1">
-          <Link href="/parent/plan" className="btn-ghost btn-sm">Quiz plan</Link>
-          <Link href="/parent/progress" className="btn-ghost btn-sm">Full progress page</Link>
-        </div>
+      </Section>
+
+      {/* ── The rest of his learning, each with its own door ──────────────── */}
+      <Section id="tasks" title="📝 Tasks and homework" href={`/parent/assignments?tab=${t.id}`} hint="set, chase, mark done">
+        {t.tasks.open === 0 ? (
+          <p className="text-sm muted">Nothing open.</p>
+        ) : (
+          <>
+            <p className="text-sm">
+              <b className={t.tasks.overdue > 0 ? "text-bad" : ""}>{t.tasks.open} open</b>
+              {t.tasks.overdue > 0 && <> · {t.tasks.overdue} overdue</>}
+              {t.tasks.soon > 0 && <> · {t.tasks.soon} due this week</>}
+            </p>
+            <ul className="text-sm divide-y divide-line">
+              {t.tasks.next.map((a, k) => (
+                <li key={k} className="py-1.5 flex items-baseline gap-2">
+                  <span className="flex-1 min-w-0 truncate">{a.title}</span>
+                  <span className="shrink-0 text-xs muted">{a.kind}</span>
+                  <span className={`shrink-0 text-xs tabular-nums ${a.due && a.due < today ? "text-bad" : "muted"}`}>{a.due ?? "no date"}</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </Section>
+
+      <Section id="practice" title="🧠 Practice and revision" href={`/parent/plan?tab=${t.id}`} hint="the quiz plan and what is waiting">
+        <p className="text-sm">
+          <b className={t.learning.reviewsDue > 20 ? "text-warn" : ""}>{t.learning.reviewsDue}</b> review{t.learning.reviewsDue === 1 ? "" : "s"} waiting ·{" "}
+          {st.results.find((r) => r.code === "quizzes")?.detail ?? "no planned quizzes"}
+        </p>
+        <p className="text-xs muted">
+          Reviews are the spaced practice the app schedules from what he got wrong. A pile of them means he has
+          stopped opening it, not that he has forgotten more.
+        </p>
+      </Section>
+
+      <Section id="files" title="📎 Extra practice from school files" href={`/parent/materials?tab=${t.id}`} hint="what the school sent, turned into sets">
+        <p className="text-sm">{st.results.find((r) => r.code === "materials")?.detail ?? "no file deadlines yet"}</p>
+        <p className="text-xs muted">Each file the school shares becomes practice: a first set within 3 days, a second by day 7, a third by day 14.</p>
+      </Section>
+
+      <Section id="curriculum" title="🎓 Curriculum" href="/parent/children" hint="change his curriculum or stream">
+        <p className="text-sm">
+          {t.curriculum.name ?? <span className="muted">No curriculum chosen yet</span>}
+          {t.curriculum.grade !== null && <> · Grade {t.curriculum.grade}</>}
+          {t.curriculum.stream && <> · {t.curriculum.stream}</>}
+        </p>
+        {t.learning.subjectsThisWeek.length > 0 && (
+          <p className="text-xs muted">Subjects he logged this week: {t.learning.subjectsThisWeek.join(" · ")}</p>
+        )}
+      </Section>
+
+      <Section id="coach" title="🦸 Coach" href={`/parent/progress?tab=${t.id}`} hint="ask the coach for a fresh read">
+        {t.learning.coach ? (
+          <>
+            <p className="text-sm font-medium">{t.learning.coach.headline}</p>
+            <details className="text-sm">
+              <summary className="cursor-pointer text-xs muted select-none">What it says in full</summary>
+              <p className="mt-1 whitespace-pre-wrap">{t.learning.coach.parent_md}</p>
+            </details>
+          </>
+        ) : (
+          <p className="text-sm muted">No coach report for {t.name} yet.</p>
+        )}
+      </Section>
+
+      <Section id="reports" title="📨 Reports" href="/parent/reports" hint="the nightly study report">
+        <p className="text-sm">
+          {t.lastReport ? <>Last report {prettyDate(t.lastReport.date)} · {t.lastReport.status}</> : <span className="muted">No report has been sent yet.</span>}
+        </p>
       </Section>
 
       {/* ── Manners and home duties ───────────────────────────────────────── */}
-      <Section id="manners" title="🤝 Manners">
+      <Section id="manners" title="🤝 Manners" href="/parent/manners" hint="the daily ✓ and ✗">
         <ul className="text-sm divide-y divide-line">
           {st.results.filter((r) => r.code === "manners").map((r) => (
             <li key={r.code} className="py-2 flex items-center gap-3">
@@ -219,10 +302,9 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
           ))}
         </ul>
         <p className="text-xs muted">Only you can measure this one. One tap a day on the home page; an untapped day now pays half.</p>
-        <Link href="/parent/manners" className="btn-ghost btn-sm">Manners page</Link>
       </Section>
 
-      <Section id="duties" title="🧹 Home duties">
+      <Section id="duties" title="🧹 Home duties" href="/parent/snaps" hint="photos to approve">
         <ul className="text-sm divide-y divide-line">
           {st.results.filter((r) => r.code.startsWith("snap:") || r.code === "dish" || r.code === "phone").map((r) => (
             <li key={r.code} className="py-2 flex items-center gap-3">
@@ -236,11 +318,10 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
             </li>
           ))}
         </ul>
-        <Link href="/parent/snaps" className="btn-ghost btn-sm">Snaps to approve</Link>
       </Section>
 
       {/* ── Faith and wellbeing ───────────────────────────────────────────── */}
-      <Section id="faith" title="🕌 Prayers">
+      <Section id="faith" title="🕌 Prayers" href="#week" hint="day by day, below">
         <ul className="text-sm divide-y divide-line">
           {st.results.filter((r) => r.code === "prayers" || r.code === "checkins").map((r) => (
             <li key={r.code} className="py-2 flex items-center gap-3">
@@ -251,7 +332,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         </ul>
       </Section>
 
-      <Section id="wellbeing" title="💓 How he is in himself">
+      <Section id="wellbeing" title="💓 How he is in himself" href={`/parent/clinician/${t.id}`} hint="a letter for a doctor or a counsellor">
         <p className="text-sm">{t.wellbeing.note}</p>
         <p className="text-xs muted">
           {t.wellbeing.checks > 0 ? `${t.wellbeing.checks} check-in${t.wellbeing.checks === 1 ? "" : "s"} in the last five weeks. ` : ""}
@@ -261,7 +342,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
       </Section>
 
       {/* ── Money ─────────────────────────────────────────────────────────── */}
-      <Section id="money" title="🧾 Money and proof">
+      <Section id="money" title="🧾 Money and proof" href={`/parent/allowance?tab=${t.id}`} hint="the meter, the wallet, consequences">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-1">
           <Figure value={t.owed.handOver} unit="EGP" label="Hand over now" tone="text-accent-2" />
           <Figure value={t.owed.unpaidTotal} unit="EGP" label="Unsettled weeks" tone={t.owed.unpaidTotal > 0 ? "text-accent-2" : ""} />
@@ -318,8 +399,16 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         )}
       </Section>
 
+      <Section id="rewards" title="🎁 Rewards" href="/parent/rewards?tab=requests" hint="the catalog and what he has asked for">
+        <p className="text-sm">
+          {t.points} points held ·{" "}
+          {t.requestList.length > 0 ? <b className="text-warn">{t.requestList.length} request{t.requestList.length === 1 ? "" : "s"} waiting on you</b> : "nothing requested"}
+        </p>
+        <p className="text-xs muted">A reward pays what its cash amount says, never what its title says. A title that disagrees is flagged in the catalog.</p>
+      </Section>
+
       {/* ── The week, and the ledger under everything ─────────────────────── */}
-      <Section id="week" title={`What ${t.name} did, day by day`}>
+      <Section id="week" title={`📅 What ${t.name} did, day by day`}>
         <div className="overflow-x-auto -mx-1 px-1">
           <table className="text-sm w-full">
             <thead>
@@ -369,7 +458,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         )}
       </Section>
 
-      <Section id="ledger" title="Every entry">
+      <Section id="ledger" title="🧮 Every entry">
         <p className="text-xs muted">Each figure on this page comes from one of these lines.</p>
         {t.lines.length === 0 ? <p className="text-sm muted">Nothing recorded yet.</p> : (
           <ul className="text-sm divide-y divide-line max-h-[28rem] overflow-y-auto">
