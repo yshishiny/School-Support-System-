@@ -1,9 +1,11 @@
+import Link from "next/link";
 import { requireParent } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
 import { AddRewardForm } from "@/components/AddRewardForm";
 import { Tabs } from "@/components/Tabs";
 import { adjustPointsAction, decideRedemptionAction, enableRewardTemplateAction, toggleRewardAction } from "@/lib/actions/rewards";
 import { REWARD_TEMPLATES, TEMPLATE_GROUPS } from "@/lib/reward-templates";
+import { mismatchLine, payoutOf } from "@/lib/rewards/money";
 import { POINTS } from "@/lib/points";
 import type { Profile, Redemption, Reward } from "@/lib/types";
 
@@ -13,15 +15,23 @@ export default async function ParentRewardsPage() {
   const [{ data: rewards }, { data: kids }, { data: redemptions }, { data: ledger }] = await Promise.all([
     supabase.from("rewards").select("*").eq("family_id", family.id).order("cost_points"),
     supabase.from("profiles").select("*").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
-    supabase.from("redemptions").select("*, rewards(title, emoji), profiles(full_name)").order("requested_at", { ascending: false }).limit(20),
+    supabase.from("redemptions").select("*, rewards(title, emoji, kind, cash_amount_egp, cost_points), profiles(full_name, id)").order("requested_at", { ascending: false }).limit(20),
     supabase.from("points_ledger").select("student_id, delta"),
   ]);
   const students = (kids ?? []) as Profile[];
-  const reds = (redemptions ?? []) as (Redemption & { rewards: { title: string; emoji: string } | null; profiles: { full_name: string } | null })[];
+  const reds = (redemptions ?? []) as (Redemption & {
+    rewards: { title: string; emoji: string; kind: string; cash_amount_egp: string | number | null; cost_points: number } | null;
+    profiles: { full_name: string; id: string } | null;
+  })[];
+  // Points each child holds now, so a request can say what approving it leaves him with.
+  const pointsOf = (id: string | undefined) => (ledger ?? []).filter((l) => l.student_id === id).reduce((a, l) => a + l.delta, 0);
 
   return (
     <main className="space-y-4">
-      <h1 className="h1">Rewards</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="h1">Rewards</h1>
+        <Link href="/parent/trace" className="btn-ghost btn-sm">🧾 Money and proof</Link>
+      </div>
       <p className="muted text-sm">
         A daily check-in pays {POINTS.CHECKIN}, homework on time {POINTS.HOMEWORK_ON_TIME} each, a full day {POINTS.ALL_DONE_BONUS} bonus. A good week is roughly 150 to 250 points, so price rewards accordingly.
       </p>
@@ -34,23 +44,44 @@ export default async function ParentRewardsPage() {
         <section className="card">
           <h2 className="h2 mb-2">Requests</h2>
           <ul className="divide-y divide-line text-sm">
-            {reds.map((r) => (
-              <li key={r.id} className="py-2 flex items-center gap-2">
-                <div className="flex-1">
+            {reds.map((r) => {
+              const pays = payoutOf(r.rewards ?? {});
+              const lie = r.rewards ? mismatchLine(r.rewards.title, r.rewards.cash_amount_egp) : null;
+              const has = pointsOf(r.profiles?.id);
+              return (
+              <li key={r.id} className="py-2 flex items-start gap-2">
+                <div className="flex-1 min-w-0">
                   <b>{r.profiles?.full_name}</b> · {r.rewards?.emoji} {r.rewards?.title} · {r.points_spent} pts
+                  {/*
+                    The amount, stated by the row itself. A reward titled "500 EGP" that pays 100 made a
+                    child ask for 500 and a parent read a request for 500; neither number came from the
+                    field that actually moves the money, because the row never showed it.
+                  */}
+                  {pays > 0 && <> · <b className="text-accent-2">pays {pays} EGP</b></>}
                   <div className="text-xs muted">{String(r.requested_at).slice(0, 10)} · {r.status}</div>
+                  {lie && <div className="text-xs text-bad">⚠️ {lie} Approving pays {pays} EGP. Fix the title in the Catalog tab.</div>}
+                  <details className="text-xs muted mt-1">
+                    <summary className="cursor-pointer select-none">Details</summary>
+                    <ul className="mt-1 space-y-0.5 pl-1">
+                      <li>Asked on {String(r.requested_at).slice(0, 16).replace("T", " ")}</li>
+                      <li>Costs {r.points_spent} points · he has {has} now, leaving {has - (r.status === "pending" ? r.points_spent : 0)} if you approve</li>
+                      <li>{pays > 0 ? `Approving credits ${pays} EGP to his wallet, held until you mark it handed over in Allowance → Wallets.` : "This reward is not cash; no money moves."}</li>
+                      {r.rewards && r.rewards.cost_points !== r.points_spent && <li className="text-warn">Priced at {r.rewards.cost_points} pts today; he was charged {r.points_spent}.</li>}
+                      <li>Rejecting costs him nothing: points are only deducted on approval.</li>
+                    </ul>
+                  </details>
                 </div>
                 {r.status === "pending" && (
-                  <>
+                  <div className="flex gap-1 shrink-0">
                     <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="approved" /><button className="btn-primary btn-sm">Approve</button></form>
                     <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="rejected" /><button className="btn-ghost btn-sm">Reject</button></form>
-                  </>
+                  </div>
                 )}
                 {r.status === "approved" && (
-                  <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="delivered" /><button className="btn-ghost btn-sm">Mark given</button></form>
+                  <form action={decideRedemptionAction}><input type="hidden" name="id" value={r.id} /><input type="hidden" name="decision" value="delivered" /><button className="btn-ghost btn-sm shrink-0">Mark given</button></form>
                 )}
               </li>
-            ))}
+            );})}
           </ul>
         </section>
       )}
@@ -65,7 +96,8 @@ export default async function ParentRewardsPage() {
               <span className="text-2xl">{r.emoji}</span>
               <div className="flex-1">
                 <div className="font-medium">{r.title}</div>
-                <div className="text-xs muted">{r.kind}{r.cash_amount_egp ? ` · ${Number(r.cash_amount_egp)} EGP` : ""} · {r.cost_points} pts</div>
+                <div className="text-xs muted">{r.kind}{r.cash_amount_egp ? ` · pays ${Number(r.cash_amount_egp)} EGP` : ""} · {r.cost_points} pts</div>
+                {mismatchLine(r.title, r.cash_amount_egp) && <div className="text-xs text-bad">⚠️ {mismatchLine(r.title, r.cash_amount_egp)} Hide it and add it again with a title that matches.</div>}
               </div>
               <form action={toggleRewardAction}>
                 <input type="hidden" name="id" value={r.id} />

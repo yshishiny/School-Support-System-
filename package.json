@@ -1,6 +1,6 @@
 {
   "name": "school-support-portal",
-  "version": "2.1.0-beta.14",
+  "version": "2.1.0-beta.15",
   "private": true,
   "scripts": {
     "dev": "next dev",

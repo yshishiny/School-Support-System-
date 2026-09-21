@@ -34,7 +34,8 @@ export default async function RewardsPage() {
           <div className="text-3xl">{r.emoji}</div>
           <div className="font-bold leading-tight">{r.title}</div>
           {r.description && <div className="text-xs muted">{r.description}</div>}
-          {r.kind === "cash" && r.cash_amount_egp && <div className="text-xs text-good">{Number(r.cash_amount_egp)} EGP</div>}
+          {/* The figure that will actually land in his wallet, so the card cannot promise one thing and pay another. */}
+          {r.kind === "cash" && r.cash_amount_egp && <div className="text-xs text-good">pays {Number(r.cash_amount_egp)} EGP</div>}
           {(r.requires_full_weeks ?? 0) > 0 && <div className="text-xs text-warn">Extra effort: {r.requires_full_weeks} full week{r.requires_full_weeks === 1 ? "" : "s"} in a row ({streakFull} so far){r.effort_note ? ` · ${r.effort_note}` : ""}</div>}
           <div className="mt-auto pt-1 space-y-1">
             <div className="flex items-center justify-between"><span className="text-sm font-semibold">{r.cost_points} ⭐</span><TargetButton rewardId={r.id} isTarget={target?.id === r.id} /></div>

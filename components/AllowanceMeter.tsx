@@ -17,6 +17,16 @@ export function AllowanceMeter({ status, compact = false }: { status: WeekStatus
         <div className="text-4xl font-extrabold text-accent-2" style={{ fontFamily: "var(--font-display)" }}>{status.amount} <span className="text-base muted font-semibold">EGP</span></div>
         <div className="text-sm muted pb-1">{b.label} · score {status.score}/100 · day {status.elapsedDays} of 7</div>
       </div>
+      {/*
+        Where the score came from. Untouched columns pay in full on purpose — a week with no homework
+        set should not be punished for it — but that generosity is invisible in a single number, and a
+        parent looking at "37" cannot tell an average week from one where nobody opened the app.
+      */}
+      <div className="text-xs muted">
+        <b className={status.measuredScore > 0 ? "text-good" : "text-bad"}>{status.measuredScore} earned</b>
+        {" "}from what he actually did · <b>{status.defaultScore} given</b> because nothing was set, ticked or due
+        {status.measuredScore === 0 && status.score > 0 && <span className="text-bad"> — nothing this week was earned.</span>}
+      </div>
       <div className="h-3 rounded-full bg-panel-2 overflow-hidden relative">
         <div className={`h-full ${color} transition-all`} style={{ width: `${status.score}%` }} />
         {BANDS.filter((x) => x.min > 0).map((x) => (
@@ -51,7 +61,8 @@ export function AllowanceMeter({ status, compact = false }: { status: WeekStatus
             <li key={r.code} className="py-1.5 flex items-center gap-2">
               <span className="text-lg">{r.emoji}</span>
               <span className="flex-1">{r.label}<span className="muted text-xs"> · {r.detail}</span></span>
-              <span className={`badge ${r.fraction >= 0.99 ? "text-good" : r.fraction >= 0.5 ? "text-warn" : "text-bad"}`}>{r.earned}/{r.weight}</span>
+              {r.basis === "default" && <span className="badge muted text-[10px]" title="Nothing to measure, so this was given in full">given</span>}
+              <span className={`badge ${r.basis === "default" ? "muted" : r.fraction >= 0.99 ? "text-good" : r.fraction >= 0.5 ? "text-warn" : "text-bad"}`}>{r.earned}/{r.weight}</span>
             </li>
           ))}
         </ul>

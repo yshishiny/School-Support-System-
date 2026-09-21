@@ -159,3 +159,56 @@ describe("a learner who is past school", () => {
     expect(week.results.some((r) => r.code === "grades")).toBe(false);
   });
 });
+
+describe("earned against given", () => {
+  // The week that prompted this: a child who did nothing at all still scored 37, because seven
+  // untouched columns paid in full. The score itself is unchanged; what is new is being able to say
+  // how much of it he earned.
+  const empty = {
+    kpis: mergeKpis([]),
+    start: "2026-09-12",
+    end: "2026-09-18",
+    today: "2026-09-18",
+    ticks: [],
+    prayerDays: {},
+    checkinDates: [],
+    plannedTotal: 0,
+    plannedAttempted: 0,
+    wellbeingDue: false,
+    wellbeingDone: false,
+  };
+
+  it("counts a full mark as given when there was nothing to measure", () => {
+    const r = scoreWeek(empty);
+    expect(r.measuredScore).toBe(0);
+    expect(r.defaultScore).toBe(r.score);
+    expect(r.score).toBeGreaterThan(0); // the point: a blank week is not a zero
+  });
+
+  it("splits the score into two parts that add back up", () => {
+    const r = scoreWeek(base);
+    expect(r.measuredScore + r.defaultScore).toBe(r.score);
+  });
+
+  it("calls a parent KPI measured once it has been ticked either way", () => {
+    const ticked = scoreWeek({ ...empty, ticks: [{ tick_date: "2026-09-12", code: "dish", value: true }] });
+    const dish = ticked.results.find((r) => r.code === "dish")!;
+    expect(dish.basis).toBe("measured");
+    expect(dish.detail).toBe("1 day marked ✓");
+    expect(scoreWeek(empty).results.find((r) => r.code === "dish")!.basis).toBe("default");
+  });
+
+  it("says plainly when a parent KPI was never ticked", () => {
+    expect(scoreWeek(empty).results.find((r) => r.code === "dish")!.detail).toBe("never ticked either way");
+  });
+
+  it("counts prayers and check-ins as measured even at zero", () => {
+    const r = scoreWeek(empty);
+    expect(r.results.find((x) => x.code === "prayers")!.basis).toBe("measured");
+    expect(r.results.find((x) => x.code === "checkins")!.basis).toBe("measured");
+  });
+
+  it("reports how much of the week was measurable at all", () => {
+    expect(scoreWeek(empty).measurable).toBeLessThan(50);
+  });
+});

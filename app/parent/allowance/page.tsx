@@ -40,7 +40,10 @@ export default async function AllowancePage() {
     <main className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="h1">Allowance and consequences</h1>
-        <Link href="/parent" className="btn-ghost btn-sm">← Home</Link>
+        <div className="flex gap-1">
+          <Link href="/parent/trace" className="btn-ghost btn-sm">🧾 Money and proof</Link>
+          <Link href="/parent" className="btn-ghost btn-sm">← Home</Link>
+        </div>
       </div>
 
       {!family.allowance_enabled && (
