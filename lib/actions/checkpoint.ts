@@ -12,6 +12,6 @@ export async function requestSpotCheckAction(_prev: { error?: string; ok?: strin
   const subject = String(formData.get("subject") ?? "").trim() || null;
   if (!studentId) return { error: "Pick a child." };
   const r = await createCheckpoint({ studentId, familyId: family.id, kind: "spot", subject, requestedBy: profile.id, today: todayIn(family.timezone), payWeekday: family.allowance_pay_weekday });
-  ["/parent", "/parent/progress", "/today"].forEach((p) => revalidatePath(p));
+  ["/parent", "/today"].forEach((p) => revalidatePath(p));
   return r.error ? { error: r.error } : { ok: `Spot check ready: ${r.questions} questions. He has been notified.` };
 }

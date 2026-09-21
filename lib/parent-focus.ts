@@ -6,7 +6,7 @@
  * fifteen other destinations and a strip of his brothers and sisters beside him. Those pages drop the menu and
  * carry a single way back instead.
  */
-const FOCUS = [/^\/parent\/trace\/[^/]+$/];
+const FOCUS = [/^\/parent\/trace\/[^/]+$/, /^\/parent\/prayers\/[^/]+$/];
 
 export function isFocusRoute(path: string): boolean {
   return FOCUS.some((r) => r.test(path));

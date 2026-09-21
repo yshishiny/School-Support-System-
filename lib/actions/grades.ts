@@ -10,7 +10,7 @@ import { readGrades } from "@/lib/ai/read-grades";
 import { MATERIAL_BUCKET } from "@/lib/materials/server";
 import { pingParents } from "@/lib/notify";
 
-const PATHS = ["/me", "/rewards", "/parent", "/parent/progress", "/parent/allowance"];
+const PATHS = ["/me", "/rewards", "/parent", "/parent/allowance"];
 
 /** After the browser uploaded the sheet to the materials bucket: record it for the month and read it. */
 export async function registerGradeSheetAction(studentId: string, path: string, mime: string, month?: string): Promise<{ error?: string; average?: number | null; appraisal?: string }> {
@@ -31,7 +31,7 @@ export async function registerGradeSheetAction(studentId: string, path: string, 
     const buf = Buffer.from(await file.arrayBuffer());
     const r = await readGrades({ media_type: mime as "application/pdf" | "image/jpeg" | "image/png" | "image/webp", data: buf.toString("base64") }, { studentFirstName: student.full_name.split(" ")[0], grade: student.grade, previousAverage: prev?.average !== undefined && prev?.average !== null ? Number(prev.average) : null });
     await admin.from("grade_sheets").update({ status: "ready", items: r.items, average: r.average, appraisal: r.appraisal, error: null }).eq("id", row.id);
-    void pingParents(family.id, `${student.full_name.split(" ")[0]}'s grades sheet is in`, `${r.period}${r.average !== null ? ` · average ${r.average}%` : ""}${prev?.average ? ` (was ${prev.average}%)` : ""}`, "/parent/progress");
+    void pingParents(family.id, `${student.full_name.split(" ")[0]}'s grades sheet is in`, `${r.period}${r.average !== null ? ` · average ${r.average}%` : ""}${prev?.average ? ` (was ${prev.average}%)` : ""}`, `/parent/trace/${studentId}#grades`);
     PATHS.forEach((p) => revalidatePath(p));
     return { average: r.average, appraisal: r.appraisal };
   } catch (err) {

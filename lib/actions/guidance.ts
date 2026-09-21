@@ -11,5 +11,4 @@ export async function setProfessionalGuidanceAction(formData: FormData): Promise
   const text = String(formData.get("guidance") ?? "").trim().slice(0, 3000) || null;
   const supabase = await createClient();
   await supabase.from("profiles").update({ professional_guidance: text }).eq("id", studentId).eq("family_id", family.id).eq("role", "student");
-  revalidatePath("/parent/progress");
 }

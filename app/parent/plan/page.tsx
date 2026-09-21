@@ -23,7 +23,7 @@ export default async function PlanPage() {
     <main className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="h1">Weekly quiz plan</h1>
-        <Link href="/parent/progress" className="btn-ghost btn-sm">Progress</Link>
+        <Link href="/parent/trace" className="btn-ghost btn-sm">Money and proof</Link>
       </div>
       <p className="text-sm muted">
         One school quiz per school day, chosen from that day&apos;s timetable and the topics each child is weakest in, plus a daily SAT/ACT set in high school.

@@ -35,7 +35,7 @@ export default async function ClinicianPage({ params, searchParams }: { params: 
     <main className="space-y-4">
       <div className="flex items-center justify-between print:hidden">
         <h1 className="h1">Clinician summary · {first}</h1>
-        <Link href="/parent/progress" className="btn-ghost btn-sm">← Progress</Link>
+        <Link href={`/parent/trace/${studentId}`} className="btn-ghost btn-sm">← Back to him</Link>
       </div>
       <div className="card text-sm space-y-1 muted print:hidden">
         <p><b className="text-ink">What this is:</b> a collateral-information summary for a mental-health professional, in the sections of a standard child and adolescent psychiatric assessment. It reports the WHO-5 with its published cut-offs, the app&apos;s own questionnaires (marked non-validated), study and routine data, safety flags, and the AI&apos;s notes (marked machine-generated).</p>

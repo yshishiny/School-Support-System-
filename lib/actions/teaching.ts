@@ -5,7 +5,7 @@ import { requireParent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { failed } from "@/lib/ops/fault";
 
-const PATHS = ["/parent", "/parent/progress", "/learn"];
+const PATHS = ["/parent", "/learn"];
 
 /**
  * "This matched what the class did."

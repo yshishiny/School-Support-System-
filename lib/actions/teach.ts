@@ -18,7 +18,7 @@ import { learnerPromptLine } from "@/lib/learner";
 import { classifyRisk } from "@/lib/ai/coach-chat";
 import type { Topic } from "@/lib/types";
 
-const PATHS = ["/teach", "/today", "/learn", "/parent/progress"];
+const PATHS = ["/teach", "/today", "/learn"];
 const LESSON_POINTS = 10;
 
 export async function chooseCharacterAction(characterId: string): Promise<void> {
