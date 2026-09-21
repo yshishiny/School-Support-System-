@@ -87,33 +87,36 @@ export async function reviewQueue(familyId: string, limit = 40): Promise<ReviewI
       return { ...base, failed: questionsFor(r.failed_checks ?? [], base) };
     });
 
-    // Held lessons: the operations log is the only place they exist.
+    // Held lessons live in their own table. They used to be recovered from the error log, which is where they were
+    // being written — and one correct hold then showed up as three red rows on Admin plus a note in the parent's
+    // inbox. A stopped lesson is the system working; only faults belong in the fault log.
     const { data: held } = await admin
-      .from("app_errors")
-      .select("ref, meta, created_at")
-      .eq("area", "learning.lessonHeld")
-      .is("resolved_at", null)
+      .from("held_lessons")
+      .select("id, topic_id, level, grade, blocking, created_at, topics(name, subject, unit, language)")
+      // This family's years, and holds recorded without one — a null grade means "every year", not "no year".
+      .or(`grade.in.(${grades.join(",")}),grade.is.null`)
+      .is("cleared_at", null)
       .order("created_at", { ascending: false })
       .limit(limit);
 
-    for (const h of (held ?? []) as { ref: string | null; meta: Record<string, unknown> | null; created_at: string }[]) {
-      const m = h.meta ?? {};
-      const topicId = typeof m.topicId === "string" ? m.topicId : null;
-      if (!topicId) continue;
+    for (const h of (held ?? []) as unknown as {
+      id: string; topic_id: string; level: string; grade: number | null; blocking: string[]; created_at: string;
+      topics: { name: string; subject: string; unit: string | null; language: string } | null;
+    }[]) {
       const base = {
         kind: "held" as const,
         lessonId: null,
-        topicId,
-        topic: typeof m.topic === "string" ? m.topic : "a topic",
-        subject: "",
-        unit: null,
-        grade: null,
-        level: levelOf(m.level),
-        language: "en",
+        topicId: h.topic_id,
+        topic: h.topics?.name ?? "a topic",
+        subject: h.topics?.subject ?? "",
+        unit: h.topics?.unit ?? null,
+        grade: h.grade,
+        level: levelOf(h.level),
+        language: h.topics?.language ?? "en",
         at: h.created_at,
-        ref: h.ref,
+        ref: null,
       };
-      items.push({ ...base, failed: questionsFor(Array.isArray(m.blocking) ? (m.blocking as string[]) : [], base) });
+      items.push({ ...base, failed: questionsFor(h.blocking ?? [], base) });
     }
 
     return items.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
