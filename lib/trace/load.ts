@@ -9,7 +9,12 @@ import { createClient } from "@/lib/supabase/server";
 import { allowanceWeekStatus, type WeekStatus } from "@/lib/allowance/week";
 import { loadWallet } from "@/lib/wallet/ledger";
 import { balances, type WalletEntry } from "@/lib/wallet";
-import { owed, timeline, weekIsEmpty, type ClosedWeek, type DayEvidence, type Owed, type PointEntry, type TraceLine } from "@/lib/trace";
+import { owed, timeline, weekCounts, weekIsEmpty, type ClosedWeek, type DayEvidence, type Owed, type PointEntry, type TraceLine } from "@/lib/trace";
+import { evaluate, type Evaluation } from "@/lib/evaluation";
+import { wellbeingStatus, type CheckHistoryRow } from "@/lib/wellbeing";
+import { computeAttention } from "@/lib/coach/signals-run";
+import { masteryMaps, type AttemptWithQuiz } from "@/lib/mastery";
+import type { CoachReport, Topic } from "@/lib/types";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { signHeroUrls } from "@/lib/hero";
 import type { Family, Profile } from "@/lib/types";
@@ -42,12 +47,30 @@ export interface ChildSummary {
   requests: number;
 }
 
+export interface SubjectMastery { topic: string; subject: string; pct: number; attempts: number }
+export interface GradeSheet { month: string; status: string; average: number | null; previous_average: number | null; appraisal: string | null; items: { subject: string; grade: string; percent: number | null }[] | null }
+
 export interface ChildTrace extends ChildSummary {
   status: WeekStatus;
   days: DayEvidence[];
   lines: TraceLine[];
   requestList: PendingRequest[];
   weekEmpty: boolean;
+  /** The one judgement across every discipline, and the evidence under each. */
+  evaluation: Evaluation;
+  /** Learning detail, folded in from what used to be its own Progress page. */
+  learning: {
+    weakest: SubjectMastery[];
+    strongest: SubjectMastery[];
+    recentQuizzes: { title: string; score: number; total: number; on: string }[];
+    grades: GradeSheet[];
+    coach: CoachReport | null;
+    subjectsThisWeek: string[];
+    reviewsDue: number;
+  };
+  wellbeing: { band: "green" | "amber" | "red" | null; note: string; checks: number; signals: number };
+  /** Who else is in the family, for the row of small faces that switches child. */
+  siblings: { id: string; name: string; emoji: string; avatar: string | null }[];
 }
 
 async function students(familyId: string): Promise<Profile[]> {
@@ -138,6 +161,23 @@ export async function traceSummaries(family: TraceFamily): Promise<ChildSummary[
   }));
 }
 
+/** Mastery per topic from submitted attempts, named so a parent reads a subject rather than a uuid. */
+function masteryOf(attempts: AttemptWithQuiz[], topics: Topic[]): { weakest: SubjectMastery[]; strongest: SubjectMastery[] } {
+  const { topic: pctByTopic } = masteryMaps(attempts);
+  const tries = new Map<string, number>();
+  for (const a of attempts) {
+    const id = a.quizzes?.topic_id;
+    if (id && a.submitted_at && !a.flagged) tries.set(id, (tries.get(id) ?? 0) + 1);
+  }
+  const named: SubjectMastery[] = [];
+  pctByTopic.forEach((pct, id) => {
+    const t = topics.find((x) => x.id === id);
+    if (t) named.push({ topic: t.name, subject: t.subject, pct: Math.round(pct), attempts: tries.get(id) ?? 0 });
+  });
+  const sorted = [...named].sort((a, b) => a.pct - b.pct);
+  return { weakest: sorted.slice(0, 5), strongest: [...sorted].reverse().slice(0, 5) };
+}
+
 /** One child, in full. Null when the id is not a child of this family — never trust an id from a URL. */
 export async function traceFor(family: TraceFamily, studentId: string): Promise<ChildTrace | null> {
   const kids = await students(family.id);
@@ -147,7 +187,7 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
   const supabase = await createClient();
   const today = todayIn(family.timezone);
   const [avatars, status, wallet, { data: weekRows }, { data: pointRows }, { data: reqRows }] = await Promise.all([
-    avatarsFor([s]),
+    avatarsFor(kids),
     allowanceWeekStatus(s.id, family),
     loadWallet(s.id),
     supabase.from("allowance_weeks").select("id, student_id, week_start, week_end, score, band, amount, paid_at, claimed_at").eq("family_id", family.id).eq("student_id", s.id).order("week_start", { ascending: false }),
@@ -159,6 +199,74 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
   const { active, elapsed } = activeDays(days, today);
   const requestList = ((reqRows ?? []) as unknown as { id: string; points_spent: number; requested_at: string; rewards: { title: string; emoji: string; cash_amount_egp: string | number | null } | null }[])
     .map((r) => ({ id: r.id, title: r.rewards?.title ?? "reward", emoji: r.rewards?.emoji ?? "🎁", cash: r.rewards?.cash_amount_egp ?? null, pointsSpent: r.points_spent, requestedAt: r.requested_at }));
+
+  // Everything the Progress page used to hold about this one child, plus the ticks and alerts the evaluation
+  // needs. Read together so the page is one round trip rather than six.
+  const [
+    { data: topicRows }, { data: attemptRows }, { data: gradeRows }, { data: coachRows },
+    { data: subjRows }, { data: dueRows }, { data: wbRows }, { data: tickRows }, { data: alertRows },
+    attention,
+  ] = await Promise.all([
+    supabase.from("topics").select("*"),
+    supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", s.id).not("submitted_at", "is", null).order("submitted_at", { ascending: false }).limit(200),
+    admin.from("grade_sheets").select("month, status, average, previous_average, appraisal, items").eq("student_id", s.id).order("month", { ascending: false }).limit(3),
+    supabase.from("coach_reports").select("*").eq("student_id", s.id).order("created_at", { ascending: false }).limit(1),
+    admin.from("lesson_logs").select("subject_name").eq("student_id", s.id).gte("log_date", shiftDate(today, -6)),
+    admin.from("review_queue").select("id", { count: "exact", head: false }).eq("student_id", s.id).lte("due_date", today),
+    admin.from("wellbeing_checks").select("student_id, instrument, taken_on, band, score").eq("student_id", s.id).order("taken_on", { ascending: false }).limit(60),
+    admin.from("kpi_ticks").select("code, value, tick_date").eq("student_id", s.id).gte("tick_date", status.start).lte("tick_date", status.end),
+    supabase.from("safety_alerts").select("id").eq("student_id", s.id).is("acknowledged_at", null),
+    computeAttention(s.id).catch(() => ({ today, score: 0, tier: "none" as const, signals: [] })),
+  ]);
+
+  const topics = (topicRows ?? []) as Topic[];
+  const attempts = (attemptRows ?? []) as AttemptWithQuiz[];
+  const mastery = masteryOf(attempts, topics);
+  const recentQuizzes = attempts.slice(0, 8)
+    .filter((a) => a.score !== null && a.total !== null)
+    .map((a) => ({ title: a.quizzes?.title ?? "Quiz", score: a.score!, total: a.total!, on: (a.submitted_at ?? "").slice(0, 10) }));
+  const wb = wellbeingStatus(((wbRows ?? []) as CheckHistoryRow[]), today);
+
+  const ticks = (tickRows ?? []) as { code: string; value: boolean; tick_date: string }[];
+  const tickCount = (code: string) => ticks.filter((t) => t.code === code).length;
+  const badCount = (code: string) => ticks.filter((t) => t.code === code && !t.value).length;
+
+  // The week's KPI lines already carry the arithmetic, and their wording is what the score was built from, so
+  // the counts are read back out of them rather than recomputed — a page that states two different figures for
+  // the same fact is worse than one that states none. weekCounts is pinned against live scoreWeek output.
+  const counts = weekCounts(status.results);
+
+  const evaluation = evaluate({
+    academic: {
+      classesDue: counts.classesDue, classesLogged: counts.classesLogged,
+      quizzesPlanned: counts.quizzesPlanned, quizzesAttempted: counts.quizzesAttempted,
+      homeworkDue: counts.homeworkDue, homeworkOnTime: counts.homeworkOnTime,
+      recentQuizzes: recentQuizzes.length,
+      recentCorrect: recentQuizzes.reduce((n, q) => n + q.score, 0),
+      recentTotal: recentQuizzes.reduce((n, q) => n + q.total, 0),
+      gradeAverage: (gradeRows ?? [])[0]?.average ?? null,
+      gradePrevious: (gradeRows ?? [])[0]?.previous_average ?? null,
+    },
+    manners: { daysTicked: tickCount("manners"), daysBad: badCount("manners"), daysElapsed: elapsed, alerts: (alertRows ?? []).length },
+    duties: {
+      snapsDue: counts.snapsDue, snapsDone: counts.snapsDone,
+      dishTicked: tickCount("dish"), dishBad: badCount("dish"),
+      phoneTicked: tickCount("phone"), phoneBad: badCount("phone"),
+      daysElapsed: elapsed,
+    },
+    faith: {
+      daysElapsed: elapsed,
+      daysWithFour: days.filter((d) => d.date <= today && d.prayers >= 4).length,
+      logged: days.filter((d) => d.date <= today).reduce((n, d) => n + d.prayers, 0),
+    },
+    wellbeing: { band: wb.band, signals: attention.signals.length },
+    money: {
+      points: points.reduce((n, p) => n + p.delta, 0),
+      owedEgp: owed(balances(wallet as WalletEntry[]).withDad, (weekRows ?? []) as ClosedWeek[]).ifSettled,
+      requests: requestList.length,
+      blocked: !!status.blocked,
+    },
+  });
 
   return {
     id: s.id,
@@ -179,5 +287,21 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     lines: timeline(points, wallet as WalletEntry[]),
     requestList,
     weekEmpty: weekIsEmpty(days.filter((d) => d.date <= today)),
+    evaluation,
+    learning: {
+      ...mastery,
+      recentQuizzes,
+      grades: (gradeRows ?? []) as GradeSheet[],
+      coach: ((coachRows ?? []) as CoachReport[])[0] ?? null,
+      subjectsThisWeek: [...new Set((subjRows ?? []).map((r) => r.subject_name as string))].sort(),
+      reviewsDue: (dueRows ?? []).length,
+    },
+    wellbeing: { band: wb.band, note: wb.note, checks: wb.checks, signals: attention.signals.length },
+    siblings: kids.filter((k) => k.id !== s.id).map((k) => ({
+      id: k.id,
+      name: k.full_name.split(" ")[0],
+      emoji: k.avatar_emoji,
+      avatar: k.avatar_image_id ? avatars.get(k.avatar_image_id) ?? null : null,
+    })),
   };
 }

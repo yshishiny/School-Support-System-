@@ -31,6 +31,17 @@ export interface KidView {
   card: ReactNode; // the full card used inside the kid tab (option B) and the middle column (option A)
 }
 
+/** Something that happened, for the home page's feed. The parent's inbox, shown where he looks first. */
+export interface HomeEvent {
+  id: string;
+  kind: string;
+  title: string;
+  body: string;
+  url: string | null;
+  at: string;      // ISO
+  unread: boolean;
+}
+
 export interface HomeData {
   today: string;
   dateLine: string;
@@ -43,4 +54,6 @@ export interface HomeData {
   reportLine: string;
   allowanceEnabled: boolean;
   kpiToday: { label: string; emoji: string; code: string }[]; // parent-judged basics for the strip
+  events: HomeEvent[];
+  timezone: string;
 }

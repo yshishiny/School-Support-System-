@@ -23,7 +23,7 @@ import { loadSnapTasks } from "@/lib/snaps/server";
 import { loadFollowups } from "@/lib/followups/run";
 import { taskDayState, type SnapLite } from "@/lib/snaps";
 import { formatInTimeZone } from "date-fns-tz";
-import { ParentLayoutA, ParentLayoutB, ParentLayoutC } from "@/components/parent-home/Layouts";
+import { ParentLayoutA, ParentLayoutB, ParentLayoutC, ParentLayoutD } from "@/components/parent-home/Layouts";
 import type { HomeData, KidView } from "@/components/parent-home/types";
 import { ageOn, daysToBirthday } from "@/lib/people";
 import { weekFor } from "@/lib/allowance";
@@ -99,6 +99,13 @@ export default async function ParentHome() {
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const live = await liveFeedAction().catch(() => null);
   const unread = await unreadCount(profile.id).catch(() => 0);
+  // What has happened, in the parent's own words: his inbox, on the page he opens first.
+  const { data: eventRows } = await supabase
+    .from("parent_notifications")
+    .select("id, kind, title, body, url, created_at, read_at")
+    .eq("parent_id", profile.id)
+    .order("created_at", { ascending: false })
+    .limit(30);
   const followups = await loadFollowups(ids, shiftDate(today, -13)).catch(() => []);
   const [snapTasks, { data: todaySnapRows }] = await Promise.all([
     loadSnapTasks(family.id, family.timezone).catch(() => []),
@@ -309,10 +316,15 @@ export default async function ParentHome() {
     reportLine: report ? `Last report ${prettyDate(report.report_date)} · ${report.status}` : "No report sent yet",
     allowanceEnabled: family.allowance_enabled,
     kpiToday: kpis.filter((k) => k.enabled && k.source === "parent").map((k) => ({ label: k.label, emoji: k.emoji, code: k.code })),
+    events: ((eventRows ?? []) as { id: string; kind: string; title: string; body: string | null; url: string | null; created_at: string; read_at: string | null }[])
+      .map((e) => ({ id: e.id, kind: e.kind, title: e.title, body: e.body ?? "", url: e.url, at: e.created_at, unread: !e.read_at })),
+    timezone: family.timezone,
   };
-  const layout = (profile as { home_layout?: string }).home_layout ?? "b";
+  // "What happened, and the children as faces" is the default. The older arrangements stay reachable for anyone
+  // who chose one, but a parent who has never picked gets the page that answers "what do I need to know?".
+  const layout = (profile as { home_layout?: string }).home_layout ?? "d";
   const isV2 = APP_VERSION.startsWith("2.");
-  const layoutNode = layout === "a" ? <ParentLayoutA d={data} /> : layout === "c" ? <ParentLayoutC d={data} /> : <ParentLayoutB d={data} />;
+  const layoutNode = layout === "a" ? <ParentLayoutA d={data} /> : layout === "b" ? <ParentLayoutB d={data} /> : layout === "c" ? <ParentLayoutC d={data} /> : <ParentLayoutD d={data} />;
 
   if (isV2) {
     return (

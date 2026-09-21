@@ -15,7 +15,8 @@ import { todayIn } from "@/lib/dates";
 import type { Profile } from "@/lib/types";
 import { APP_NAME, APP_VERSION } from "@/lib/version";
 
-const HOME_LAYOUTS: { id: "a" | "b" | "c"; title: string; emoji: string; blurb: string }[] = [
+const HOME_LAYOUTS: { id: "a" | "b" | "c" | "d"; title: string; emoji: string; blurb: string }[] = [
+  { id: "d", title: "What happened", emoji: "📰", blurb: "What you need to know, what is waiting on a decision, and your children as faces. Everything about a child lives on his own page." },
   { id: "a", title: "Command centre", emoji: "🎛️", blurb: "Three columns on a wide screen: what needs you, one card per child, live feed and inbox. Best at the laptop." },
   { id: "b", title: "Kid-first", emoji: "🧒", blurb: "Four numbers on top, then one child at a time in the coloured tabs. Best on the phone." },
   { id: "c", title: "The day as a timeline", emoji: "🕰️", blurb: "Fajr to check-in, both boys side by side, so a gap shows where it happened. Needs-you rail on the right." },
@@ -25,8 +26,8 @@ function HomeLayoutChooser({ current }: { current: string }) {
   return (
     <section className="card space-y-2">
       <h2 className="h2">🏠 Home page layout</h2>
-      <p className="text-xs muted">Same information, three arrangements. Pick the one you find easiest; you can switch any time.</p>
-      <div className="grid gap-2 sm:grid-cols-3">
+      <p className="text-xs muted">Same information, four arrangements. Pick the one you find easiest; you can switch any time.</p>
+      <div className="grid gap-2 sm:grid-cols-2">
         {HOME_LAYOUTS.map((l) => (
           <form key={l.id} action={setParentHomeLayoutAction} className={`tile space-y-1 ${current === l.id ? "ring-2 ring-accent" : ""}`}>
             <input type="hidden" name="home_layout" value={l.id} />
@@ -74,7 +75,7 @@ export default async function SettingsPage() {
         tabs={[
           { id: "you", label: "You", emoji: "👤", content: (<>
       {me && <MyParentCard me={me} />}
-      <HomeLayoutChooser current={(profile as { home_layout?: string }).home_layout ?? "b"} />
+      <HomeLayoutChooser current={(profile as { home_layout?: string }).home_layout ?? "d"} />
       <section className="card space-y-2">
         <h2 className="h2">🔔 Notifications on this phone</h2>
         <p className="text-xs muted">Daily report headline and safety alerts as browser notifications on this device. Telegram below stays the full-text channel.</p>

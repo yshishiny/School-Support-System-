@@ -101,11 +101,11 @@ export async function markNotificationsReadAction(id: string | null): Promise<vo
   revalidatePath("/parent");
 }
 
-/** Parent home layout: a (command centre), b (kid-first) or c (day timeline). */
+/** Parent home layout: d (what happened, the default), a (command centre), b (kid-first) or c (day timeline). */
 export async function setParentHomeLayoutAction(formData: FormData): Promise<void> {
   const { profile } = await requireParent();
-  const layout = String(formData.get("home_layout") ?? "b");
-  if (!["a", "b", "c"].includes(layout)) return;
+  const layout = String(formData.get("home_layout") ?? "d");
+  if (!["a", "b", "c", "d"].includes(layout)) return;
   const supabase = await createClient();
   await supabase.from("profiles").update({ home_layout: layout }).eq("id", profile.id);
   revalidatePath("/parent");
