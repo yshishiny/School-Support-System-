@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.10.0 — One child, the whole page (21 September 2026)
+
+- **Choosing a child now opens his own page.** Money and proof was one page holding every child at once behind a strip of tabs: tapping "Youssef" left three quarters of the screen showing his brothers and sisters and a column of fifteen other destinations. `/parent/trace` is now a chooser and nothing else — one wide row per child with the amount, whether he was active this week, and anything waiting — and `/parent/trace/<child>` is his account in full.
+- **That page drops the side menu.** A page about one child does not need a menu of everywhere else; it carries a single "← All children" instead. Any route can ask for the full width through `lib/parent-focus.ts`.
+- **Columns have names again.** With the width to do it, the day-by-day table says Check-in, Prayers, Classes, Quizzes, Snaps, Points rather than six emoji, and the four figures that matter — hand over now, unsettled, points held, this week's score — sit across the top as plain numbers.
+- **Tapping a child on the parent home goes there too**, from the face or the name.
+- New: every basic and what it paid, listed on the child's page with the `given` marks called out, so the score can be read line by line without opening Allowance.
+
 ## 2.9.0 — Silence is not a ✓, and no photo means no pay (21 September 2026)
 
 Two rules on top of the score, both asked for after the evidence showed a week that paid 100 EGP on almost nothing.
