@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.8.0 — A title is not an amount (21 September 2026)
+
+- **"Youssef claims 500 EGP" was a reward called "500 EGP" that pays 100.** It was set up on the 14th, priced at 200 points, with its cash amount left at 100 — the title and the field that actually moves money were never the same number. Youssef had 214 points, saw a card that said 500, and pressed the button. The approval row a parent then reads showed the title and the points and *never the amount*, so both sides read 500 and neither of them was lying.
+- **Every place a reward appears now states what it pays.** The request row, the catalog row and the child's own card all carry `pays N EGP` beside the title, and a title whose figure contradicts the amount is flagged in red where it can be fixed.
+- **The request row opens.** It was plain text with two buttons and nothing to click; it now has a Details panel — when it was asked, what it costs, what he is left with, what approving actually pays and where the money lands, and that rejecting costs him nothing.
+- **A score no longer hides an empty week.** Untouched columns pay in full on purpose, so a child who never opened the app still scored 37. The score is unchanged; what is new is that it is now stated in two parts — *earned* from what he did, and *given* because nothing was set, ticked or due — on the meter and beside every line. A week with nothing in it says so, in red.
+- **New: Money and proof** (Fairness → 🧾), one page per child. What to hand over right now and why, weeks left unsettled, requests waiting, the current week day by day — check-in, prayers, classes, quizzes, snaps, points — and every point and every EGP with its date. Each figure on the page can be traced to a line at the bottom of it.
+
 ## 2.7.1 — A stopped lesson is not an error (21 September 2026)
 
 - **The gate fired for real overnight**, twice, on مصر في عصر الولاة: the reviewer was not confident every fact in it was true, so the lesson was never stored and no child read it. That is exactly what it is for.

@@ -108,6 +108,13 @@ export interface KpiResult {
   fraction: number; // 0..1 so far
   earned: number; // weight × fraction
   detail: string;
+  /**
+   * Whether the mark stands on something the child did, or was handed over because there was nothing
+   * to measure. Full marks for an empty column are deliberate — a week with no homework set should not
+   * be punished — but a score that mixes the two silently cannot be read, and a parent asking "did he
+   * earn this?" deserves the two halves separately.
+   */
+  basis: "measured" | "default";
 }
 
 export interface WeekResult {
@@ -119,6 +126,9 @@ export interface WeekResult {
   maxScore: number; // best score still reachable if every remaining day is perfect
   bestBand: Band; // the band that maxScore reaches
   hints: string[]; // what to do to stay eligible, most valuable first
+  measuredScore: number; // the part of score backed by evidence
+  defaultScore: number;  // the part given because nothing was due or ticked
+  measurable: number;    // share of the week, 0-100, that had anything to measure at all
 }
 
 function daysBetween(a: string, b: string): number {
@@ -141,11 +151,14 @@ export function scoreWeek(i: WeekInput): WeekResult {
     let fraction = 1;
     let detail = "";
     let maxFraction = 1;
+    let basis: "measured" | "default" = "measured";
     if (k.source === "parent") {
+      const ticked = i.ticks.filter((t) => t.code === k.code && days.includes(t.tick_date)).length;
       const bad = i.ticks.filter((t) => t.code === k.code && !t.value && days.includes(t.tick_date)).length;
+      if (ticked === 0) basis = "default";
       fraction = Math.max(0, 1 - bad / elapsedDays);
       maxFraction = Math.max(0, 1 - bad / totalDays);
-      detail = bad ? `${bad} day${bad === 1 ? "" : "s"} marked ✗` : "no ✗ so far";
+      detail = bad ? `${bad} day${bad === 1 ? "" : "s"} marked ✗` : ticked ? `${ticked} day${ticked === 1 ? "" : "s"} marked ✓` : "never ticked either way";
       if (bad) hintByCode.set(k.code, `No more ✗ on “${k.label.toLowerCase()}”`);
     } else if (k.code === "prayers") {
       const good = days.filter((d) => (i.prayerDays[d] ?? 0) >= 4).length;
@@ -164,6 +177,7 @@ export function scoreWeek(i: WeekInput): WeekResult {
     } else if (k.code === "quizzes") {
       if (i.plannedTotal === 0) {
         fraction = 1;
+        basis = "default";
         detail = "no planned quizzes yet";
       } else {
         fraction = Math.min(1, i.plannedAttempted / i.plannedTotal / 0.6);
@@ -174,30 +188,35 @@ export function scoreWeek(i: WeekInput): WeekResult {
     } else if (k.code === "classlog") {
       const c = i.classLog ?? { due: 0, done: 0, missingLine: null };
       fraction = c.due === 0 ? 1 : c.done / c.due;
+      if (c.due === 0) basis = "default";
       maxFraction = 1; // catch-up is allowed until the week closes
       detail = c.due === 0 ? "no classes yet this week" : `${c.done} of ${c.due} classes logged`;
       if (fraction < 1) hintByCode.set(k.code, `Fill in ${c.due - c.done} class${c.due - c.done === 1 ? "" : "es"} in the check-in${c.missingLine ? ` (${c.missingLine})` : ""}`);
     } else if (k.code === "homework") {
       const h = i.homework ?? { due: 0, doneOnTime: 0, open: 0 };
       fraction = h.due === 0 ? 1 : h.doneOnTime / h.due;
+      if (h.due === 0) basis = "default";
       maxFraction = 1;
       detail = h.due === 0 ? "nothing due yet" : `${h.doneOnTime} of ${h.due} done on time${h.open ? ` · ${h.open} still open` : ""}`;
       if (h.open) hintByCode.set(k.code, `Finish ${h.open} open homework${h.open === 1 ? "" : "s"} and mark ${h.open === 1 ? "it" : "them"} done in the check-in`);
     } else if (k.code === "grades") {
       const g = i.gradesSheet ?? { uploaded: false, dayOfMonth: 1 };
       fraction = g.uploaded || g.dayOfMonth < 21 ? 1 : 0;
+      if (!g.uploaded && g.dayOfMonth < 21) basis = "default";
       maxFraction = 1;
       detail = g.uploaded ? "this month's sheet is in" : g.dayOfMonth < 21 ? "due from the 21st" : "not uploaded yet this month";
       if (fraction < 1) hintByCode.set(k.code, "Upload a photo of this month's grades sheet (Me → Grades)");
     } else if (k.code === "materials") {
       const m = i.materials ?? { due: 0, done: 0, next: null };
       fraction = m.due === 0 ? 1 : m.done / m.due;
+      if (m.due === 0) basis = "default";
       maxFraction = 1;
       detail = m.due === 0 ? "no file deadline yet this week" : `${m.done} of ${m.due} set${m.due === 1 ? "" : "s"} on time`;
       if (m.next) hintByCode.set(k.code, `Do a practice set on “${m.next}” (Learn → Files)`);
     } else if (k.code === "checkpoint") {
       const st = i.checkpoint?.status ?? "none";
       fraction = st === "expired" ? 0 : 1; // benefit of the doubt until it is due
+      if (st === "none" || st === "failed") basis = "default";
       maxFraction = st === "expired" ? 0 : 1;
       detail = st === "done" ? "done" : st === "ready" ? "ready, not attempted yet" : st === "expired" ? "not attempted before the week closed" : st === "failed" ? "could not be prepared (does not count)" : "none this week";
       if (st === "ready") hintByCode.set(k.code, "Do the weekly checkpoint (20 min, one attempt)");
@@ -210,6 +229,7 @@ export function scoreWeek(i: WeekInput): WeekResult {
       if (dueDays.length === 0) {
         fraction = 1;
         maxFraction = 1;
+        basis = "default";
         detail = remainingDue ? "not due yet this week" : "not due this week";
       } else {
         fraction = doneDays / dueDays.length;
@@ -219,12 +239,13 @@ export function scoreWeek(i: WeekInput): WeekResult {
       }
     } else if (k.code === "wellbeing") {
       fraction = i.wellbeingDue && !i.wellbeingDone ? 0 : 1;
+      if (!i.wellbeingDue) basis = "default";
       maxFraction = 1;
       detail = i.wellbeingDue ? (i.wellbeingDone ? "done" : "due, not done yet") : "nothing due";
       if (fraction < 1) hintByCode.set(k.code, "Do the coach check-in (2 minutes)");
     }
     maxByCode.set(k.code, k.weight * maxFraction);
-    return { code: k.code, label: k.label, emoji: k.emoji, weight: k.weight, fraction, earned: Math.round(k.weight * fraction * 10) / 10, detail };
+    return { code: k.code, label: k.label, emoji: k.emoji, weight: k.weight, fraction, earned: Math.round(k.weight * fraction * 10) / 10, detail, basis };
   });
   const score = Math.round((results.reduce((s, r) => s + r.earned, 0) / totalWeight) * 100);
   const maxScore = Math.round(([...maxByCode.values()].reduce((s, v) => s + v, 0) / totalWeight) * 100);
@@ -233,7 +254,17 @@ export function scoreWeek(i: WeekInput): WeekResult {
     .filter((k) => hintByCode.has(k.code))
     .sort((a, b) => b.weight - a.weight)
     .map((k) => hintByCode.get(k.code)!);
-  return { score, band: bandFor(score).band, results, elapsedDays, totalDays, maxScore, bestBand: bandFor(maxScore).band, hints };
+  // The same score split by where it came from. A week where nothing was set, ticked or attempted can
+  // still reach the high thirties on default marks alone; stating that number beside the score is what
+  // turns "he scored 37" into "he scored 37, none of it earned".
+  const part = (b: "measured" | "default") => results.filter((r) => r.basis === b).reduce((s, r) => s + r.earned, 0);
+  const measuredScore = Math.round((part("measured") / totalWeight) * 100);
+  const measurable = Math.round((results.filter((r) => r.basis === "measured").reduce((s, r) => s + r.weight, 0) / totalWeight) * 100);
+  return {
+    score, band: bandFor(score).band, results, elapsedDays, totalDays,
+    maxScore, bestBand: bandFor(maxScore).band, hints,
+    measuredScore, defaultScore: score - measuredScore, measurable,
+  };
 }
 
 export function amountFor(score: number, allowance: number): number {

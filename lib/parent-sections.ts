@@ -19,6 +19,7 @@ export const PARENT_SECTIONS: ParentSection[] = [
   { href: "/parent/progress", label: "Progress", emoji: "🧠", group: "Learning" },
   { href: "/parent/materials", label: "School files", emoji: "📎", group: "Learning" },
   { href: "/parent/import", label: "Import", emoji: "💬", group: "Learning" },
+  { href: "/parent/trace", label: "Money and proof", emoji: "🧾", group: "Fairness" },
   { href: "/parent/allowance", label: "Allowance", emoji: "💵", group: "Fairness" },
   { href: "/parent/manners", label: "Manners", emoji: "🤝", group: "Fairness" },
   { href: "/parent/snaps", label: "Snaps", emoji: "📸", group: "Fairness" },
