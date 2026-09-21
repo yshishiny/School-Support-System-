@@ -18,8 +18,11 @@ import { examsFor } from "@/lib/exams";
 import { straightTalkLabels } from "@/lib/wellbeing";
 import type { CoachReport, Topic } from "@/lib/types";
 import { shiftDate, todayIn } from "@/lib/dates";
+import { weeklyAccuracy, weeklyPoints, weeklyPrayers, weeklyScore, weeksBack, type WeekPoint } from "@/lib/charts/progress";
 import { signHeroUrls } from "@/lib/hero";
 import type { Family, Profile } from "@/lib/types";
+
+const TREND_WEEKS = 12;
 
 export type TraceFamily = Parameters<typeof allowanceWeekStatus>[1] & Pick<Family, "id">;
 
@@ -95,6 +98,13 @@ export interface ChildTrace extends ChildSummary {
   };
   /** The honesty check the child answers knowing a parent reads the labels, never the words. */
   straightTalk: { on: string; admitted: string[] }[];
+  /**
+   * Whether anything the app sends can actually arrive on his phone. Until this was on a screen, every child in
+   * the family had no channel at all and the hourly reminder job reported success while sending nothing.
+   */
+  reach: { push: number; telegram: boolean };
+  /** Twelve weeks on one x-axis, so the four can be read together rather than as four unrelated pictures. */
+  trend: { score: WeekPoint[]; points: WeekPoint[]; accuracy: WeekPoint[]; prayers: WeekPoint[] };
   /** Who else is in the family, for the row of small faces that switches child. */
   siblings: { id: string; name: string; emoji: string; avatar: string | null }[];
 }
@@ -254,7 +264,7 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
 
   // Open work, the curriculum he sits in, and the last report the family was sent: one more round trip, so the
   // sections that link away can still say something before a parent decides to follow the link.
-  const [{ data: taskRows }, { data: curriculumRows }, { data: reportRow }, { data: cpRows }, { data: straightRows }] = await Promise.all([
+  const [{ data: taskRows }, { data: curriculumRows }, { data: reportRow }, { data: cpRows }, { data: straightRows }, { count: pushCount }, { data: trendPrayerRows }] = await Promise.all([
     supabase.from("assignments").select("title, kind, due_date, status").eq("student_id", s.id).eq("status", "open").order("due_date", { nullsFirst: false }).limit(50),
     (s as Profile & { curriculum_id?: string | null }).curriculum_id
       ? supabase.from("curricula").select("id, name").eq("id", (s as Profile & { curriculum_id?: string | null }).curriculum_id!)
@@ -263,9 +273,15 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     admin.from("checkpoints").select("id, kind, subject, status, due_by, week_start, result, error, created_at").eq("student_id", s.id).order("created_at", { ascending: false }).limit(12),
     // The answers never leave the server: only the labels of what he admitted to are passed up.
     admin.from("wellbeing_checks").select("taken_on, answers").eq("student_id", s.id).eq("instrument", "straight").order("taken_on", { ascending: false }).limit(6),
+    admin.from("push_subscriptions").select("id", { count: "exact", head: true }).eq("user_id", s.id),
+    admin.from("prayer_logs").select("log_date, status").eq("student_id", s.id).gte("log_date", shiftDate(status.start, -7 * (TREND_WEEKS - 1))),
   ]);
   const tasksOpen = (taskRows ?? []) as { title: string; kind: string; due_date: string | null; status: string }[];
   const weekAhead = shiftDate(today, 7);
+
+  // One x-axis for all four series, so they read as small multiples of the same story.
+  const trendWeeks = weeksBack(status.start, TREND_WEEKS);
+  const trendPrayers = (trendPrayerRows ?? []) as { log_date: string; status: string | null }[];
 
   const topics = (topicRows ?? []) as Topic[];
   const attempts = (attemptRows ?? []) as AttemptWithQuiz[];
@@ -383,6 +399,13 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     },
     straightTalk: ((straightRows ?? []) as { taken_on: string; answers: Record<string, string> }[])
       .map((r) => ({ on: r.taken_on, admitted: straightTalkLabels(r.answers) })),
+    reach: { push: pushCount ?? 0, telegram: !!(s as Profile & { telegram_chat_id?: string | null }).telegram_chat_id },
+    trend: {
+      score: weeklyScore(((weekRows ?? []) as ClosedWeek[]).map((w) => ({ week_start: w.week_start, score: w.score })), trendWeeks),
+      points: weeklyPoints(points.map((p) => ({ created_at: p.created_at, delta: p.delta })), trendWeeks, today),
+      accuracy: weeklyAccuracy(attempts.map((a) => ({ submitted_at: a.submitted_at, score: a.score, total: a.total })), trendWeeks),
+      prayers: weeklyPrayers(trendPrayers, trendWeeks, today),
+    },
     siblings: kids.filter((k) => k.id !== s.id).map((k) => ({
       id: k.id,
       name: k.full_name.split(" ")[0],

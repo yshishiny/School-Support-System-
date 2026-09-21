@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { failed } from "@/lib/ops/fault";
 import { requireParent } from "@/lib/auth";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { sendPush } from "@/lib/push/server";
 import { createClient } from "@/lib/supabase/server";
 import { findTelegramChat, sendTelegram } from "@/lib/whatsapp/send";
 
@@ -117,6 +118,9 @@ export async function addTimetableAction(formData: FormData) {
   revalidatePath("/parent/children");
 }
 
+/** Where a change to a child's reminder channels shows up. */
+const PATHS_CHILD = ["/parent", "/parent/children", "/parent/trace"];
+
 export async function deleteTimetableAction(formData: FormData) {
   await requireParent();
   const supabase = await createClient();
@@ -216,4 +220,83 @@ export async function updateChildProfileAction(_prev: { error?: string; ok?: str
   }
   ["/parent", "/parent/children", "/today", "/me", "/coach"].forEach((p) => revalidatePath(p));
   return { ok: pw ? "Saved, password changed." : "Saved." };
+}
+
+/**
+ * Connect a child's phone to the bot, from the parent's side.
+ *
+ * Browser push is the better channel when it works, but it can only ever be *asked for* once per install: a "no"
+ * is permanent until somebody digs through browser settings, and until today a registration failure silently
+ * reported itself to the child as "your browser cannot do this". In this family the result was that no child had
+ * any channel at all and the hourly reminder job ran for days, reported success, and sent nothing.
+ *
+ * Telegram has neither problem. The send path for a child already existed — `lib/nudges/run.ts` writes to
+ * `telegram_chat_id` — and only the linking was missing, and only for children. This is the parent doing it while
+ * sitting with him: the child opens the bot and taps Start, the parent taps Connect.
+ */
+export async function connectChildTelegramAction(_prev: { error?: string; ok?: string } | undefined, formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { family } = await requireParent();
+  const studentId = String(formData.get("student_id") ?? "");
+  const admin = createAdminClient();
+  const { data: child } = await admin.from("profiles").select("id, full_name").eq("id", studentId).eq("family_id", family.id).eq("role", "student").maybeSingle();
+  if (!child) return { error: "Not one of your children." };
+  if (!process.env.TELEGRAM_BOT_TOKEN) return { error: "TELEGRAM_BOT_TOKEN is not set on the server." };
+
+  // A pasted id wins; otherwise take the most recent person to message the bot, which is him if he just tapped Start.
+  const manual = (String(formData.get("telegram_chat_id") ?? "").match(/-?\d{5,}/) ?? [""])[0];
+  let chatId = manual;
+  let name = child.full_name.split(" ")[0];
+  if (!chatId) {
+    const found = await findTelegramChat();
+    if ("error" in found) return { error: found.error };
+    chatId = found.chatId;
+    name = found.name;
+  } else if (process.env.TELEGRAM_BOT_TOKEN.startsWith(`${chatId}:`)) {
+    return { error: "That number is the bot's own id. Leave the box empty, have him tap Start in Telegram, then press Connect." };
+  }
+
+  // One chat, one person: linking a child to a chat another account already uses would send his reminders to them.
+  const { data: clash } = await admin.from("profiles").select("id, full_name").eq("telegram_chat_id", chatId).neq("id", studentId).maybeSingle();
+  if (clash) return { error: `That Telegram chat is already connected to ${clash.full_name.split(" ")[0]}. Disconnect it there first.` };
+
+  const { error } = await admin.from("profiles").update({ telegram_chat_id: chatId }).eq("id", studentId);
+  if (error) return failed("actions.children.connectChildTelegram", error);
+  const test = await sendTelegram(chatId, `✅ Reminders are on, ${child.full_name.split(" ")[0]}. You will hear from me before a prayer window closes, when a snap is still owed, and before the week closes.`);
+  PATHS_CHILD.forEach((p) => revalidatePath(p));
+  return test.ok ? { ok: `Connected to ${name}. A test message was sent to his Telegram.` } : { error: `Saved, but the test message failed: ${test.error}` };
+}
+
+export async function disconnectChildTelegramAction(formData: FormData): Promise<void> {
+  const { family } = await requireParent();
+  const studentId = String(formData.get("student_id") ?? "");
+  const admin = createAdminClient();
+  await admin.from("profiles").update({ telegram_chat_id: null }).eq("id", studentId).eq("family_id", family.id).eq("role", "student");
+  PATHS_CHILD.forEach((p) => revalidatePath(p));
+}
+
+/** Proves the channel end to end rather than trusting that it is configured. */
+export async function testChildReminderAction(formData: FormData): Promise<{ error?: string; ok?: string }> {
+  const { family } = await requireParent();
+  const studentId = String(formData.get("student_id") ?? "");
+  const admin = createAdminClient();
+  const { data: child } = await admin.from("profiles").select("id, full_name, telegram_chat_id").eq("id", studentId).eq("family_id", family.id).eq("role", "student").maybeSingle();
+  if (!child) return { error: "Not one of your children." };
+  const first = child.full_name.split(" ")[0];
+  const sent: string[] = [];
+  const failures: string[] = [];
+
+  const push = await sendPush(child.id, { title: "Study Portal 👋", body: `A test from your father, ${first}.`, url: "/today", tag: "test" });
+  if (push.sent > 0) sent.push(`${push.sent} phone${push.sent === 1 ? "" : "s"} by push`);
+  else if (push.total > 0) failures.push(`push: ${push.error ?? "no delivery"}`);
+
+  if (child.telegram_chat_id) {
+    const tg = await sendTelegram(child.telegram_chat_id, `👋 A test from your father, ${first}. Reminders will arrive here.`);
+    if (tg.ok) sent.push("Telegram");
+    else failures.push(`Telegram: ${tg.error ?? "failed"}`);
+  }
+
+  if (sent.length === 0) {
+    return { error: failures.length ? failures.join(" · ") : `${first} has no channel at all — nothing can reach his phone yet.` };
+  }
+  return { ok: `Sent to ${sent.join(" and ")}.${failures.length ? ` (${failures.join(" · ")})` : ""}` };
 }
