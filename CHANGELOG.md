@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.24 — The curriculum, and what has actually been made for it (21 September 2026, `v2` branch)
+
+- **New: Learning → 📚 Lessons.** The catalogue holds 1,711 topics and thirty of them have a lesson. Nothing in the app said so: material is written the night before a child needs it, so "not written yet" and "written and fine" looked identical from every other screen — a fine way to run a cache and a poor way to run a curriculum.
+- **Four states, kept apart on purpose.** *Not written* is nothing attempted. *Held* is a lesson that was written and the reviewer refused, which is the system working and a person being owed a decision. *Old* is written long enough ago to be worth re-reading. *Written* is a lesson a child could open right now. Reporting all four as "no" would hide the one that needs you.
+- **Filter by curriculum, language, grade, subject and state**, with a subject rollup that puts the barest subject first — a thousand rows read as twenty.
+- **Open any topic and read what was actually written**: the basics script and the deep script in full, every diagram rendered rather than counted, every video link, when it was made, by which model, which checks it failed, and whether a person ever signed it off. Rewrite a lesson or remake its media from the same page.
+- **A search for a video is no longer reported as a video.** All 99 links stored carry no video id and point at a YouTube *search* page, so nobody has ever confirmed a video is on the other end. The page now says that in those words instead of counting them as material.
+
 ## 2.1.0-beta.23 — Accounts belong to the people who use them (21 September 2026, `v2` branch)
 
 - **Everyone can now change their own password**, parent and child alike, on their own page — and it asks for the current one. A session only proves this browser was left signed in, which in a house with a shared laptop is not the same as proving who is typing.
