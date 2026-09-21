@@ -13,7 +13,7 @@ export async function generateCoachReportAction(studentId: string): Promise<{ er
   if (!child) return { error: "That student is not in your family." };
   try {
     const report = await generateCoachReport(studentId);
-    ["/parent/progress", "/parent", "/today", "/parent/plan"].forEach((p) => revalidatePath(p));
+    ["/parent", "/today", "/parent/plan"].forEach((p) => revalidatePath(p));
     return { headline: report.headline };
   } catch (err) {
     return failed("actions.coach.generateCoachReport", err, "The coach could not run.");

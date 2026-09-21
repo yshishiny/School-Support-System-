@@ -297,9 +297,9 @@ export async function finishAttemptAction(attemptId: string, tabSwitches: number
   if (quizMeta?.checkpoint_id) await settleCheckpoint(quizMeta.checkpoint_id, attemptId).catch((err) => console.error("[checkpoint] settle failed", err));
   if (attempt.kind !== "review") {
     const { data: qz } = await admin.from("quizzes").select("title").eq("id", attempt.quiz_id).maybeSingle();
-    void pingParents(family.id, `${profile.full_name.split(" ")[0]} · ${quizMeta?.checkpoint_id ? "checkpoint" : "quiz"} done`, `${qz?.title ?? "Quiz"}: ${score}/${total}${flag ? ` · ⚠️ ${flag}` : ""}`, quizMeta?.checkpoint_id ? "/parent/progress" : "/parent");
+    void pingParents(family.id, `${profile.full_name.split(" ")[0]} · ${quizMeta?.checkpoint_id ? "checkpoint" : "quiz"} done`, `${qz?.title ?? "Quiz"}: ${score}/${total}${flag ? ` · ⚠️ ${flag}` : ""}`, quizMeta?.checkpoint_id ? `/parent/trace/${profile.id}#academic` : "/parent");
   }
-  ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/progress", "/parent/plan"].forEach((p) => revalidatePath(p));
+  ["/learn", "/today", "/review", "/rewards", "/parent", "/parent/plan"].forEach((p) => revalidatePath(p));
   return { score, total, earned, flag };
 }
 
@@ -311,7 +311,6 @@ export async function setTargetExamAction(formData: FormData) {
   const exam = raw === "ACT" || raw === "SAT" || raw === "BOTH" ? raw : null;
   const date = String(formData.get("target_exam_date") ?? "") || null;
   await supabase.from("profiles").update({ target_exam: exam, target_exam_date: date }).eq("id", studentId);
-  revalidatePath("/parent/progress");
   revalidatePath("/learn");
   revalidatePath("/today");
 }

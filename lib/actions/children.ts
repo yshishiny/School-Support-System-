@@ -214,6 +214,6 @@ export async function updateChildProfileAction(_prev: { error?: string; ok?: str
     const { error: pwErr } = await admin.auth.admin.updateUserById(studentId, { password: pw });
     if (pwErr) return failed("actions.children.updateChildProfile.password", pwErr, "Saved, but the password was not changed.");
   }
-  ["/parent", "/parent/children", "/parent/progress", "/today", "/me", "/coach"].forEach((p) => revalidatePath(p));
+  ["/parent", "/parent/children", "/today", "/me", "/coach"].forEach((p) => revalidatePath(p));
   return { ok: pw ? "Saved, password changed." : "Saved." };
 }

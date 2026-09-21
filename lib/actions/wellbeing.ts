@@ -26,7 +26,6 @@ async function raiseAlert(opts: { familyId: string; studentId: string; studentNa
   const send = await notifyParents(opts.familyId, parentAlertText(opts.studentName, opts.level, opts.category), { kind: "alert", url: "/parent" });
   await admin.from("safety_alerts").insert({ family_id: opts.familyId, student_id: opts.studentId, level: opts.level, category: opts.category, summary: opts.summary, notified: send.ok });
   revalidatePath("/parent");
-  revalidatePath("/parent/progress");
 }
 
 export async function submitCheckAction(instrument: Instrument, answers: Record<string, string>, freeText: string): Promise<{ error?: string; earned?: number; band?: string; score?: number }> {
@@ -132,5 +131,4 @@ export async function acknowledgeAlertAction(alertId: string): Promise<void> {
   const admin = createAdminClient();
   await admin.from("safety_alerts").update({ acknowledged_at: new Date().toISOString() }).eq("id", alertId).eq("family_id", family.id);
   revalidatePath("/parent");
-  revalidatePath("/parent/progress");
 }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.14.0 — A prayers page, and Progress folded away (21 September 2026)
+
+- **New: one child's prayers, over 7, 30 or 90 days.** Which of the five he keeps and which he keeps dropping — each of the five rated as a share of the days, so they are comparable, with the weakest named outright. A grid of every day and every prayer, days fully accounted for in a row, Fajr at the mosque, and the prayers he filled in after the fact rather than at the time.
+- **Silence is not a missed prayer, and the page never adds the two together.** A prayer with no row is the app knowing nothing; "missed" is something the child *typed*, an admission the points system pays for on purpose. Conflating them would report thirty missed prayers where the truth is two owned and six days never opened — opposite conversations. The distinction is enforced in `lib/prayers/history.ts` and held by tests.
+- **Progress is retired.** Everything it held about a child now lives on his own page: exam readiness and estimates, the topic-by-topic mastery map, checkpoints, the school grades sheet and its uploader, flagged attempts, the coach's full analysis with the button to ask for a fresh one, straight talk, the specialist's guidance, and the target-exam setting.
+- **The one thing on it that was not about a child got its own page.** Lessons the reviewer held belong to a topic, not to a boy, so they are at **Learning → 🔍 Lessons to check**, and counted on the home page among the things waiting on you.
+- Every link that pointed at Progress now points at the child it was about — including the notifications for a finished checkpoint and a transcribed grades sheet, which land on the right section of the right boy's page.
+
 ## 2.13.0 — Every title on a child's page is a door (21 September 2026)
 
 - **Each section heading is now the link**, not a small grey button at the foot of the card, and it opens that subject's own page **already on this child** — Academic → Progress, Practice → the quiz plan, Money → the allowance meter, and so on, each carrying `?tab=<child>` so the side menu lands where you meant. Each heading also carries a line saying what is through the door, so a tap is never a guess.

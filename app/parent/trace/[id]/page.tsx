@@ -6,7 +6,15 @@ import { markAllowancePaidAction } from "@/lib/actions/allowance";
 import { verdict } from "@/lib/trace";
 import { RATING_LABEL, type Dimension, type Rating } from "@/lib/evaluation";
 import { mismatchLine, payoutOf } from "@/lib/rewards/money";
-import { subjectEmoji } from "@/lib/plan";
+import { subjectEmoji, subjectLabel } from "@/lib/plan";
+import { masteryColor } from "@/lib/mastery";
+import { EXAM_INFO, scaledEstimate, sectionsFor } from "@/lib/exams";
+import { CheckpointPanel, type CheckpointRow } from "@/components/CheckpointPanel";
+import { GradeSheetUploader } from "@/components/GradeSheetUploader";
+import { CoachButton } from "@/components/CoachButton";
+import { setTargetExamAction } from "@/lib/actions/learning";
+import { setProfessionalGuidanceAction } from "@/lib/actions/guidance";
+import ReactMarkdown from "react-markdown";
 import { prettyDate, todayIn } from "@/lib/dates";
 
 export const dynamic = "force-dynamic";
@@ -147,7 +155,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
       </section>
 
       {/* ── Academic ──────────────────────────────────────────────────────── */}
-      <Section id="academic" title="📚 Academic" href={`/parent/progress?tab=${t.id}`} hint="mastery, checkpoints, grade sheets">
+      <Section id="academic" title="📚 Academic" hint="mastery, exams, checkpoints">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pb-1">
           <Figure value={`${st.results.find((r) => r.code === "classlog")?.detail.match(/^(\d+)/)?.[1] ?? 0}`} label="Classes written up" />
           <Figure value={t.learning.recentQuizzes.length} label="Recent quizzes" />
@@ -203,20 +211,74 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
           </details>
         )}
 
-        {t.learning.grades[0]?.appraisal && (
+        {t.school.exams.length > 0 && (
+          <div className="rounded-xl border border-line p-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-sm">🎓 {t.school.exams.join(" and ")} readiness</span>
+              {t.school.targetExamDate && <span className="text-xs muted">target {t.school.targetExamDate}</span>}
+            </div>
+            {t.school.exams.map((exam) => (
+              <div key={exam} className="grid grid-cols-4 gap-2 text-center text-xs">
+                {sectionsFor(exam as "SAT" | "ACT").map(([k, sec]) => (
+                  <div key={k}>
+                    <div className="text-lg font-extrabold">{t.school.sectionPct[k] !== undefined ? `~${scaledEstimate(exam as "SAT" | "ACT", t.school.sectionPct[k])}` : "–"}</div>
+                    <div className="muted">{sec.label}</div>
+                  </div>
+                ))}
+              </div>
+            ))}
+            <p className="text-[11px] muted">Estimates from practice sets ({EXAM_INFO[t.school.exams[0] as "SAT" | "ACT"].scale}). Real scores depend on full timed tests.</p>
+          </div>
+        )}
+
+        {t.school.subjects.length > 0 && (
           <details className="text-sm">
-            <summary className="cursor-pointer text-xs muted select-none">School grades sheet, {t.learning.grades[0].month}</summary>
-            <p className="mt-1 text-sm whitespace-pre-wrap">{t.learning.grades[0].appraisal}</p>
+            <summary className="cursor-pointer text-xs muted select-none">Every topic, coloured by how well he does it</summary>
+            <div className="mt-2 space-y-2">
+              {t.school.subjects.map((g) => (
+                <div key={g.subject}>
+                  <div className="text-sm font-semibold mb-1">{subjectEmoji(g.subject)} {subjectLabel(g.subject)}</div>
+                  <div className="flex flex-wrap gap-1">
+                    {g.topics.map((x) => (
+                      <span key={x.id} title={`${x.name}: ${x.pct === null ? "not practised" : `${x.pct}%`}`} className={`h-4 w-4 rounded ${masteryColor(x.pct ?? undefined)}`} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <p className="text-[11px] muted">Green 80%+, yellow 50–79%, red below 50%, grey never practised. Hover for the topic.</p>
+            </div>
           </details>
         )}
 
-        {t.learning.coach && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-xs muted select-none">What the coach makes of him — {t.learning.coach.headline}</summary>
-            <p className="mt-1 text-sm whitespace-pre-wrap">{t.learning.coach.parent_md}</p>
-          </details>
+        {t.school.flagged.length > 0 && (
+          <div className="rounded-xl border border-warn/40 p-3 text-sm space-y-1">
+            <div className="font-semibold text-warn">⚠️ Attempts the app flagged</div>
+            {t.school.flagged.map((a) => (
+              <div key={a.id} className="text-xs">{a.on} · {a.title} · {a.score}/{a.total}{a.reason ? ` · ${a.reason}` : ""}</div>
+            ))}
+          </div>
         )}
 
+        <CheckpointPanel studentId={t.id} firstName={t.name} rows={t.school.checkpoints as unknown as CheckpointRow[]} subjects={t.learning.subjectsThisWeek} />
+      </Section>
+
+      {/* ── Grades from the school itself ─────────────────────────────────── */}
+      <Section id="grades" title="📊 School grades sheet" hint="uploaded monthly, transcribed and compared">
+        {t.learning.grades.length === 0 ? (
+          <p className="text-sm muted">No sheet yet. He uploads a photo each month from Me → Grades; you can too.</p>
+        ) : t.learning.grades.map((g) => (
+          <div key={g.month} className="text-sm space-y-0.5 border-t border-line pt-2 first:border-0 first:pt-0">
+            <div className="font-semibold">
+              {g.month.slice(0, 7)}
+              {g.average !== null && <> · average {g.average}%</>}
+              {g.previous_average !== null && g.average !== null && <> ({Number(g.average) >= Number(g.previous_average) ? "▲" : "▼"} from {g.previous_average}%)</>}
+              {g.status !== "ready" && <> · {g.status}</>}
+            </div>
+            {g.items && g.items.length > 0 && <div className="text-xs muted">{g.items.map((i) => `${i.subject} ${i.grade}`).join(" · ")}</div>}
+            {g.appraisal && <p className="text-xs muted whitespace-pre-wrap">{g.appraisal}</p>}
+          </div>
+        ))}
+        <GradeSheetUploader familyId={family.id} studentId={t.id} month={today.slice(0, 7)} />
       </Section>
 
       {/* ── The rest of his learning, each with its own door ──────────────── */}
@@ -268,19 +330,64 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         {t.learning.subjectsThisWeek.length > 0 && (
           <p className="text-xs muted">Subjects he logged this week: {t.learning.subjectsThisWeek.join(" · ")}</p>
         )}
+        <form action={setTargetExamAction} className="grid grid-cols-5 gap-2 items-end border-t border-line pt-2.5">
+          <input type="hidden" name="student_id" value={t.id} />
+          <div className="col-span-2">
+            <label className="label">Target exam</label>
+            <select name="target_exam" className="input" defaultValue={t.school.targetExam ?? ""}>
+              <option value="">None</option>
+              <option value="ACT">ACT</option>
+              <option value="SAT">SAT</option>
+              <option value="BOTH">Both SAT and ACT</option>
+            </select>
+          </div>
+          <div className="col-span-2">
+            <label className="label">Exam date</label>
+            <input name="target_exam_date" type="date" className="input" defaultValue={t.school.targetExamDate ?? ""} />
+          </div>
+          <button className="btn-ghost btn-sm">Save</button>
+        </form>
       </Section>
 
-      <Section id="coach" title="🦸 Coach" href={`/parent/progress?tab=${t.id}`} hint="ask the coach for a fresh read">
+      <Section id="coach" title="🦸 Coach">
+        <div className="flex items-center justify-end gap-2 -mt-1">
+          <Link href={`/parent/clinician/${t.id}`} className="text-xs muted underline" title="Summary for a psychiatrist or psychologist">For a professional</Link>
+          <CoachButton studentId={t.id} hasReport={!!t.learning.coach} />
+        </div>
         {t.learning.coach ? (
           <>
             <p className="text-sm font-medium">{t.learning.coach.headline}</p>
+            <p className="text-[11px] muted">{t.learning.coach.period_start} → {t.learning.coach.period_end}</p>
+            {t.learning.coach.data.focus.length > 0 && (
+              <ul className="text-sm space-y-1">
+                {t.learning.coach.data.focus.map((f) => (
+                  <li key={f.subject} className="rounded-lg bg-warn/10 border border-warn/30 p-2">
+                    <b>Needs practice: {subjectEmoji(f.subject)} {subjectLabel(f.subject)}</b> · {f.why}
+                    {f.foundation.length > 0 && <div className="text-xs muted mt-0.5">Foundations: {f.foundation.join(" · ")}</div>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            {t.learning.coach.data.accelerate.length > 0 && (
+              <ul className="text-sm space-y-1">
+                {t.learning.coach.data.accelerate.map((a) => (
+                  <li key={a.subject} className="rounded-lg bg-good/10 border border-good/30 p-2">
+                    <b>Push harder: {subjectEmoji(a.subject)} {subjectLabel(a.subject)}</b> · {a.plan}
+                  </li>
+                ))}
+              </ul>
+            )}
             <details className="text-sm">
-              <summary className="cursor-pointer text-xs muted select-none">What it says in full</summary>
-              <p className="mt-1 whitespace-pre-wrap">{t.learning.coach.parent_md}</p>
+              <summary className="cursor-pointer text-xs muted select-none">Full report</summary>
+              <div className="prose-lesson mt-2"><ReactMarkdown>{t.learning.coach.parent_md}</ReactMarkdown></div>
+              <div className="text-xs muted mt-2">Quiz levels now: {Object.entries(t.learning.coach.levels).map(([k, v]) => `${subjectLabel(k)} ${v}`).join(" · ") || "medium everywhere"}</div>
             </details>
           </>
         ) : (
-          <p className="text-sm muted">No coach report for {t.name} yet.</p>
+          <p className="text-sm muted">
+            Runs every week by itself once there is data. Press for a first analysis now: which subjects need
+            foundations, where to push harder, and a note for {t.name}.
+          </p>
         )}
       </Section>
 
@@ -321,7 +428,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
       </Section>
 
       {/* ── Faith and wellbeing ───────────────────────────────────────────── */}
-      <Section id="faith" title="🕌 Prayers" href="#week" hint="day by day, below">
+      <Section id="faith" title="🕌 Prayers" href={`/parent/prayers/${t.id}`} hint="which of the five, day by day">
         <ul className="text-sm divide-y divide-line">
           {st.results.filter((r) => r.code === "prayers" || r.code === "checkins").map((r) => (
             <li key={r.code} className="py-2 flex items-center gap-3">
@@ -339,6 +446,35 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
           {t.wellbeing.signals > 0 ? `${t.wellbeing.signals} signal${t.wellbeing.signals === 1 ? "" : "s"} worth watching. ` : ""}
           What he wrote stays private to him — you see the colour, never the answers.
         </p>
+
+        <div className="rounded-xl border border-line p-3 text-sm flex items-start gap-3">
+          <span className="text-2xl">🤝</span>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold">Straight talk <span className="muted font-normal">· the weekly honesty check he knows you see</span></div>
+            {t.straightTalk.length === 0 ? (
+              <div className="muted text-xs">Not answered yet. It appears on his Coach page every week.</div>
+            ) : (
+              <ul className="text-xs space-y-0.5 mt-0.5">
+                {t.straightTalk.map((r) => (
+                  <li key={r.on}>
+                    {r.on}: {r.admitted.length ? `admitted a slip on ${r.admitted.join(", ")}` : "nothing to admit"}{" "}
+                    {r.admitted.length ? <span className="muted">· thank him for saying so; no punishment that week</span> : "✅"}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+
+        <form action={setProfessionalGuidanceAction} className="rounded-xl border border-line p-3 space-y-2">
+          <input type="hidden" name="student_id" value={t.id} />
+          <div>
+            <div className="font-semibold text-sm">🩺 Guidance from a professional</div>
+            <div className="text-xs muted">Paste what the specialist recommends (tone, what to avoid, what to practise). The coach and the private chat follow it; {t.name} is never told it exists.</div>
+          </div>
+          <textarea name="guidance" className="input" rows={3} maxLength={3000} defaultValue={t.school.guidance ?? ""} placeholder="e.g. Avoid competition framing; praise effort not outcome; keep sessions under 20 minutes; encourage sleep before 11pm." />
+          <div className="flex justify-end"><button className="btn-ghost btn-sm">Save guidance</button></div>
+        </form>
       </Section>
 
       {/* ── Money ─────────────────────────────────────────────────────────── */}

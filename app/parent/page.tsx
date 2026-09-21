@@ -30,6 +30,7 @@ import { weekFor } from "@/lib/allowance";
 import { askedToday, custodianFor, custodyInUse, parentName, type CustodyOverride, type ParentLite } from "@/lib/custody";
 import { KIND_EMOJI, type Assignment, type Checkin, type CheckinItem, type Profile, type TimetableEntry } from "@/lib/types";
 import { isBeta } from "@/lib/brand";
+import { reviewQueue } from "@/lib/teaching/queue";
 
 const MOOD = ["", "😞", "😕", "😐", "🙂", "😄"];
 const PRAYERS = ["fajr", "dhuhr", "asr", "maghrib", "isha"];
@@ -99,6 +100,8 @@ export default async function ParentHome() {
   const integrity = await Promise.all(students.map((s) => computeIntegrity(s.id, today, family.timezone).catch(() => [])));
   const live = await liveFeedAction().catch(() => null);
   const unread = await unreadCount(profile.id).catch(() => 0);
+  // Lessons the reviewer held: the one judgement the teaching model hands to a person rather than a model.
+  const heldLessons = (await reviewQueue(family.id).catch(() => [])).length;
   // What has happened, in the parent's own words: his inbox, on the page he opens first.
   const { data: eventRows } = await supabase
     .from("parent_notifications")
@@ -123,6 +126,7 @@ export default async function ParentHome() {
     { href: "/parent/allowance", label: "earn-back to confirm", n: claimsCount ?? 0, emoji: "🪞" },
     { href: "/parent/import", label: "announcement to review", n: findingsCount ?? 0, emoji: "🏫" },
     { href: "/parent/plan", label: "quiz to prepare", n: planMissing, emoji: "📅" },
+    { href: "/parent/lessons", label: "lesson to check", n: heldLessons, emoji: "🔍" },
     { href: "/parent/snaps", label: "snap to approve", n: snapsPending ?? 0, emoji: "📸" },
     { href: "/parent/materials", label: "file with tasks to confirm", n: filesToReview, emoji: "📎" },
   ].filter((x) => x.n > 0);

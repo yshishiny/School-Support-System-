@@ -14,6 +14,8 @@ import { evaluate, type Evaluation } from "@/lib/evaluation";
 import { wellbeingStatus, type CheckHistoryRow } from "@/lib/wellbeing";
 import { computeAttention } from "@/lib/coach/signals-run";
 import { masteryMaps, type AttemptWithQuiz } from "@/lib/mastery";
+import { examsFor } from "@/lib/exams";
+import { straightTalkLabels } from "@/lib/wellbeing";
 import type { CoachReport, Topic } from "@/lib/types";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { signHeroUrls } from "@/lib/hero";
@@ -48,6 +50,7 @@ export interface ChildSummary {
 }
 
 export interface SubjectMastery { topic: string; subject: string; pct: number; attempts: number }
+export interface CheckpointLite { id: string; kind: string; subject: string | null; status: string; due_by: string | null; week_start: string | null; result: unknown; error: string | null; created_at: string }
 export interface GradeSheet { month: string; status: string; average: number | null; previous_average: number | null; appraisal: string | null; items: { subject: string; grade: string; percent: number | null }[] | null }
 
 export interface ChildTrace extends ChildSummary {
@@ -75,6 +78,23 @@ export interface ChildTrace extends ChildSummary {
   curriculum: { name: string | null; stream: string | null; grade: number | null };
   /** The family's most recent daily report, for the Reports section. */
   lastReport: { date: string; status: string } | null;
+  /**
+   * Everything the Progress page used to hold about this child and nothing else did: his exams, the mastery
+   * heat map, his checkpoints, the grade sheets, the attempts the app flagged, and the two things a parent
+   * writes rather than reads — the target exam and a specialist's guidance.
+   */
+  school: {
+    exams: string[];
+    targetExam: string | null;
+    targetExamDate: string | null;
+    sectionPct: Record<string, number>;
+    subjects: { subject: string; topics: { id: string; name: string; pct: number | null }[] }[];
+    checkpoints: CheckpointLite[];
+    flagged: { id: string; on: string; title: string; score: number | null; total: number | null; reason: string | null }[];
+    guidance: string | null;
+  };
+  /** The honesty check the child answers knowing a parent reads the labels, never the words. */
+  straightTalk: { on: string; admitted: string[] }[];
   /** Who else is in the family, for the row of small faces that switches child. */
   siblings: { id: string; name: string; emoji: string; avatar: string | null }[];
 }
@@ -168,6 +188,13 @@ export async function traceSummaries(family: TraceFamily): Promise<ChildSummary[
 }
 
 /** Mastery per topic from submitted attempts, named so a parent reads a subject rather than a uuid. */
+/** One topic's mastery percentage, or null when he has never practised it. */
+function pctByTopicFor(attempts: AttemptWithQuiz[], topicId: string): number | null {
+  const { topic } = masteryMaps(attempts.filter((a) => a.quizzes?.topic_id === topicId));
+  const v = topic.get(topicId);
+  return v === undefined ? null : Math.round(v);
+}
+
 function masteryOf(attempts: AttemptWithQuiz[], topics: Topic[]): { weakest: SubjectMastery[]; strongest: SubjectMastery[] } {
   const { topic: pctByTopic } = masteryMaps(attempts);
   const tries = new Map<string, number>();
@@ -227,12 +254,15 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
 
   // Open work, the curriculum he sits in, and the last report the family was sent: one more round trip, so the
   // sections that link away can still say something before a parent decides to follow the link.
-  const [{ data: taskRows }, { data: curriculumRows }, { data: reportRow }] = await Promise.all([
+  const [{ data: taskRows }, { data: curriculumRows }, { data: reportRow }, { data: cpRows }, { data: straightRows }] = await Promise.all([
     supabase.from("assignments").select("title, kind, due_date, status").eq("student_id", s.id).eq("status", "open").order("due_date", { nullsFirst: false }).limit(50),
     (s as Profile & { curriculum_id?: string | null }).curriculum_id
       ? supabase.from("curricula").select("id, name").eq("id", (s as Profile & { curriculum_id?: string | null }).curriculum_id!)
       : Promise.resolve({ data: [] as { id: string; name: string }[] }),
     supabase.from("daily_reports").select("report_date, status").eq("family_id", family.id).order("report_date", { ascending: false }).limit(1),
+    admin.from("checkpoints").select("id, kind, subject, status, due_by, week_start, result, error, created_at").eq("student_id", s.id).order("created_at", { ascending: false }).limit(12),
+    // The answers never leave the server: only the labels of what he admitted to are passed up.
+    admin.from("wellbeing_checks").select("taken_on, answers").eq("student_id", s.id).eq("instrument", "straight").order("taken_on", { ascending: false }).limit(6),
   ]);
   const tasksOpen = (taskRows ?? []) as { title: string; kind: string; due_date: string | null; status: string }[];
   const weekAhead = shiftDate(today, 7);
@@ -286,6 +316,12 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     },
   });
 
+  // The mastery heat map: every school topic at this child's grade, with the percentage where one exists.
+  const { section: sectionPct } = masteryMaps(attempts);
+  const schoolTopics = topics.filter((x) => x.track === "school" && x.grade === s.grade);
+  const subjectsOf = [...new Set(schoolTopics.map((x) => x.subject))].sort();
+  const profileWithExam = s as Profile & { target_exam?: string | null; target_exam_date?: string | null; professional_guidance?: string | null };
+
   return {
     id: s.id,
     name: s.full_name.split(" ")[0],
@@ -329,6 +365,24 @@ export async function traceFor(family: TraceFamily, studentId: string): Promise<
     lastReport: ((reportRow ?? []) as { report_date: string; status: string }[])[0]
       ? { date: (reportRow as { report_date: string; status: string }[])[0].report_date, status: (reportRow as { report_date: string; status: string }[])[0].status }
       : null,
+    school: {
+      exams: examsFor(profileWithExam.target_exam ?? null, s.grade),
+      targetExam: profileWithExam.target_exam ?? null,
+      targetExamDate: profileWithExam.target_exam_date ?? null,
+      sectionPct: Object.fromEntries(sectionPct),
+      subjects: subjectsOf.map((subject) => ({
+        subject,
+        topics: schoolTopics.filter((x) => x.subject === subject).map((x) => ({ id: x.id, name: x.name, pct: pctByTopicFor(attempts, x.id) })),
+      })),
+      checkpoints: (cpRows ?? []) as CheckpointLite[],
+      flagged: attempts.filter((a) => a.flagged).slice(0, 8).map((a) => ({
+        id: a.id, on: (a.submitted_at ?? "").slice(0, 10), title: a.quizzes?.title ?? "review",
+        score: a.score, total: a.total, reason: (a as AttemptWithQuiz & { flag_reason?: string | null }).flag_reason ?? null,
+      })),
+      guidance: profileWithExam.professional_guidance ?? null,
+    },
+    straightTalk: ((straightRows ?? []) as { taken_on: string; answers: Record<string, string> }[])
+      .map((r) => ({ on: r.taken_on, admitted: straightTalkLabels(r.answers) })),
     siblings: kids.filter((k) => k.id !== s.id).map((k) => ({
       id: k.id,
       name: k.full_name.split(" ")[0],

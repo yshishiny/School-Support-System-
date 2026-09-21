@@ -70,7 +70,7 @@ describe("every link on the child's page goes somewhere", () => {
 
   it("would catch a link to a page that does not exist", () => {
     expect(resolves("/parent/nowhere", all)).toBe(false);
-    expect(resolves("/parent/progress", all)).toBe(true);
+    expect(resolves("/parent/trace", all)).toBe(true);
     expect(resolves("/parent/clinician/x", all)).toBe(true); // the [studentId] segment
   });
 });
