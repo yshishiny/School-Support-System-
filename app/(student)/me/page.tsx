@@ -13,7 +13,8 @@ import { GradeSheetUploader } from "@/components/GradeSheetUploader";
 import { KpiTicks } from "@/components/KpiTicks";
 import { mergeKpis } from "@/lib/allowance";
 import { todayIn } from "@/lib/dates";
-import { APP_NAME, APP_VERSION } from "@/lib/version";
+import { APP_VERSION } from "@/lib/version";
+import { brand } from "@/lib/brand";
 import { DEFAULT_NUDGES, type NudgeSettings } from "@/lib/nudges";
 import { HeroUploader } from "@/components/HeroUploader";
 import { HeroGallery } from "@/components/HeroGallery";
@@ -155,7 +156,10 @@ export default async function MePage() {
         <span className="btn-ghost btn-sm">Open</span>
       </Link>
 
-      <Link href="/about" className="text-xs muted block text-center">{APP_NAME} v{APP_VERSION} · About</Link>
+      {/* Spelled out for the children too: which of the two apps this is, and exactly what is running in it. */}
+      <Link href="/about" className="text-xs muted block text-center">
+        {brand().name} · v{APP_VERSION} · {brand().beta ? "beta" : "live"} · About
+      </Link>
 
       <form action={logoutAction}>
         <button className="btn-ghost w-full">Sign out</button>
