@@ -15,8 +15,22 @@ import { materialStages } from "@/lib/materials/study";
 import { todayIn } from "@/lib/dates";
 import { SideTabs } from "@/components/SideTabs";
 import { kidColor } from "@/lib/kid-tabs";
+import { Group } from "@/components/MoreList";
 
 export const maxDuration = 300;
+
+/** Newest month first, files newest first inside it — the order they are already sorted in. */
+function byMonth(list: MaterialRow[]): [string, MaterialRow[]][] {
+  const map = new Map<string, MaterialRow[]>();
+  for (const m of list) {
+    const key = m.created_at.slice(0, 7);
+    map.set(key, [...(map.get(key) ?? []), m]);
+  }
+  return [...map.entries()];
+}
+
+const monthLabel = (ym: string) =>
+  new Date(`${ym}-01T00:00:00Z`).toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
 
 const KIND: Record<string, string> = { worksheet: "📝 Worksheet", notes: "📒 Notes", study_guide: "📘 Study guide", announcement: "📣 Announcement", other: "📎 File" };
 
@@ -27,7 +41,7 @@ export default async function MaterialsPage() {
   const [{ data: kids }, { data: subjectRows }, { data: rows }] = await Promise.all([
     supabase.from("profiles").select("id, full_name").eq("family_id", family.id).eq("role", "student").order("grade", { ascending: false }),
     supabase.from("subjects").select("name"),
-    supabase.from("materials").select("*").eq("family_id", family.id).order("created_at", { ascending: false }).limit(60),
+    supabase.from("materials").select("*").eq("family_id", family.id).order("created_at", { ascending: false }).limit(500),
   ]);
   const students = kids ?? [];
   const materials = (rows ?? []) as MaterialRow[];
@@ -49,6 +63,9 @@ export default async function MaterialsPage() {
           <span className="text-2xl">{fileEmoji(m.mime)}</span>
           <div className="flex-1 min-w-0">
             <div className="font-bold">{m.title}</div>
+            {/* The model's title is a description, not a name: two different worksheets in one batch were both
+                called "Story Settings Description". This is what the file was called when it was sent. */}
+            {m.original_name && <div className="text-[11px] muted truncate">📄 {m.original_name}</div>}
             <div className="text-xs muted">{nameOf(m.student_id)} · {m.subject ?? "no subject"} · {m.kind ? KIND[m.kind] ?? m.kind : ""} · {prettyDate(m.created_at.slice(0, 10))} · {Math.round(m.size_bytes / 1024)} KB{m.status === "failed" ? " · ⚠️ not read" : m.status === "new" ? " · reading…" : ""}</div>
           </div>
           {urls.get(m.id) && <a href={urls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">Open</a>}
@@ -111,7 +128,17 @@ export default async function MaterialsPage() {
       emoji: "📚",
       color: kidColor(idx),
       sub: `${list.length} file${list.length === 1 ? "" : "s"}`,
-      content: list.length === 0 ? <p className="card muted text-sm">No files for {s.full_name.split(" ")[0]} yet.</p> : <div className="space-y-3">{list.map((m) => <FileCard key={m.id} m={m} />)}</div>,
+      content: list.length === 0 ? <p className="card muted text-sm">No files for {s.full_name.split(" ")[0]} yet.</p> : (
+        <div className="card">
+          {/* Nothing is ever dropped from here; a school year is just too long to read in one column, so the
+              months fold and the current one is open. */}
+          {byMonth(list).map(([month, group], i) => (
+            <Group key={month} title={monthLabel(month)} count={group.length} open={i === 0}>
+              <div className="space-y-3 pt-1">{group.map((m) => <FileCard key={m.id} m={m} />)}</div>
+            </Group>
+          ))}
+        </div>
+      ),
     };
   });
 
