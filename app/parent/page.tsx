@@ -189,7 +189,11 @@ export default async function ParentHome() {
             <div className="text-xs muted">{pr.label ? <span className={pr.online ? "text-good" : ""}>{pr.online ? "🟢 " : ""}{pr.label} · </span> : null}{balance.toLocaleString()} ★ · {streak} 🔥{lp ? ` · 📍 ${where ?? "seen"} ${ago(lp.created_at)}` : ""}</div>
             {(() => { const d = daysToBirthday(s.birth_date, today); return d !== null && d <= 7 ? <div className="text-xs text-warn">🎂 {d === 0 ? `Birthday today, turns ${ageOn(s.birth_date, today)}!` : `Birthday in ${d} day${d === 1 ? "" : "s"}`}</div> : null; })()}
           </div>
-          <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
+          <div className="shrink-0 flex flex-col items-end gap-1">
+            <div className={`badge ${ck ? "text-good" : "text-bad"}`}>{ck ? (ck.entered_late ? "✓ checked in (later)" : "✓ checked in") : "no check-in"}</div>
+            {/* The evening question — yesterday, today, and anything waiting on a parent — one tap from here. */}
+            <Link href={`/parent/day/${s.id}`} className="btn-ghost btn-sm">📋 Today</Link>
+          </div>
         </div>
 
         <Link href="/parent/children" className={`tile !p-2 block text-xs ${school.off ? "border-warn/60" : ""}`}>

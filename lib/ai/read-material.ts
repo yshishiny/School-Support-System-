@@ -16,7 +16,7 @@ export type MaterialInput = { media_type: "application/pdf" | "image/jpeg" | "im
  * reading away. normalise() below turns it into the exact shape the app stores.
  */
 const LooseItemSchema = z.object({
-  kind: z.string().describe("One of: homework, quiz, exam, project, event, note"),
+  kind: z.string().describe("One of: homework, quiz, exam, project, event, note, sign"),
   title: z.string().describe("Short, specific title a student would recognise, e.g. 'Math p.45 ex 1-10'"),
   subject: z.string().nullable().describe("Subject name if it can be inferred, else null"),
   details: z.string().nullable().describe("Anything the student needs to know to do it"),
@@ -55,7 +55,7 @@ export interface MaterialReading {
 
 const KINDS = ["worksheet", "notes", "study_guide", "announcement", "other"] as const;
 const LANGS = ["english", "arabic", "mixed"] as const;
-const ITEM_KINDS = ["homework", "quiz", "exam", "project", "event", "note"] as const;
+const ITEM_KINDS = ["homework", "quiz", "exam", "project", "event", "note", "sign"] as const;
 const CONF = ["high", "medium", "low"] as const;
 const pick = <T extends string>(v: string, allowed: readonly T[], fallback: T): T => (allowed as readonly string[]).includes(v.trim().toLowerCase().replace(/[\s-]+/g, "_")) ? (v.trim().toLowerCase().replace(/[\s-]+/g, "_") as T) : fallback;
 
@@ -88,7 +88,8 @@ const SYSTEM = `You read a school file (PDF, photo, Word, PowerPoint, Excel, CSV
 Rules:
 - Describe what the file is and what the student should do with it. Use the parent's instructions when given; they override your guess.
 - The digest is for writing practice questions later: keep the actual content (formulas, definitions, facts, example problems, vocabulary), not commentary. Preserve Arabic in Arabic.
-- Items: homework, quiz, exam, project, event, or note. Resolve dates against today's date given by the user; the Egyptian school week is Sunday to Thursday. If no date is stated anywhere, due_date is null and confidence is "low".
+- Items: homework, quiz, exam, project, event, note, or sign. Resolve dates against today's date given by the user; the Egyptian school week is Sunday to Thursday. If no date is stated anywhere, due_date is null and confidence is "low".
+- Use "sign" for anything the PARENT must sign and send back: a consent or permission slip, a trip form, a test paper to be signed and returned, a medical or photo consent, an acknowledgement slip. Phrases that mean this include "please sign and return", "parent/guardian signature", "signed by a parent", "توقيع ولي الأمر", "يرجى التوقيع". A child cannot do these, so never file one as homework or a note. The due_date is the day it must be back at school.
 - Weekly syllabus / week plan files (one row per subject with what is covered that week): set is_week_summary true, copy the dates the file states (D/M/YYYY in Egypt: "1/3/2026" is 1 March), and fill subjects with one entry per subject. Do not judge whether the dates are right; the app checks that.
 - If the file is unreadable, say so in the summary and return no items.`;
 
