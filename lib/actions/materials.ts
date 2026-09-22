@@ -1,6 +1,7 @@
 "use server";
 
 import { failed } from "@/lib/ops/fault";
+import type { KnownFile } from "@/lib/materials/duplicates";
 import { logError } from "@/lib/ops/log";
 
 import { ACCEPT_LABEL, FILE_KINDS } from "@/lib/materials/files";
@@ -29,7 +30,7 @@ const MIMES = new Set(FILE_KINDS.map((k) => k.mime));
  * After the browser uploaded the file to Storage: record it, then read it with the AI.
  * Parents may add for any child; a child only for himself. Reading failures keep the file (status "failed").
  */
-export async function registerMaterialAction(studentId: string, path: string, meta: { mime: string; size: number; name: string; subject: string; instructions: string; weekSummary?: "this" | "last" | null }): Promise<RegisterMaterialResult> {
+export async function registerMaterialAction(studentId: string, path: string, meta: { mime: string; size: number; name: string; subject: string; instructions: string; weekSummary?: "this" | "last" | null; sha?: string | null }): Promise<RegisterMaterialResult> {
   const { profile, family } = await requireSession();
   if (!path.startsWith(`${family.id}/${studentId}/`)) return { error: "Bad upload path." };
   if (profile.role !== "parent" && profile.id !== studentId) return { error: "Not allowed." };
@@ -42,7 +43,7 @@ export async function registerMaterialAction(studentId: string, path: string, me
   const fallbackTitle = meta.name.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ").trim().slice(0, 80) || "School file";
   const { data: row, error } = await admin
     .from("materials")
-    .insert({ family_id: family.id, student_id: studentId, uploaded_by: profile.id, subject, title: fallbackTitle, instructions, path, mime: meta.mime, size_bytes: meta.size, is_week_summary: !!meta.weekSummary, covers_week_start: meta.weekSummary ? (meta.weekSummary === "this" ? schoolWeekStart(todayIn(family.timezone)) : shiftDate(schoolWeekStart(todayIn(family.timezone)), -7)) : null })
+    .insert({ family_id: family.id, student_id: studentId, uploaded_by: profile.id, subject, title: fallbackTitle, original_name: meta.name.slice(0, 200), content_sha256: /^[0-9a-f]{64}$/.test(meta.sha ?? "") ? meta.sha : null, instructions, path, mime: meta.mime, size_bytes: meta.size, is_week_summary: !!meta.weekSummary, covers_week_start: meta.weekSummary ? (meta.weekSummary === "this" ? schoolWeekStart(todayIn(family.timezone)) : shiftDate(schoolWeekStart(todayIn(family.timezone)), -7)) : null })
     .select("id")
     .single();
   if (error || !row) return failed("actions.materials.registerMaterial", error, "Could not save.");
@@ -50,6 +51,58 @@ export async function registerMaterialAction(studentId: string, path: string, me
   const r = await readAndStore(row.id, { path, mime: meta.mime, subject, instructions, fallbackTitle, grade: student.grade, firstName: student.full_name.split(" ")[0], today: todayIn(family.timezone), weekChoice: meta.weekSummary ?? null });
   PATHS.forEach((p) => revalidatePath(p));
   return r;
+}
+
+/**
+ * What the family already holds, out of the files about to be sent.
+ *
+ * Asked before a byte is uploaded, so a file the app has already read costs neither the upload nor a second
+ * AI read. Only the hashes offered are looked up — this never returns the family's whole library.
+ */
+export async function knownMaterialsAction(shas: string[]): Promise<KnownFile[]> {
+  const { family } = await requireSession();
+  const clean = [...new Set(shas.filter((s) => /^[0-9a-f]{64}$/.test(s)))].slice(0, 50);
+  if (clean.length === 0) return [];
+  await backfillHashes(family.id);
+  const { data } = await createAdminClient()
+    .from("materials")
+    .select("id, content_sha256, student_id, title, original_name, created_at")
+    .eq("family_id", family.id)
+    .in("content_sha256", clean);
+  return ((data ?? []) as { id: string; content_sha256: string; student_id: string; title: string; original_name: string | null; created_at: string }[])
+    .map((m) => ({ id: m.id, sha: m.content_sha256, studentId: m.student_id, title: m.title, originalName: m.original_name, createdAt: m.created_at }));
+}
+
+/**
+ * Hashes a few of the family's older files, so duplicate detection also covers everything uploaded before the
+ * hash existed.
+ *
+ * Bounded and lazy on purpose: it runs during the check the uploader already waits on, does a handful at a
+ * time, and a failure is swallowed — not being able to hash an old file is never a reason to stop a parent
+ * uploading a new one.
+ */
+async function backfillHashes(familyId: string): Promise<void> {
+  try {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("materials")
+      .select("id, path")
+      .eq("family_id", familyId)
+      .is("content_sha256", null)
+      .limit(10);
+    const rows = (data ?? []) as { id: string; path: string }[];
+    if (rows.length === 0) return;
+
+    await Promise.all(rows.map(async (m) => {
+      const { data: blob } = await admin.storage.from("materials").download(m.path);
+      if (!blob) return;
+      const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
+      const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
+      await admin.from("materials").update({ content_sha256: sha }).eq("id", m.id);
+    }));
+  } catch (err) {
+    await logError("materials.backfillHashes", err);
+  }
 }
 
 /** Re-runs the reading on a file that failed (out of credit, busy) or whose instructions changed. */

@@ -10,6 +10,8 @@ export interface MaterialRow {
   uploaded_by: string | null;
   subject: string | null;
   title: string;
+  /** The name the file had on the uploader's device. The AI title is not unique; this is what a person recognises. */
+  original_name: string | null;
   instructions: string | null;
   path: string;
   mime: string;

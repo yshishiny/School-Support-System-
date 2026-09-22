@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.27 — Six files chosen, five uploaded, nobody told (22 September 2026, `v2` branch)
+
+- **The uploader silently threw away everything past the fifth file.** Six were chosen for Omar; the sixth was discarded before a byte moved and the button then read "5 files chosen". The cap is now 20, and whatever the cap is, every file it will not take is named on screen.
+- **The same file is no longer read twice.** A SHA-256 of the bytes is taken in the browser before anything is uploaded. A file this child already has is skipped entirely — no upload, no second AI read — and the app says when it arrived and what it was called. A file a sibling has is still uploaded, because that is this child's copy, and it says so. The same file chosen twice in one batch is sent once.
+- **The name you gave the file is kept.** Two different worksheets uploaded together — one about a beach, one about a haunted house — were both titled "Story Settings Description" by the model, and the file itself is stored under a random UUID, so nothing on screen told them apart. The original filename is now stored and shown under the title.
+- **Uploads no longer wait for the AI.** Each file used to wait for the previous file's reading to finish before it even started transferring. Five files took 95 seconds, about 80 of it reading one PDF at a time. The transfers now all run at once; only the reading is still sequential, which is deliberate — a crowd of AI calls is how a family hits a rate limit halfway through a batch.
+- **Files are kept as a reference, and can be found.** The parent's file list held the most recent 60 and a child's the most recent 40, so a term's worth quietly fell out of view. It now holds 500 and 200, folded by month with the current month open.
+
 ## 2.1.0-beta.26 — A reward can be corrected, not just hidden (21 September 2026, `v2` branch)
 
 - **Rewards can now be edited.** There was no update: only add, hide and redeem. So the advice printed under a reward whose title was lying read "hide it and add it again" — which is not a repair, because redemptions point at the reward's id and a replacement row orphans every request a child ever made for it.

@@ -57,7 +57,7 @@ export default async function LearnPage() {
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
     supabase.from("quizzes").select("id, title, scheduled_for, plan_slot, topic_id, act_section, topics(subject), attempts(score, total, submitted_at)").eq("student_id", profile.id).not("scheduled_for", "is", null).gte("scheduled_for", shiftDate(today, -6)).lte("scheduled_for", shiftDate(today, 6)).order("scheduled_for"),
-    supabase.from("materials").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(40),
+    supabase.from("materials").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(200),
     supabase.from("quizzes").select("material_id, title, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null),
     supabase.from("subjects").select("name").eq("student_id", profile.id),
   ]);
@@ -269,6 +269,7 @@ export default async function LearnPage() {
             <span className="text-3xl sticker-still">{fileEmoji(m.mime)}</span>
             <div className="flex-1 min-w-0">
               <div className="font-bold">{m.title}</div>
+              {m.original_name && <div className="text-[11px] muted truncate">📄 {m.original_name}</div>}
               <div className="text-xs muted">{m.subject ?? "no subject"} · {prettyDate(m.created_at.slice(0, 10))}{m.status !== "ready" ? " · not read yet" : ""}</div>
             </div>
             {materialUrls.get(m.id) && <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">Open</a>}
