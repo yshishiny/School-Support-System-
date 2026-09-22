@@ -33,6 +33,11 @@ export interface ExplainSpec {
    * nobody but a person who saw the child's class could have written, so it is given the most weight.
    */
   corrections?: string[];
+  /**
+   * The child read the standard lesson and asked to be taught again, a particular way. Carries the whole
+   * reason this second lesson exists, so it is stated last and stated plainly.
+   */
+  reteach?: string | null;
 }
 
 export async function explainTopic(spec: ExplainSpec): Promise<{ content: string; model: string }> {
@@ -56,6 +61,7 @@ export async function explainTopic(spec: ExplainSpec): Promise<{ content: string
           // The depth is the paid difference between the two tiers, so it is stated last and stated plainly.
           `How to pitch it: ${LEVEL[level].lessonBrief}`,
           // Last, because it outranks everything above it: a parent watched this class and the model did not.
+          spec.reteach ?? "",
           spec.corrections?.length
             ? `A parent read the previous version of this lesson and sent it back. Do not repeat these mistakes:\n${spec.corrections.map((c) => `- ${c}`).join("\n")}`
             : "",
