@@ -7,6 +7,8 @@ import { disclosure } from "@/lib/teaching/fluency";
 import { levelOf } from "@/lib/levels";
 import { createClient } from "@/lib/supabase/server";
 import { AddResourcesButton, ExplainButton, PracticeButton } from "@/components/LearnButtons";
+import { ReteachPanel } from "@/components/ReteachPanel";
+import { newestPerStyle, type Retake } from "@/lib/learning/reteach";
 import { TopicVideos, TopicVisuals } from "@/components/TopicResources";
 import { loadTopicResources } from "@/lib/learning/resources";
 import { masteryFor } from "@/lib/learning";
@@ -27,13 +29,18 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
   const t = topic as Topic;
   const grade = t.track === "school" ? (t.grade ?? profile.grade) : null;
   // Both depths are fetched in one go; which of them a child may read is a separate question from whether it exists.
-  const [{ data: lessonRows }, resources, { data: quizzes }, unlocked] = await Promise.all([
+  const [{ data: lessonRows }, { data: retakeRows }, resources, { data: quizzes }, unlocked] = await Promise.all([
     supabase.from("lessons").select("content_md, level, human_reviewed_at").eq("topic_id", id).filter("grade", grade === null ? "is" : "eq", grade),
+    supabase.from("lesson_retakes").select("id, style, content_md, level, created_at").eq("topic_id", id).eq("student_id", profile.id),
     loadTopicResources(id, grade),
     supabase.from("quizzes").select("id, title, created_at, attempts(score, total, submitted_at, flagged)").eq("topic_id", id).eq("student_id", profile.id).order("created_at", { ascending: false }),
     deepUnlocked(profile.id, family.id),
   ]);
   const lessons = (lessonRows ?? []) as { content_md: string; level: string; human_reviewed_at: string | null }[];
+  const allRetakes = ((retakeRows ?? []) as { id: string; style: string; content_md: string; level: string; created_at: string }[])
+    .map((r) => ({ id: r.id, style: r.style as Retake["style"], contentMd: r.content_md, createdAt: r.created_at, level: r.level }));
+  const retakesFor = (lvl: string): Retake[] =>
+    newestPerStyle(allRetakes.filter((r) => r.level === lvl).map(({ level: _l, ...rest }) => rest));
   const lesson = lessons.find((l) => l.level === "basics") ?? null;
   const deep = lessons.find((l) => l.level === "advanced") ?? null;
   type QZ = { id: string; title: string; created_at: string; attempts: { score: number | null; total: number | null; submitted_at: string | null; flagged: boolean }[] };
@@ -94,6 +101,8 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
                     ) : (
                       <AddResourcesButton topicId={t.id} />
                     )}
+                    {/* Offered on a lesson that exists — which is exactly where it was missing. */}
+                    <ReteachPanel topicId={t.id} level="basics" retakes={retakesFor("basics")} />
                   </>
                 ) : (
                   <>
@@ -114,10 +123,13 @@ export default async function TopicPage({ params }: { params: Promise<{ id: stri
                 {!unlocked ? (
                   <p className="text-sm muted">{LOCKED_NOTE}</p>
                 ) : deep ? (
-                  <article className="prose-lesson text-sm leading-relaxed space-y-2">
-                    <ReactMarkdown>{deep.content_md}</ReactMarkdown>
+                  <>
+                    <article className="prose-lesson text-sm leading-relaxed space-y-2">
+                      <ReactMarkdown>{deep.content_md}</ReactMarkdown>
                       <p className="mt-3 text-[11px] muted border-t border-line pt-2">{disclosure({ aiWritten: true, topicId: id, level: levelOf(deep.level), model: "", checkedAt: "", failedChecks: [], humanReviewedBy: deep.human_reviewed_at ? "parent" : null }, topic.language)}</p>
-                  </article>
+                    </article>
+                    <ReteachPanel topicId={t.id} level="advanced" retakes={retakesFor("advanced")} />
+                  </>
                 ) : (
                   <>
                     <p className="text-sm muted">Not written yet. It takes about a minute, and it is kept afterwards.</p>

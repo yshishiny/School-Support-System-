@@ -1,6 +1,8 @@
 "use server";
 
 import { deepUnlocked } from "@/lib/entitlement";
+import { isStyle, styleOf } from "@/lib/learning/reteach";
+import { explainTopic } from "@/lib/ai/explain-topic";
 import { levelOf } from "@/lib/levels";
 import { failed } from "@/lib/ops/fault";
 import { logError } from "@/lib/ops/log";
@@ -25,6 +27,55 @@ import type { Topic } from "@/lib/types";
 const QUESTIONS_PER_SET = 8;
 
 /** Writes (or returns) the cached lesson for a topic at the student's grade. */
+/**
+ * Teaches a topic again, the way this child asked for it.
+ *
+ * Never touches the shared lesson: that one is cached per topic, grade and depth for everyone in the year, and
+ * rewriting it because one child said "I don't get it" would change it under his brother. This writes a second
+ * explanation belonging to the child who asked.
+ */
+export async function reteachTopicAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
+  const { profile } = await requireSession();
+  if (profile.role !== "student") return { error: "Only a student can ask to be taught again." };
+  const topicId = String(formData.get("topic_id") ?? "");
+  const rawStyle = formData.get("style");
+  if (!isStyle(rawStyle)) return { error: "Pick one of the three ways." };
+  const style = styleOf(rawStyle)!;
+
+  const admin = createAdminClient();
+  const { data: topic } = await admin.from("topics").select("*").eq("id", topicId).maybeSingle();
+  if (!topic) return { error: "Topic not found." };
+  const t = topic as Topic;
+  const level = levelOf(formData.get("level"));
+  if (level === "advanced" && !(await deepUnlocked(profile.id, profile.family_id))) {
+    return { error: "The deeper lesson comes with the teacher." };
+  }
+  if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
+
+  try {
+    const { content, model } = await explainTopic({
+      grade: t.track === "school" ? (t.grade ?? profile.grade) : null,
+      level,
+      subject: t.subject,
+      unit: t.unit,
+      topic: t.name,
+      track: t.track as "school" | "act" | "sat",
+      language: (t.language as "en" | "ar" | undefined) ?? "en",
+      learner: learnerPromptLine(profile.learner_profile),
+      reteach: style.brief,
+    });
+    const { error } = await admin.from("lesson_retakes").insert({
+      student_id: profile.id, topic_id: topicId, level, style: style.id, content_md: content, model,
+    });
+    if (error) return failed("actions.learning.reteach", error);
+  } catch (err) {
+    await logError("learning.reteach", err, { userId: profile.id, meta: { topicId, style: style.id } });
+    return failed("actions.learning.reteach", err, "Could not write it. Try again in a moment.");
+  }
+  revalidatePath(`/learn/topic/${topicId}`);
+  return {};
+}
+
 export async function explainTopicAction(_prev: { error?: string } | undefined, formData: FormData): Promise<{ error?: string }> {
   const { profile } = await requireSession();
   const topicId = String(formData.get("topic_id"));

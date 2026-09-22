@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.31 — "I don't get it — teach me again" (22 September 2026, `v2` branch)
+
+- **Every lesson now carries a way out of not understanding it.** The explain button only ever appeared where a lesson was *missing*; a child who read one and did not follow it had no button at all. Three ways now, in his words rather than a teacher's: **easier words**, **more examples**, **another way**.
+- **Each one is his.** A lesson is cached per topic, grade and depth and shared by every child in that year, so rewriting it because one child asked would have changed it under his brother. A re-teach is written against the child who asked and never touches the class lesson.
+- **The three are different complaints, so they get different briefs.** "Simpler" is told explicitly not to cut content — a child who needed smaller words is not slow. "Another way" is told not to reuse the original's structure or analogy, because saying the same thing again more slowly is the one thing that will not help.
+- **All three are kept**, so he can go back to whichever landed, and once he has tried them all the app says so rather than offering a fourth round.
+
 ## 2.1.0-beta.30 — The five questions a parent asks every evening (22 September 2026, `v2` branch)
 
 - **New: 📋 Today, on each child** — from the parent home or the child's page. What he did yesterday, what is past due, what is due today, what is coming this week, what quizzes are booked, and what the school gave no date for. One page, no guessing between four screens.
