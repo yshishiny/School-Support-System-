@@ -35,14 +35,14 @@ export default async function CheckinPage({ searchParams }: { searchParams: Prom
   const doneDates = new Set((weekCheckins ?? []).map((c) => c.checkin_date as string));
   const missedDays = Array.from({ length: 6 }, (_, k) => shiftDate(realToday, -6 + k)).filter((d) => !doneDates.has(d));
   const lessonDays = buildLessonDays({ today, lookBackDays: filledLater ? 0 : undefined, timetable: week, topics: topics ?? [], logs: (logs ?? []) as { log_date: string; subject_name: string; note: string; topic_id: string | null; homework_given: boolean | null; homework: string | null; homework_due: string | null }[], daysOff: (offRows ?? []).map((d) => d.day as string) });
-  const { data: sharedRows } = await supabase.from("materials").select("subject, title, topics, is_week_summary, covers_week_start, subjects").eq("student_id", profile.id).eq("status", "ready").or(`created_at.gte.${shiftDate(today, -6)}T00:00:00Z,covers_week_start.gte.${shiftDate(today, -13)}`);
-  type Shared = { subject: string | null; title: string; topics: string[] | null; is_week_summary: boolean | null; covers_week_start: string | null; subjects: { subject: string; topics: string[] }[] | null };
+  const { data: sharedRows } = await supabase.from("materials").select("subject, title, topics, is_week_summary, covers_week_start, subjects, created_at").eq("student_id", profile.id).eq("status", "ready").or(`created_at.gte.${shiftDate(today, -6)}T00:00:00Z,covers_week_start.gte.${shiftDate(today, -13)}`);
+  type Shared = { subject: string | null; title: string; topics: string[] | null; is_week_summary: boolean | null; covers_week_start: string | null; subjects: { subject: string; topics: string[] }[] | null; created_at: string | null };
   const shared = ((sharedRows ?? []) as Shared[]);
   for (const day of lessonDays) for (const sub of day.subjects) {
     const weekStart = schoolWeekStart(day.date);
     const mine = [
-      ...shared.filter((m) => !m.is_week_summary && m.subject && sameSubject(m.subject, sub.subject)).map((m) => ({ title: m.title, topics: (m.topics ?? []).slice(0, 5) })),
-      ...shared.filter((m) => m.is_week_summary && m.covers_week_start === weekStart).flatMap((m) => (m.subjects ?? []).filter((e) => sameSubject(e.subject, sub.subject)).map((e) => ({ title: `Weekly syllabus`, topics: e.topics.slice(0, 5) }))),
+      ...shared.filter((m) => !m.is_week_summary && m.subject && sameSubject(m.subject, sub.subject)).map((m) => ({ title: m.title, topics: (m.topics ?? []).slice(0, 5), createdAt: m.created_at ?? null })),
+      ...shared.filter((m) => m.is_week_summary && m.covers_week_start === weekStart).flatMap((m) => (m.subjects ?? []).filter((e) => sameSubject(e.subject, sub.subject)).map((e) => ({ title: `Weekly syllabus`, topics: e.topics.slice(0, 5), createdAt: m.created_at ?? null }))),
     ];
     if (mine.length) sub.schoolShared = mine;
   }

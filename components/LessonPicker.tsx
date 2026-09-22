@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { sharedChips } from "@/lib/checkin/shared";
 import { guessLessonAction } from "@/lib/actions/lessons";
 import type { LessonSubjectInput } from "@/lib/lessons";
 import { subjectEmoji } from "@/lib/plan";
@@ -48,7 +49,10 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
   }
 
   return (
-    <div className="rounded-xl border border-line bg-panel-2/40 p-2.5 space-y-2" dir={/[\u0600-\u06FF]/.test(input.topics[0]?.name ?? "") ? "rtl" : undefined}>
+    // The card stays left-to-right: its labels and buttons are English. Setting rtl on the whole card because
+    // the first topic happened to be Arabic flipped the header too, so "what was the lesson?" rendered as
+    // "?what was the lesson". Each Arabic string carries its own direction instead, via dir="auto".
+    <div className="rounded-xl border border-line bg-panel-2/40 p-2.5 space-y-2">
       <input type="hidden" name={`lesson_${fieldKey}`} value={note} />
       <input type="hidden" name={`lessontopic_${fieldKey}`} value={topicId ?? ""} />
       <input type="hidden" name={`lessonhwgiven_${fieldKey}`} value={hwGiven} />
@@ -56,13 +60,13 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
       <input type="hidden" name={`lessonhwdue_${fieldKey}`} value={hwGiven === "yes" ? hwDue : ""} />
       <div className="flex items-center justify-between gap-2">
         <span className="text-sm font-semibold truncate"><span className="text-lg align-middle">{subjectEmoji(input.subject)}</span> {input.subject}</span>
-        {note ? <span className={`badge truncate max-w-[60%] ${hwGiven ? "text-good" : "text-warn"}`}>{hwGiven ? "✓" : "…"} {note}</span> : <span className="text-xs muted">what was the lesson?</span>}
+        {note ? <span dir="auto" className={`badge truncate max-w-[60%] ${hwGiven ? "text-good" : "text-warn"}`}>{hwGiven ? "✓" : "…"} {note}</span> : <span className="text-sm muted shrink-0">what was the lesson?</span>}
       </div>
 
       {mode === "chips" && (
         <div className="flex flex-wrap gap-1.5">
           {suggested.map((t) => (
-            <button key={t.id} type="button" onClick={() => choose(t.id, t.name)} className={`chip ${topicId === t.id ? "chip-on" : ""}`}>
+            <button key={t.id} type="button" dir="auto" onClick={() => choose(t.id, t.name)} className={`chip !text-sm ${topicId === t.id ? "chip-on" : ""}`}>
               {t.name}
             </button>
           ))}
@@ -75,12 +79,30 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
         </div>
       )}
 
-      {input.schoolShared && input.schoolShared.length > 0 && (
-        <div className={`text-xs rounded-xl p-2 ${note === "No class / absent" ? "border border-warn bg-warn/10" : "bg-panel-2"}`}>
-          🏫 The school shared this week: {input.schoolShared.map((m) => `${m.title}${m.topics.length ? ` (${m.topics.join(", ")})` : ""}`).join("; ")}.
-          {note === "No class / absent" ? <b> You marked “no class”. If the class happened, pick the lesson instead. Your parents see the file and your log side by side, and your coach will ask about it.</b> : " Pick the lesson that matches, or say what really happened."}
-        </div>
-      )}
+      {input.schoolShared && input.schoolShared.length > 0 && (() => {
+        // Was every matching file joined into one sentence: thirteen documents and sixty-five topics under a
+        // single class, repeated for every class and every missed day. Deduped, capped, and laid out as rows.
+        const { chips, more } = sharedChips(input.schoolShared);
+        return (
+          <div className={`rounded-xl p-2.5 space-y-1.5 ${note === "No class / absent" ? "border border-warn bg-warn/10" : "bg-panel-2"}`}>
+            <div className="text-sm font-semibold">🏫 The school sent these</div>
+            <ul className="space-y-1">
+              {chips.map((c) => (
+                <li key={c.title} className="text-sm leading-snug">
+                  <span className="block">{c.title}</span>
+                  {c.hint.length > 0 && <span className="block text-xs muted">{c.hint.join(" · ")}</span>}
+                </li>
+              ))}
+            </ul>
+            {more > 0 && <div className="text-xs muted">and {more} more</div>}
+            <div className="text-sm">
+              {note === "No class / absent"
+                ? <b>You said “no class”. If you did have it, pick the lesson instead — your parents see the file and your log side by side.</b>
+                : "Pick the lesson that matches, or say what really happened."}
+            </div>
+          </div>
+        );
+      })()}
 
       {note && note !== "No class / absent" && (
         <div className="space-y-1.5">
@@ -154,11 +176,11 @@ export function LessonPicker({ fieldKey, input }: { fieldKey: string; input: Les
               {pending ? "Thinking…" : "Ask"}
             </button>
           </div>
-          {reply && <p className="text-sm">🤖 {reply}</p>}
+          {reply && <p className="text-sm" dir="auto">🤖 {reply}</p>}
           {guesses.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {guesses.map((g, i) => (
-                <button key={i} type="button" onClick={() => choose(g.topic_id, g.title)} className="chip" title={g.why}>
+                <button key={i} type="button" dir="auto" onClick={() => choose(g.topic_id, g.title)} className="chip !text-sm" title={g.why}>
                   {g.title}
                 </button>
               ))}

@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.32 — The check-in page a child can actually read (22 September 2026, `v2` branch)
+
+- **A twenty-six-line wall of grey text is gone.** "The school shared this week" joined every matching file into one run-on sentence — thirteen documents and sixty-five topics under a single class, repeated under every class and again under every missed day. It now shows the three newest sheets as rows, two short hints each, and says "and 2 more" rather than printing them.
+- **The same sheet sent twice is one sheet.** Titles are matched loosely — an en dash, a subtitle, a capital or a plural no longer makes a second document — so thirteen entries collapse to the five real ones. Two worksheets that only *look* alike are kept apart: "Story Settings Description" (a beach) and "Story Settings Description: Haunted House" are different sheets, and merging them would lose one.
+- **The Arabic classes no longer flip the whole card.** Religion and Social Studies set `rtl` on the entire card because their first topic was Arabic, which flipped the header too and rendered the English label as "?what was the lesson". The card stays left-to-right; each Arabic topic carries its own direction.
+- **Bigger text on the class cards** — the lesson chips and labels were 12px on a page a thirteen-year-old fills in after school.
+
 ## 2.1.0-beta.31 — "I don't get it — teach me again" (22 September 2026, `v2` branch)
 
 - **Every lesson now carries a way out of not understanding it.** The explain button only ever appeared where a lesson was *missing*; a child who read one and did not follow it had no button at all. Three ways now, in his words rather than a teacher's: **easier words**, **more examples**, **another way**.
