@@ -5,6 +5,10 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import type { CoachStats } from "@/lib/coach/analyze";
 import { learnerPromptLine } from "@/lib/learner";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const COACH_TOKENS = 12000;
 
 const Schema = z.object({
   headline: z.string().describe("One line for the parent's daily report, max 20 words, e.g. 'Omar: strong in Math, needs foundations in Arabic grammar'"),
@@ -59,13 +63,11 @@ export async function runCoach(stats: CoachStats): Promise<CoachOutput & { model
   const model = modelFor("coach-report");
   const stream = client.messages.stream({
     model,
-    max_tokens: 6000,
+    max_tokens: COACH_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: lines.join("\n") }],
     output_config: { format: zodOutputFormat(Schema), effort: "medium" },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The coach declined to write this analysis.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return { ...Schema.parse(JSON.parse(text)), model };
+  return { ...readStructured(message, Schema, "the coach's report", COACH_TOKENS), model };
 }

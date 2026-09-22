@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0-beta.29 — A reply that was cut off now says so (22 September 2026, `v2` branch)
+
+- **The nightly job's "Some steps reported errors" was one truncated reply.** A quiz was being written under a 12,000-token ceiling; it hit the ceiling, the JSON stopped mid-string, and the error stored was `Unterminated string in JSON at position 41055` — which names neither the cause nor the cure. `stop_reason` had said `max_tokens` all along and nothing looked at it.
+- **Every AI step now reads how the reply ended before trying to parse it.** Thirteen call sites shared the same shape: check for a refusal, then hand the text to `JSON.parse`. They now go through one helper that reports a cut-off reply as a cut-off reply, names the limit it hit and how much it used, and keeps that separate from a reply that finished and still was not valid.
+- **The ceilings were too low for the work.** The quiz step wrote under 12,000 tokens while being handed up to 20,000 characters of a school file to write from. Quiz, lesson and worksheet steps now write under 32,000, reading a file under 24,000. These are caps, not spend — a step that does not need the room does not use it.
+- **An empty reply says "the model returned nothing", not a parse error.**
+
 ## 2.1.0-beta.28 — The school's term against what is ready for it (22 September 2026, `v2` branch)
 
 - **New: a child page → 📎 school files now opens a comparison.** Every topic the school's files mention, matched against that child's own curriculum, in four answers: a lesson is ready, the school is teaching it and no lesson exists, it is not in the curriculum at all, or the curriculum holds it and no file has mentioned it yet.

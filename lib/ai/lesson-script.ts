@@ -5,6 +5,10 @@ import { effortFor, modelFor } from "./models";
 import type { Level } from "@/lib/levels";
 import { normaliseQuestions } from "./generate-quiz";
 import type { Character } from "@/lib/characters";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const SCRIPT_TOKENS = 32000;
 
 /** Scripts older than this are rewritten on the next start (illustrated scenes arrived in 2, spoken-word rules and tashkeel in 3). */
 export const SCRIPT_VERSION = 4;
@@ -107,15 +111,13 @@ export async function generateLessonScript(spec: LessonSpec): Promise<LessonScri
   ].filter(Boolean);
   const stream = client.messages.stream({
     model,
-    max_tokens: 20000,
+    max_tokens: SCRIPT_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: lines.join("\n") }],
     output_config: { format: zodOutputFormat(LessonScriptSchema), ...effortFor("lesson", "medium") },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to write this lesson.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  const raw = LessonScriptSchema.parse(JSON.parse(text));
+  const raw = readStructured(message, LessonScriptSchema, "the lesson", SCRIPT_TOKENS);
   // Repair four-choice rules on checks and quiz; drop a check that cannot be repaired.
   const beats = raw.beats
     .map((b) => (b.kind === "check" && b.check ? { ...b, check: normaliseQuestions([{ ...b.check, choices: b.check.choices }])[0] ?? null } : b))

@@ -3,6 +3,10 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { modelFor } from "./models";
 import { materialBlocks, type MaterialInput } from "./read-material";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const GRADES_TOKENS = 8000;
 
 const Item = z.object({
   subject: z.string(),
@@ -24,9 +28,7 @@ export async function readGrades(doc: MaterialInput, ctx: { studentFirstName: st
   const client = new Anthropic();
   const content: Anthropic.ContentBlockParam[] = materialBlocks(doc);
   content.push({ type: "text", text: `Student: ${ctx.studentFirstName}${ctx.grade ? `, grade ${ctx.grade}` : ""}. ${ctx.previousAverage !== null ? `Previous month's average: ${ctx.previousAverage}%.` : "No previous sheet on record."} Read the sheet.` });
-  const stream = client.messages.stream({ model: modelFor("read-material"), max_tokens: 4000, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content }], output_config: { format: zodOutputFormat(Schema) } });
+  const stream = client.messages.stream({ model: modelFor("read-material"), max_tokens: GRADES_TOKENS, system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }], messages: [{ role: "user", content }], output_config: { format: zodOutputFormat(Schema) } });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to read this sheet.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return Schema.parse(JSON.parse(text));
+  return readStructured(message, Schema, "these grades", GRADES_TOKENS);
 }

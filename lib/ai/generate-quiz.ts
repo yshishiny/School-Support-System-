@@ -3,6 +3,10 @@ import { LEVEL, type Level } from "@/lib/levels";
 import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const QUIZ_TOKENS = 32000;
 
 const QuestionSchema = z.object({
   prompt: z.string(),
@@ -108,15 +112,13 @@ export async function generateQuiz(spec: QuizSpec): Promise<GeneratedQuiz> {
 
   const stream = client.messages.stream({
     model: modelFor("quiz"),
-    max_tokens: 12000,
+    max_tokens: QUIZ_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: lines.join("\n") }],
     output_config: { format: zodOutputFormat(QuizSchema), ...effortFor("quiz", "medium") },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to generate this quiz.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  const raw = QuizSchema.parse(JSON.parse(text));
+  const raw = readStructured(message, QuizSchema, "this quiz", QUIZ_TOKENS);
   const quiz = { ...raw, questions: normaliseQuestions(raw.questions) };
   if (quiz.questions.length === 0) throw new Error("No questions were generated.");
   return quiz;
