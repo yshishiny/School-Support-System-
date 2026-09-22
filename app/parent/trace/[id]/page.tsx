@@ -2,6 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireParent } from "@/lib/auth";
 import { traceFor } from "@/lib/trace/load";
+import { dayFor } from "@/lib/day/load";
+import { setAssignmentStatusAction, signPaperAction } from "@/lib/actions/assignments";
+import { KIND_EMOJI } from "@/lib/types";
 import { markAllowancePaidAction } from "@/lib/actions/allowance";
 import { verdict } from "@/lib/trace";
 import { RATING_LABEL, type Dimension, type Rating } from "@/lib/evaluation";
@@ -113,9 +116,9 @@ function Section({ id, title, href, hint, children }: { id: string; title: strin
 export default async function ChildTracePage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const { family } = await requireParent();
-  const t = await traceFor(family, id);
-  if (!t) notFound();
   const today = todayIn(family.timezone);
+  const [t, day] = await Promise.all([traceFor(family, id), dayFor(id, family.id, today)]);
+  if (!t) notFound();
   const st = t.status;
   const ev = t.evaluation;
 
@@ -145,7 +148,69 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         </div>
       </header>
 
-      {/* ── The evaluation, before anything else ──────────────────────────── */}
+      {/* ── What he owes, before any judgement of him ─────────────────────────
+           A parent opens a child's page for one of two reasons: how is he doing, or what does he owe. The
+           second is the daily question and it used to sit four sections down, under the evaluation, the
+           academic summary, the grade sheet and the charts. It goes first now. */}
+      {day && (
+        <section className="card space-y-2 border-2 border-accent/50">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="h2 text-base min-w-0">📝 Homework and school work</h2>
+            <Link href={`/parent/day/${t.id}`} className="btn-ghost btn-sm shrink-0">📋 Today</Link>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5 text-xs">
+            {day.toSign.length > 0 && <span className="chip !border-accent text-accent-2">✍️ {day.toSign.length} to sign</span>}
+            <span className={`chip ${day.overdue.length ? "text-bad !border-bad/60" : "muted"}`}>⏰ {day.overdue.length} late</span>
+            <span className={`chip ${day.dueToday.length ? "text-warn" : "muted"}`}>📌 {day.dueToday.length} due today</span>
+            <span className="chip muted">🗓️ {day.comingUp.length} this week</span>
+            {day.undated.length > 0 && <span className="chip muted">❓ {day.undated.length} no date</span>}
+            {day.quizzesToday.length > 0 && <span className="chip text-warn">⚡ {day.quizzesToday.length} quiz today</span>}
+          </div>
+
+          {[...day.toSign, ...day.overdue, ...day.dueToday, ...day.comingUp, ...day.undated].length === 0 ? (
+            <p className="text-sm muted">Nothing open. Anything the school sends arrives here once its file is read.</p>
+          ) : (
+            <ul className="divide-y divide-line">
+              {[...day.toSign, ...day.overdue, ...day.dueToday, ...day.comingUp, ...day.undated].slice(0, 6).map((i) => {
+                const late = i.dueDate !== null && i.dueDate < today;
+                return (
+                  <li key={i.id} className="py-2 flex items-center gap-2">
+                    <span className="shrink-0">{KIND_EMOJI[i.kind] ?? "📌"}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm">{i.title}</span>
+                      <span className="block text-xs muted">
+                        {i.subject ?? "no subject"}
+                        {i.dueDate ? ` · due ${prettyDate(i.dueDate)}` : " · no date from school"}
+                        {late && <span className="text-bad"> · late</span>}
+                      </span>
+                    </span>
+                    {i.kind === "sign" ? (
+                      <form action={signPaperAction} className="shrink-0">
+                        <input type="hidden" name="id" value={i.id} />
+                        <button className="btn-primary btn-sm">Signed ✍️</button>
+                      </form>
+                    ) : (
+                      <form action={setAssignmentStatusAction} className="shrink-0">
+                        <input type="hidden" name="id" value={i.id} />
+                        <input type="hidden" name="status" value="done" />
+                        <button className="btn-ghost btn-sm">Done ✓</button>
+                      </form>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+          {[...day.toSign, ...day.overdue, ...day.dueToday, ...day.comingUp, ...day.undated].length > 6 && (
+            <Link href={`/parent/day/${t.id}`} className="btn-ghost btn-sm w-full justify-center">
+              All {[...day.toSign, ...day.overdue, ...day.dueToday, ...day.comingUp, ...day.undated].length} →
+            </Link>
+          )}
+        </section>
+      )}
+
+      {/* ── The evaluation, then the detail behind it ──────────────────────── */}
       <section className="card space-y-1">
         <div className="text-[10px] uppercase tracking-wide muted">How {t.name} is doing</div>
         <p className="text-sm font-medium pb-1">{ev.verdict}</p>
@@ -326,7 +391,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
       </Section>
 
       {/* ── The rest of his learning, each with its own door ──────────────── */}
-      <Section id="tasks" title="📝 Tasks and homework" href={`/parent/assignments?tab=${t.id}`} hint="set, chase, mark done">
+      <Section id="tasks" title="📝 Homework and tasks — all of them" href={`/parent/assignments?tab=${t.id}`} hint="set, chase, mark done">
         {t.tasks.open === 0 ? (
           <p className="text-sm muted">Nothing open.</p>
         ) : (
@@ -341,7 +406,9 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
                 <li key={k} className="py-1.5 flex items-baseline gap-2">
                   <span className="flex-1 min-w-0 truncate">{a.title}</span>
                   <span className="shrink-0 text-xs muted">{a.kind}</span>
-                  <span className={`shrink-0 text-xs tabular-nums ${a.due && a.due < today ? "text-bad" : "muted"}`}>{a.due ?? "no date"}</span>
+                  <span className={`shrink-0 text-xs ${a.due && a.due < today ? "text-bad" : "muted"}`}>
+                    {a.due ? prettyDate(a.due) : "no date"}{a.due && a.due < today ? " · late" : ""}
+                  </span>
                 </li>
               ))}
             </ul>
