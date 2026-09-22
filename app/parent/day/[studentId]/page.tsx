@@ -68,9 +68,9 @@ export default async function DayPage({ params }: { params: Promise<{ studentId:
         <Link href={`/parent/trace/${d.studentId}`} className="btn-ghost btn-sm shrink-0">Everything →</Link>
       </div>
 
-      <section className="card space-y-1">
+      <section className="card space-y-2">
         <p className="text-sm font-semibold">{firstLine(d, d.firstName)}</p>
-        <p className={`text-sm ${d.yesterdaySilent ? "muted" : ""}`}>
+        <p className={`text-sm border-t border-line pt-2 ${d.yesterdaySilent ? "muted" : ""}`}>
           <b>Yesterday ({prettyDate(d.yesterdayDate)}):</b> {yesterdayLine(d, d.firstName)}
         </p>
       </section>
