@@ -12,6 +12,9 @@ import { materialStages, nextStage } from "@/lib/materials/study";
 import { loadRevisions } from "@/lib/revision/run";
 import { Tabs } from "@/components/Tabs";
 import { Group, MoreList } from "@/components/MoreList";
+import { orderSheets, orderTasks, sheetAction, urgencyOf, whatNow, type Quiz as WQuiz, type Sheet as WSheet, type Task as WTask } from "@/lib/learn/workspace";
+import { setAssignmentStatusAction } from "@/lib/actions/assignments";
+import { CheckMyWorking } from "@/components/CheckMyWorking";
 import { Seated } from "@/components/Seated";
 import { hasCurriculum, topicsFor } from "@/lib/curriculum";
 import { MaterialUploader } from "@/components/MaterialUploader";
@@ -51,7 +54,7 @@ export default async function LearnPage() {
   const exams = examsFor(profile.target_exam, profile.grade);
   const examTracks = new Set(exams.map(trackFor));
 
-  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }] = await Promise.all([
+  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }, { data: myTasks }] = await Promise.all([
     curriculumTopics(profile),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
@@ -60,6 +63,7 @@ export default async function LearnPage() {
     supabase.from("materials").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }).limit(200),
     supabase.from("quizzes").select("material_id, title, attempts(submitted_at)").eq("student_id", profile.id).not("material_id", "is", null),
     supabase.from("subjects").select("name").eq("student_id", profile.id),
+    supabase.from("assignments").select("id, title, subject_name, due_date, kind").eq("student_id", profile.id).is("completed_at", null).neq("kind", "sign").limit(100),
   ]);
   const week = await weekTopicsFor(profile.id, profile.grade, family.timezone);
   const revisions = await loadRevisions([profile.id], 12).catch(() => []);
@@ -297,6 +301,153 @@ export default async function LearnPage() {
     </div>
   );
 
+  // ── What he actually has to do, in the order he would do it ─────────────────
+  // Learn used to open on six tabs and leave a child to assemble his evening out of them. His day starts with
+  // the school's sheets and what is owed on them; everything else here is reference.
+  const wTasks: WTask[] = ((myTasks ?? []) as { id: string; title: string; subject_name: string | null; due_date: string | null; kind: string }[])
+    .map((a) => ({ id: a.id, title: a.title, subject: a.subject_name, dueDate: a.due_date, kind: a.kind }));
+  const wSheets: WSheet[] = materials.filter((m) => m.status === "ready").map((m) => ({
+    id: m.id,
+    title: m.title,
+    subject: m.subject,
+    createdAt: m.created_at,
+    solvable: !!m.worksheet?.questions?.length,
+    sets: setsFor(m.id),
+    hasLesson: (m.topics?.length ?? 0) > 0,
+  }));
+  const wQuizzes: WQuiz[] = ((planned ?? []) as unknown as PlannedQuiz[])
+    .map((q) => ({ id: q.id, title: q.title, scheduledFor: q.scheduled_for, done: q.attempts.some((a) => a.submitted_at) }));
+  const now = whatNow(wTasks, wSheets, wQuizzes, today);
+  const orderedTasks = orderTasks(wTasks, today);
+  const quizzesToSit = wQuizzes.filter((q) => !q.done && q.scheduledFor !== null && q.scheduledFor <= today);
+
+  const myWork = (
+    <div className="space-y-3">
+      <section className="card !py-3 border-2 border-accent/50">
+        <div className="text-[11px] uppercase tracking-wide muted">Do this next</div>
+        <p className="text-base font-semibold leading-snug mt-0.5">{now.line}</p>
+      </section>
+
+      {orderedTasks.length > 0 && (
+        <section className="card space-y-1">
+          <h2 className="h2 text-base">📝 My homework <span className="muted font-normal text-sm">· {orderedTasks.length}</span></h2>
+          <MoreList show={4} noun="more" className="divide-y divide-line">
+            {orderedTasks.map((t) => {
+              const u = urgencyOf(t.dueDate, today);
+              return (
+                <div key={t.id} className="py-2 flex items-center gap-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm">{t.title}</span>
+                    <span className="block text-xs muted">
+                      {t.subject ?? "school"}
+                      {u === "late" ? <span className="text-bad"> · late</span>
+                        : u === "today" ? <span className="text-warn"> · due today</span>
+                        : t.dueDate ? ` · due ${prettyDate(t.dueDate)}` : " · no date given"}
+                    </span>
+                  </span>
+                  <form action={setAssignmentStatusAction} className="shrink-0">
+                    <input type="hidden" name="id" value={t.id} />
+                    <input type="hidden" name="status" value="done" />
+                    <button className="btn-ghost btn-sm">Done ✓</button>
+                  </form>
+                </div>
+              );
+            })}
+          </MoreList>
+        </section>
+      )}
+
+      {quizzesToSit.length > 0 && (
+        <section className="card space-y-1">
+          <h2 className="h2 text-base">⚡ Quizzes to sit <span className="muted font-normal text-sm">· {quizzesToSit.length}</span></h2>
+          <ul className="divide-y divide-line">
+            {quizzesToSit.map((q) => (
+              <li key={q.id} className="py-2 flex items-center gap-2">
+                <span className="flex-1 text-sm">{q.title}</span>
+                <Link href={`/quiz/${q.id}`} className="btn-primary btn-sm shrink-0">Start</Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section className="space-y-2">
+        <h2 className="h2 text-base px-1">📄 My sheets from school <span className="muted font-normal text-sm">· {wSheets.length}</span></h2>
+        {wSheets.length === 0 ? (
+          <p className="card text-sm muted">No sheets yet. When a parent adds a file from the class group it appears here, with a lesson and practice built from it.</p>
+        ) : (
+          <MoreList show={3} noun="more sheet" className="space-y-2">
+            {orderSheets(wSheets).map((m) => {
+              const act = sheetAction(m);
+              const full = materials.find((x) => x.id === m.id)!;
+              return (
+                <section key={m.id} className="card space-y-2">
+                  <div className="flex items-start gap-2">
+                    <span className="text-2xl shrink-0">{fileEmoji(full.mime)}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold leading-tight">{m.title}</div>
+                      <div className="text-xs muted">{m.subject ?? "school"} · {prettyDate(m.createdAt.slice(0, 10))}</div>
+                    </div>
+                    {materialUrls.get(m.id) && (
+                      <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm shrink-0">Open</a>
+                    )}
+                  </div>
+                  {full.summary && <p className="text-xs muted leading-snug">{full.summary.slice(0, 180)}</p>}
+                  <p className="text-[11px] muted">{act.hint}</p>
+                  {m.solvable
+                    ? <DoWorksheetButton materialId={m.id} questions={full.worksheet!.questions.length} attempts={worksheetDone(m.id)} />
+                    : <PractiseFromFile materialId={m.id} sets={m.sets} />}
+                  {/* The other half of finishing a sheet. Plenty of school work has to be written by hand, and
+                      until now there was nowhere to put it once it was done on paper. */}
+                  <details className="group">
+                    <summary className="btn-ghost btn-sm w-full justify-center cursor-pointer list-none">
+                      <span className="group-open:hidden">📷 I did it on paper — check it</span>
+                      <span className="hidden group-open:inline">Close</span>
+                    </summary>
+                    <div className="mt-2">
+                      <CheckMyWorking
+                        materialId={m.id}
+                        title="Photograph your answers"
+                        blurb={`${m.title} · Take a clear photo of the page you wrote. You will be told where it first goes wrong — not the answer.`}
+                      />
+                    </div>
+                  </details>
+                </section>
+              );
+            })}
+          </MoreList>
+        )}
+      </section>
+
+      <section className="card space-y-2">
+        <h2 className="h2 text-base">🎯 Want a better grade?</h2>
+        <p className="text-xs muted">
+          Homework gets you through the week; practice moves the grade. Eight fresh questions each time, aimed at
+          what you got wrong before.
+        </p>
+        {weakest.length > 0 ? (
+          <ul className="divide-y divide-line text-sm">
+            {weakest.slice(0, 3).map((t) => (
+              <li key={t.id} className="py-2 flex items-center gap-2">
+                <Link href={`/learn/topic/${t.id}`} className="flex-1 min-w-0 truncate hover:text-accent-2">
+                  {subjectEmoji(t.subject)} {t.name}
+                </Link>
+                <span className="badge text-warn text-xs shrink-0">{mastery.get(t.id)}%</span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm muted">Do a few sets and the weakest topics show up here to fix first.</p>
+        )}
+        {(dueCount ?? 0) > 0 && (
+          <Link href="/review" className="btn-ghost btn-sm w-full justify-center">
+            {dueCount} review{dueCount === 1 ? "" : "s"} waiting →
+          </Link>
+        )}
+      </section>
+    </div>
+  );
+
   const DAY = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const thisWeek = (
     <div className="space-y-3">
@@ -345,6 +496,7 @@ export default async function LearnPage() {
       <Tabs
         storageKey="learn"
         tabs={[
+          { id: "work", label: "My work", emoji: "🎒", badge: orderedTasks.length + quizzesToSit.length || null, content: myWork },
           { id: "week", label: "This week", emoji: "🗓️", badge: week.length || null, content: thisWeek },
           { id: "me", label: "For me", emoji: "⭐", badge: dueCount ?? 0, content: forMe },
           { id: "subjects", label: "Subjects", emoji: "📚", badge: null, content: subjects.length ? subjectTabs : <p className="card muted">No curriculum loaded for grade {profile.grade}.</p> },

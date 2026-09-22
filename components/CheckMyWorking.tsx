@@ -22,7 +22,16 @@ interface Result {
   hint: string;
 }
 
-export function CheckMyWorking({ topicId, topicName }: { topicId?: string; topicName?: string }) {
+export function CheckMyWorking({
+  topicId, topicName, materialId, title, blurb,
+}: {
+  topicId?: string;
+  topicName?: string;
+  /** A school sheet he did on paper. Its text is sent as context so the marking knows the questions. */
+  materialId?: string;
+  title?: string;
+  blurb?: string;
+}) {
   const [state, setState] = useState<"idle" | "reading" | "done">("idle");
   const [result, setResult] = useState<Result | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +44,7 @@ export function CheckMyWorking({ topicId, topicName }: { topicId?: string; topic
     const body = new FormData();
     body.set("photo", f);
     if (topicId) body.set("topic_id", topicId);
+    if (materialId) body.set("material_id", materialId);
     try {
       const res = await fetch("/api/working", { method: "POST", body });
       const j = (await res.json()) as Result & { error?: string };
@@ -57,9 +67,9 @@ export function CheckMyWorking({ topicId, topicName }: { topicId?: string; topic
       <div className="flex items-center gap-2">
         <span className="text-2xl">✍️</span>
         <div className="flex-1 min-w-0">
-          <div className="font-bold text-sm" style={{ fontFamily: "var(--font-display)" }}>Check my working</div>
+          <div className="font-bold text-sm" style={{ fontFamily: "var(--font-display)" }}>{title ?? "Check my working"}</div>
           <div className="text-xs muted">
-            {topicName ? `${topicName} · ` : ""}Photograph what you wrote. You will be told where it first goes wrong — not the answer.
+            {blurb ?? `${topicName ? `${topicName} · ` : ""}Photograph what you wrote. You will be told where it first goes wrong — not the answer.`}
           </div>
         </div>
       </div>

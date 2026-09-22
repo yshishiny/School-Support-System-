@@ -24,6 +24,7 @@ export async function POST(request: Request): Promise<Response> {
   if (!KINDS.has(photo.type)) return NextResponse.json({ error: "Take a photo, or choose a JPEG or PNG." }, { status: 400 });
 
   const topicId = String(form.get("topic_id") ?? "") || null;
+  const materialId = String(form.get("material_id") ?? "") || null;
   const question = String(form.get("question") ?? "").trim().slice(0, 500) || null;
 
   const admin = createAdminClient();
@@ -34,12 +35,25 @@ export async function POST(request: Request): Promise<Response> {
     subject = (t?.subject as string) ?? null;
     topicName = (t?.name as string) ?? null;
   }
+  // A photograph of a school sheet done on paper. The sheet's own text is the best possible context for
+  // marking it: without it the model is guessing at what the question even was.
+  let sheetContext: string | null = null;
+  if (materialId) {
+    const { data: m } = await admin
+      .from("materials").select("title, subject, digest").eq("id", materialId).eq("student_id", profile.id).maybeSingle();
+    const row = m as { title: string; subject: string | null; digest: string | null } | null;
+    if (row) {
+      subject = subject ?? row.subject;
+      topicName = topicName ?? row.title;
+      sheetContext = row.digest ? row.digest.slice(0, 4000) : null;
+    }
+  }
 
   try {
     const buf = Buffer.from(await photo.arrayBuffer());
     const result = await checkWorking(
       { media_type: photo.type as "image/jpeg" | "image/png" | "image/webp", data: buf.toString("base64") },
-      { subject, topic: topicName, grade: profile.grade, question },
+      { subject, topic: topicName, grade: profile.grade, question: question ?? (sheetContext ? `This is the worksheet he is answering:\n${sheetContext}` : null) },
     );
 
     // Kept whether he got it right or wrong: "he tried and it was fine" is as much a signal as "he is stuck".

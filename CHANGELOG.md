@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.33 — Learn opens on what he has to do (22 September 2026, `v2` branch)
+
+- **New first tab: 🎒 My work.** Learn opened on six tabs — This week, For me, Subjects, exams, Quran, Files — and left a child to assemble his evening out of them. It now opens on one line telling him what to start with, then his homework, the quizzes to sit, the sheets the school sent, and practice.
+- **The order is a claim, not a layout.** Late homework beats anything he could learn tonight; then what is due today; then a quiz that has a time and will not wait; then the newest sheet from school; and practice last — always offered, never urgent, because it is the route to a better grade rather than a rescue.
+- **Every sheet now has two ways to finish it.** Answer it in the app where the questions have been transcribed, or **do it on paper and photograph it** — plenty of school work has to be handwritten, and until now there was nowhere to put it once it was done. The marking is given the sheet's own text, so it knows what the questions were instead of guessing.
+- **It says where the working first goes wrong, not the answer.** The next try is still his.
+- **Undated work is never called late**, and reviews are shown as a standing count rather than another thing shouting for tonight.
+
 ## 2.1.0-beta.32 — The check-in page a child can actually read (22 September 2026, `v2` branch)
 
 - **A twenty-six-line wall of grey text is gone.** "The school shared this week" joined every matching file into one run-on sentence — thirteen documents and sixty-five topics under a single class, repeated under every class and again under every missed day. It now shows the three newest sheets as rows, two short hints each, and says "and 2 more" rather than printing them.
