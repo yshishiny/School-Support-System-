@@ -360,7 +360,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
         </p>
       </Section>
 
-      <Section id="files" title="📎 Extra practice from school files" href={`/parent/materials?tab=${t.id}`} hint="what the school sent, turned into sets">
+      <Section id="files" title="📎 Extra practice from school files" href={`/parent/gap/${t.id}`} hint="what the school sent, against what is ready for it">
         <p className="text-sm">{st.results.find((r) => r.code === "materials")?.detail ?? "no file deadlines yet"}</p>
         <p className="text-xs muted">Each file the school shares becomes practice: a first set within 3 days, a second by day 7, a third by day 14.</p>
       </Section>

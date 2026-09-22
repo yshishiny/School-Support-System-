@@ -77,29 +77,42 @@ export async function knownMaterialsAction(shas: string[]): Promise<KnownFile[]>
  * Hashes a few of the family's older files, so duplicate detection also covers everything uploaded before the
  * hash existed.
  *
- * Bounded and lazy on purpose: it runs during the check the uploader already waits on, does a handful at a
- * time, and a failure is swallowed — not being able to hash an old file is never a reason to stop a parent
- * uploading a new one.
+ * Bounded and lazy on purpose: it runs during the check the uploader already waits on and a failure is
+ * swallowed — not being able to hash an old file is never a reason to stop a parent uploading a new one.
+ *
+ * **Newest first.** The first version of this took ten rows in whatever order the database returned them, and
+ * spent all ten on a sibling's files and a week-old batch — leaving the eleven files uploaded an hour earlier
+ * unhashed, which is precisely the set about to be sent again. Exactly one of them had been hashed, and
+ * exactly that one was correctly skipped while the other ten went through. A file uploaded recently is the one
+ * most likely to be uploaded again.
  */
+const BACKFILL_BATCH = 12;
+const BACKFILL_ROUNDS = 5;
+
 async function backfillHashes(familyId: string): Promise<void> {
   try {
     const admin = createAdminClient();
-    const { data } = await admin
-      .from("materials")
-      .select("id, path")
-      .eq("family_id", familyId)
-      .is("content_sha256", null)
-      .limit(10);
-    const rows = (data ?? []) as { id: string; path: string }[];
-    if (rows.length === 0) return;
+    for (let round = 0; round < BACKFILL_ROUNDS; round += 1) {
+      const { data } = await admin
+        .from("materials")
+        .select("id, path")
+        .eq("family_id", familyId)
+        .is("content_sha256", null)
+        .order("created_at", { ascending: false })
+        .limit(BACKFILL_BATCH);
+      const rows = (data ?? []) as { id: string; path: string }[];
+      if (rows.length === 0) return;
 
-    await Promise.all(rows.map(async (m) => {
-      const { data: blob } = await admin.storage.from("materials").download(m.path);
-      if (!blob) return;
-      const digest = await crypto.subtle.digest("SHA-256", await blob.arrayBuffer());
-      const sha = [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-      await admin.from("materials").update({ content_sha256: sha }).eq("id", m.id);
-    }));
+      await Promise.all(rows.map(async (m) => {
+        const { data: blob } = await admin.storage.from("materials").download(m.path);
+        // A row whose file is gone would otherwise be picked again every round, and the loop would spin.
+        const sha = blob
+          ? [...new Uint8Array(await crypto.subtle.digest("SHA-256", await blob.arrayBuffer()))].map((b) => b.toString(16).padStart(2, "0")).join("")
+          : "";
+        await admin.from("materials").update({ content_sha256: sha || "missing" }).eq("id", m.id);
+      }));
+      if (rows.length < BACKFILL_BATCH) return;
+    }
   } catch (err) {
     await logError("materials.backfillHashes", err);
   }

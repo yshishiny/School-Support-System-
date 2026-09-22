@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.21.0 — The school's term against what is ready for it (22 September 2026)
+
+- **New: a child page → 📎 school files now opens a comparison.** Every topic the school's files mention, matched against that child's own curriculum, in four answers: a lesson is ready, the school is teaching it and no lesson exists, it is not in the curriculum at all, or the curriculum holds it and no file has mentioned it yet.
+- **Matched on shared words, not by a model.** Instant, free, and every pairing can be read and argued with. A pairing it is not sure of is never counted as covered: run over the real files, a half-overlap paired "mood and atmosphere" with "Verb mood and shifts" and "Kinetic energy" with "Conservation of energy" — three wrong for one right. A wrong pairing marks a gap as filled, which is the one mistake this page exists to avoid.
+- **It names which topic set a child is being measured against**, and what else exists at that grade with how many lessons written against it. A lesson written against a set the child is not on never reaches that child, and nothing said so before.
+- **The duplicate check missed the files that mattered.** The hash backfill took twelve rows in whatever order the database returned them and spent them on a sibling's files, leaving the batch uploaded an hour earlier unhashed — the exact set about to be sent again. One of the eleven had been hashed and that one was correctly skipped; the other ten went through. It now works newest-first, which is the order a file is likely to be re-sent in.
+
 ## 2.20.0 — Six files chosen, five uploaded, nobody told (22 September 2026)
 
 - **The uploader silently threw away everything past the fifth file.** Six were chosen for Omar; the sixth was discarded before a byte moved and the button then read "5 files chosen". The cap is now 20, and whatever the cap is, every file it will not take is named on screen.
