@@ -23,7 +23,7 @@ export async function extractItemsFromImages(images: ImageInput[], today: string
   const client = new Anthropic();
   const stream = client.messages.stream({
     model: modelFor("extract"),
-    max_tokens: 16000,
+    max_tokens: 24000,
     system: [{ type: "text", text: ITEMS_SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [
       {

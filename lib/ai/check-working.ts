@@ -3,6 +3,10 @@ import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { modelFor } from "./models";
 import { materialBlocks, type MaterialInput } from "./read-material";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const WORKING_TOKENS = 8000;
 
 /**
  * Reading a child's handwritten working and finding the first line that is wrong.
@@ -64,13 +68,11 @@ export async function checkWorking(
 
   const stream = client.messages.stream({
     model,
-    max_tokens: 4000,
+    max_tokens: WORKING_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content }],
     output_config: { format: zodOutputFormat(Schema) },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to read this photograph.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return { ...(Schema.parse(JSON.parse(text))), model: message.model };
+  return { ...readStructured(message, Schema, "the check of this working", WORKING_TOKENS), model: message.model };
 }

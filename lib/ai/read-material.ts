@@ -3,6 +3,10 @@ import { modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { ExtractedItemSchema, type ExtractedItem } from "./extract-items";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const READ_TOKENS = 24000;
 
 export type MaterialInput = { media_type: "application/pdf" | "image/jpeg" | "image/png" | "image/webp"; data: string } | { media_type: "text/plain"; text: string; name?: string };
 
@@ -103,13 +107,11 @@ export async function readMaterial(doc: MaterialInput, ctx: { today: string; sub
   const content: Anthropic.ContentBlockParam[] = materialBlocks(doc, lines.join("\n"));
   const stream = client.messages.stream({
     model: modelFor("read-material"),
-    max_tokens: 12000,
+    max_tokens: READ_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content }],
     output_config: { format: zodOutputFormat(MaterialSchema) },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to read this file.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return normaliseReading(MaterialSchema.parse(JSON.parse(text)));
+  return normaliseReading(readStructured(message, MaterialSchema, "this file's summary", READ_TOKENS));
 }

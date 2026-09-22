@@ -2,6 +2,10 @@ import Anthropic from "@anthropic-ai/sdk";
 import { effortFor, modelFor } from "./models";
 import { z } from "zod";
 import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const ARCHIVE_TOKENS = 8000;
 
 const Schema = z.object({
   summary_md: z.string().describe("Markdown, 150-300 words, for the parent: how this group works"),
@@ -24,13 +28,11 @@ export async function learnArchiveConventions(sample: string, statsLine: string)
   const client = new Anthropic();
   const stream = client.messages.stream({
     model: modelFor("archive"),
-    max_tokens: 4000,
+    max_tokens: ARCHIVE_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: `${statsLine}\n\nSample of the chat (attachments marked as <kind: file>):\n\n${sample}` }],
     output_config: { format: zodOutputFormat(Schema), ...effortFor("archive", "medium") },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to read this archive.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  return Schema.parse(JSON.parse(text));
+  return readStructured(message, Schema, "these insights", ARCHIVE_TOKENS);
 }

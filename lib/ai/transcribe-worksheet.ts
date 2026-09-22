@@ -4,6 +4,10 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 import { modelFor } from "./models";
 import { normaliseQuestions } from "./generate-quiz";
 import { materialBlocks, type MaterialInput } from "./read-material";
+import { readStructured } from "./finish";
+
+/** The ceiling this step writes under, named so the failure can say which limit it hit. */
+const SHEET_TOKENS = 32000;
 
 const QuestionSchema = z.object({
   prompt: z.string().describe("The question exactly as written on the sheet (fix only obvious typos). Keep the sheet's number at the start, e.g. '12. …'"),
@@ -38,15 +42,13 @@ export async function transcribeWorksheet(doc: MaterialInput, ctx: { title: stri
   content.push({ type: "text", text: `Worksheet: ${ctx.title}${ctx.subject ? ` (${ctx.subject})` : ""}${ctx.grade ? `, grade ${ctx.grade}` : ""}. Transcribe it into practice questions.` });
   const stream = client.messages.stream({
     model,
-    max_tokens: 32000,
+    max_tokens: SHEET_TOKENS,
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content }],
     output_config: { format: zodOutputFormat(Schema) },
   });
   const message = await stream.finalMessage();
-  if (message.stop_reason === "refusal") throw new Error("The model declined to read this sheet.");
-  const text = message.content.filter((b): b is Anthropic.TextBlock => b.type === "text").map((b) => b.text).join("");
-  const raw = Schema.parse(JSON.parse(text));
+  const raw = readStructured(message, Schema, "this worksheet", SHEET_TOKENS);
   const questions = normaliseQuestions(raw.questions);
   return { ...raw, questions, skipped: raw.skipped + (raw.questions.length - questions.length), model };
 }

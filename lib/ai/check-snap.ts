@@ -78,7 +78,7 @@ export async function checkSnap(image: ImageInput, task: { kind: SnapKind; label
   ].filter(Boolean);
   const stream = client.messages.stream({
     model: modelFor("snap"),
-    max_tokens: 2000,
+    max_tokens: 4000,
     system: [{ type: "text", text: task.kind === "handwriting" ? HANDWRITING_SYSTEM : SYSTEM, cache_control: { type: "ephemeral" } }],
     messages: [{ role: "user", content: [{ type: "image", source: { type: "base64", media_type: image.media_type, data: image.data } }, { type: "text", text: lines.join("\n") }] }],
     output_config: { format: zodOutputFormat(schema) },
