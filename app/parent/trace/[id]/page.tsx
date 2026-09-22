@@ -395,6 +395,7 @@ export default async function ChildTracePage({ params }: { params: Promise<{ id:
 
       <Section id="coach" title="🦸 Coach">
         <div className="flex items-center justify-end gap-2 -mt-1">
+          <Link href={`/parent/day/${t.id}`} className="text-xs muted underline" title="Yesterday, today, and what needs you">Today &amp; yesterday</Link>
           <Link href={`/parent/clinician/${t.id}`} className="text-xs muted underline" title="Summary for a psychiatrist or psychologist">For a professional</Link>
           <CoachButton studentId={t.id} hasReport={!!t.learning.coach} />
         </div>

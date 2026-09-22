@@ -1,5 +1,6 @@
 export type UserRole = "parent" | "student";
-export type AssignmentKind = "homework" | "quiz" | "exam" | "project" | "event" | "note";
+/** "sign" is a paper the PARENT must sign and return; a child cannot clear it by doing anything. */
+export type AssignmentKind = "homework" | "quiz" | "exam" | "project" | "event" | "note" | "sign";
 export type AssignmentSource = "manual" | "whatsapp" | "student";
 export type AssignmentStatus = "open" | "done" | "missed";
 export type ItemStatus = "done" | "partial" | "not_done";
@@ -100,6 +101,8 @@ export interface Assignment {
   title: string;
   details: string | null;
   due_date: string | null;
+  signed_at?: string | null;
+  signed_by?: string | null;
   source: AssignmentSource;
   source_excerpt: string | null;
   status: AssignmentStatus;
@@ -193,6 +196,7 @@ export const KIND_LABEL: Record<AssignmentKind, string> = {
   project: "Project",
   event: "Event",
   note: "Note",
+  sign: "To sign",
 };
 
 export const KIND_EMOJI: Record<AssignmentKind, string> = {
@@ -202,6 +206,7 @@ export const KIND_EMOJI: Record<AssignmentKind, string> = {
   project: "🧩",
   event: "📅",
   note: "📌",
+  sign: "✍️",
 };
 
 export type LearningTrack = "school" | "act" | "sat";

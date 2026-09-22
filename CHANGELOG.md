@@ -1,5 +1,13 @@
 # Changelog
 
+## 2.1.0-beta.30 — The five questions a parent asks every evening (22 September 2026, `v2` branch)
+
+- **New: 📋 Today, on each child** — from the parent home or the child's page. What he did yesterday, what is past due, what is due today, what is coming this week, what quizzes are booked, and what the school gave no date for. One page, no guessing between four screens.
+- **Papers to sign now exist.** Consent slips, trip forms, a test paper to be signed and returned — none of these were modelled. The file reader could only file them as "note", where they sat among a child's reminders and nobody was ever told a signature was owed. They are their own kind now, they lead the page, and a child can never clear one: signing is recorded apart from completing, with **which parent signed it**.
+- **The reader recognises them by what they say** — "please sign and return", "parent/guardian signature", "توقيع ولي الأمر" — so they arrive on their own from the next file onward.
+- **A blank yesterday says the app was not told**, not that the child did nothing. Those are different claims and only one of them is honest.
+- **Work the school gave no date for is listed, not dropped, and never called late.** It cannot be overdue, and it is the easiest thing in the house to forget.
+
 ## 2.1.0-beta.29 — A reply that was cut off now says so (22 September 2026, `v2` branch)
 
 - **The nightly job's "Some steps reported errors" was one truncated reply.** A quiz was being written under a 12,000-token ceiling; it hit the ceiling, the JSON stopped mid-string, and the error stored was `Unterminated string in JSON at position 41055` — which names neither the cause nor the cure. `stop_reason` had said `max_tokens` all along and nothing looked at it.
