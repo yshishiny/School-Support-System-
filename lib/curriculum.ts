@@ -102,6 +102,42 @@ export async function topicsFor(l: Learner, subject?: string): Promise<Topic[]> 
   }, []);
 }
 
+/**
+ * Who a child is, read off his profile row.
+ *
+ * Every page that needs topics needs these same three fields, and every page was assembling them by hand.
+ */
+export function learnerOf(p: { grade?: number | null; curriculum_id?: string | null; stream?: string | null }): Learner {
+  return { curriculumId: p.curriculum_id ?? null, grade: p.grade ?? null, stream: p.stream ?? null };
+}
+
+/**
+ * The school topics to put in front of one child — the query every page outside the curriculum browser wants.
+ *
+ * These pages all used to ask for "track = school and grade = his", which was the right question while there
+ * was one syllabus in the table. There are three now, and the grade number is the one thing they have in
+ * common: a grade-8 child was being offered 229 topics across fourteen subjects — his own eight, plus six more
+ * from the Egyptian national syllabus he does not study. It showed up as a lesson picker nobody could use and
+ * a subject list that did not match his timetable.
+ *
+ * A child nobody has set a curriculum for still gets the old answer. An over-long picker is a nuisance; an
+ * empty one stops him logging the lesson he just had.
+ */
+export async function schoolTopicsFor(l: Learner): Promise<Topic[]> {
+  if (hasCurriculum(l)) return topicsFor(l);
+  return attempt("curriculum.school-topics", async () => {
+    const admin = createAdminClient();
+    const { data } = await admin
+      .from("topics")
+      .select("*")
+      .eq("track", "school")
+      .eq("grade", l.grade ?? 0)
+      .order("subject")
+      .order("sort");
+    return (data ?? []) as Topic[];
+  }, []);
+}
+
 /** The streams offered in one grade, for the picker. Empty means the grade is not streamed. */
 export function streamsIn(levels: Level[], grade: number): Level[] {
   return levels.filter((l) => l.grade === grade && l.stream);

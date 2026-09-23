@@ -16,7 +16,7 @@ import { orderSheets, orderTasks, sheetAction, urgencyOf, whatNow, type Quiz as 
 import { setAssignmentStatusAction } from "@/lib/actions/assignments";
 import { CheckMyWorking } from "@/components/CheckMyWorking";
 import { Seated } from "@/components/Seated";
-import { hasCurriculum, topicsFor } from "@/lib/curriculum";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
 import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
@@ -30,21 +30,25 @@ export const maxDuration = 300;
 
 
 /**
- * This child's topics.
+ * This child's topics: his year's syllabus, plus the exam tracks he is preparing for.
  *
- * When a parent has said which curriculum he follows, that is the answer and it is exact — his year, his stream,
- * his subjects. Until then it falls back to what this page always did: everything tagged with his grade number,
- * plus the exam tracks. The fallback is why a child on grade 9 used to see an empty page, and it stays only for
- * the children nobody has set yet.
+ * The exam half used to be lost the moment a parent set a curriculum. The curriculum branch returned and the
+ * SAT and ACT rows — which belong to no curriculum, because they belong to no school year — never came back,
+ * so a grade-10 child silently stopped seeing the exam he is sitting. They are fetched by track instead, which
+ * is what they are keyed by.
  */
-async function curriculumTopics(profile: { id: string; grade: number | null; curriculum_id?: string | null; stream?: string | null }) {
-  const learner = { curriculumId: profile.curriculum_id ?? null, grade: profile.grade ?? null, stream: profile.stream ?? null };
-  if (hasCurriculum(learner)) {
-    const mine = await topicsFor(learner);
-    if (mine.length > 0) return { data: mine };
-  }
+async function curriculumTopics(
+  profile: { id: string; grade: number | null; curriculum_id?: string | null; stream?: string | null },
+  examTracks: Set<"act" | "sat">,
+): Promise<Topic[]> {
   const supabase = await createClient();
-  return supabase.from("topics").select("*").or(`grade.eq.${profile.grade ?? 0},track.eq.act,track.eq.sat`).order("subject").order("sort");
+  const [school, exam] = await Promise.all([
+    schoolTopicsFor(learnerOf(profile)),
+    examTracks.size === 0
+      ? Promise.resolve({ data: [] as Topic[] })
+      : supabase.from("topics").select("*").in("track", [...examTracks]).order("subject").order("sort"),
+  ]);
+  return [...school, ...((exam.data ?? []) as Topic[])];
 }
 
 export default async function LearnPage() {
@@ -54,8 +58,8 @@ export default async function LearnPage() {
   const exams = examsFor(profile.target_exam, profile.grade);
   const examTracks = new Set(exams.map(trackFor));
 
-  const [{ data: topics }, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }, { data: myTasks }] = await Promise.all([
-    curriculumTopics(profile),
+  const [topics, { data: attempts }, { count: dueCount }, { count: memorizeCount }, { data: planned }, { data: materialRows }, { data: materialQuizzes }, { data: mySubjects }, { data: myTasks }] = await Promise.all([
+    curriculumTopics(profile, examTracks),
     supabase.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", profile.id).not("submitted_at", "is", null),
     supabase.from("review_queue").select("id", { count: "exact", head: true }).eq("student_id", profile.id).lte("due_date", today),
     supabase.from("memorize_items").select("id", { count: "exact", head: true }).eq("student_id", profile.id),
@@ -75,7 +79,7 @@ export default async function LearnPage() {
   const setsFor = (id: string) => mq.filter((q) => q.material_id === id && !q.title.startsWith("Worksheet:")).length;
   const attemptDatesFor = (id: string) => mq.filter((q) => q.material_id === id).flatMap((q) => q.attempts.filter((a) => a.submitted_at).map((a) => a.submitted_at!.slice(0, 10)));
   const worksheetDone = (id: string) => mq.filter((q) => q.material_id === id && q.title.startsWith("Worksheet:") && q.attempts.some((a) => a.submitted_at)).length;
-  const all = (topics ?? []) as Topic[];
+  const all = topics ?? [];
   const school = all.filter((t) => t.track === "school");
   const examTopics = all.filter((t) => examTracks.has(t.track as "act" | "sat"));
   const { topic: mastery, section: sectionMastery } = masteryMaps((attempts ?? []) as AttemptWithQuiz[]);

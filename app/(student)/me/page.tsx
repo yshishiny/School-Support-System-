@@ -28,6 +28,7 @@ import { Tabs } from "@/components/Tabs";
 import { Seated } from "@/components/Seated";
 import { signSnapUrls } from "@/lib/snaps/server";
 import { prettyDate, shiftDate } from "@/lib/dates";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 
 export default async function MePage() {
   const { profile, family } = await requireStudent();
@@ -41,7 +42,7 @@ export default async function MePage() {
   ]);
   const [{ data: checkins }, { data: topics }, { data: heroRows }] = await Promise.all([
     supabase.from("checkins").select("*").eq("student_id", profile.id).order("checkin_date", { ascending: false }).limit(14),
-    supabase.from("topics").select("subject").eq("track", "school").eq("grade", profile.grade ?? 0),
+    schoolTopicsFor(learnerOf(profile)).then((data) => ({ data })),
     supabase.from("hero_images").select("*").eq("student_id", profile.id).order("created_at", { ascending: false }),
   ]);
   type SibSnap = { id: string; student_id: string; task_code: string; kind: string; path: string; taken_on: string; ai_verdict: string | null; ai_note: string | null; created_at: string };

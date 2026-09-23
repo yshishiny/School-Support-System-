@@ -7,6 +7,7 @@ import { guessLesson, type LessonGuess } from "@/lib/ai/guess-lesson";
 import { curriculumSubject } from "@/lib/plan";
 import { shiftDate, todayIn } from "@/lib/dates";
 import type { Topic } from "@/lib/types";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 
 /** The kid types a vague hint about a class; Claude guesses the lesson from the curriculum and recent notes. */
 export async function guessLessonAction(subject: string, hint: string): Promise<LessonGuess | { error: string }> {
@@ -16,8 +17,7 @@ export async function guessLessonAction(subject: string, hint: string): Promise<
   if (!process.env.ANTHROPIC_API_KEY) return { error: "The helper is not configured on the server." };
   const admin = createAdminClient();
   const today = todayIn(family.timezone);
-  const { data: topics } = await admin.from("topics").select("*").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort");
-  const all = (topics ?? []) as Topic[];
+  const all = await schoolTopicsFor(learnerOf(profile));
   const mapped = curriculumSubject(subject, [...new Set(all.map((t) => t.subject))]);
   const list = all.filter((t) => t.subject === mapped);
   const { data: logs } = await admin

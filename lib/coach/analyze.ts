@@ -7,6 +7,7 @@ import { shiftDate, todayIn } from "@/lib/dates";
 import { computeStreak } from "@/lib/points";
 import { subjectLabel } from "@/lib/plan";
 import type { Profile, Topic } from "@/lib/types";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 
 export interface SubjectStat {
   subject: string;
@@ -59,7 +60,7 @@ export async function collectCoachStats(studentId: string, days = 14): Promise<C
   const periodStart = shiftDate(today, -days);
 
   const [{ data: topics }, { data: attempts }, { data: logs }, { data: checkins }, { data: prayers }, { data: planned }, { data: wellbeing }, { data: privateNotes }] = await Promise.all([
-    admin.from("topics").select("*").eq("track", "school").eq("grade", p.grade ?? 0),
+    schoolTopicsFor(learnerOf(p)).then((data) => ({ data })),
     admin.from("attempts").select("score, total, submitted_at, flagged, quizzes(topic_id, act_section, track, scheduled_for, plan_slot)").eq("student_id", studentId).not("submitted_at", "is", null).gte("submitted_at", periodStart),
     admin.from("lesson_logs").select("subject_name, note, topic_id").eq("student_id", studentId).gte("log_date", periodStart),
     admin.from("checkins").select("checkin_date, minutes_studied, stuck_on").eq("student_id", studentId).gte("checkin_date", periodStart),

@@ -8,6 +8,7 @@ import type { Profile, Topic } from "@/lib/types";
 import { themeById } from "@/lib/themes";
 import { learnerPromptLine } from "@/lib/learner";
 import type { Level } from "@/lib/plan";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 
 const SCHOOL_SET_SIZE = 8;
 
@@ -44,7 +45,7 @@ export async function loadPlan(studentId: string): Promise<PlanOverview> {
 
   const [{ data: timetable }, { data: topics }, { data: attempts }, { data: quizzes }, { data: covered }, { data: flags }, { data: coach }] = await Promise.all([
     admin.from("timetable_entries").select("weekday, subject_name").eq("student_id", studentId).order("weekday").order("start_time"),
-    admin.from("topics").select("*").eq("track", "school").eq("grade", p.grade ?? 0).order("subject").order("sort"),
+    schoolTopicsFor(learnerOf(p)).then((data) => ({ data })),
     admin.from("attempts").select("*, quizzes(topic_id, act_section, track, title)").eq("student_id", studentId).not("submitted_at", "is", null),
     admin
       .from("quizzes")
