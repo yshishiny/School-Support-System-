@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.0-beta.34 — The children get their own syllabus back (23 September 2026, `v2` branch)
+
+- **Every lesson in the app had become unreachable.** The curriculum catalogue was added after the app already had topics, so the 160 topics the school's own work hangs off were never tagged with a curriculum. Once both boys were set to the American curriculum the app started answering with the seeded Common Core list instead — and that list has never had a single lesson against it. 27 lessons, 13 scripts, 29 media sets and 59 quizzes were sitting on topics no child could open.
+- **The school's topics are now the American curriculum's topics.** They keep their own ids, so not one lesson, quiz or media set was re-pointed and none could land on the wrong topic. Where the seeded list said the same thing in finer words — three Common Core lines for what the school teaches as one — the seeded line was dropped; where it covered ground the school's list does not reach, it stayed.
+- **Arabic, Arabic Social Studies and Religion are subjects now, not strays.** An American-diploma school in Egypt still teaches all three to the national syllabus, and grade 10 takes Biology and Physics where Common Core has only Chemistry. The catalogue was missing five subjects the children actually sit.
+- **Youssef's subject list went from 16 to 11, Omar's from 9 to 8.** The Egyptian national syllabus was bleeding into every page that asked for topics "by grade" — Youssef was being offered 311 topics across sixteen subjects, half of them from a syllabus he does not study. Eight pages asked that question; they now ask for his curriculum.
+- **Setting a curriculum no longer hides the exam he is sitting.** SAT and ACT topics belong to no school year, so the curriculum query dropped them — a grade-10 child silently lost his exam prep the moment a parent filled in the curriculum field.
+- **This term's syllabus sorts above the catalogue**, rather than making a child scroll past twenty-seven headings he has never been taught to reach the ten his teacher set.
+- **One thing the word matcher got wrong is worth naming:** it scored "World War I" against "The Second World War" at a perfect 1.00, because it drops one-character tokens and the roman numeral is the entire difference between the two wars. Reading the pairs caught it; no threshold would have. Every row this migration touched is copied to a backup table first.
+
 ## 2.1.0-beta.33 — Learn opens on what he has to do (22 September 2026, `v2` branch)
 
 - **New first tab: 🎒 My work.** Learn opened on six tabs — This week, For me, Subjects, exams, Quran, Files — and left a child to assemble his evening out of them. It now opens on one line telling him what to start with, then his homework, the quizzes to sit, the sheets the school sent, and practice.

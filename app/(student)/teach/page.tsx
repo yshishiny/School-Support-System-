@@ -13,6 +13,7 @@ import { isSchoolStage } from "@/lib/allowance";
 import { loadAccess } from "@/lib/access/store";
 import { UpgradeCard } from "@/components/UpgradeCard";
 import type { Topic } from "@/lib/types";
+import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 
 export const maxDuration = 300;
 
@@ -28,7 +29,7 @@ export default async function TeachPage() {
   const access = await loadAccess(family.id).catch(() => null);
   const unlocked = await deepUnlocked(profile.id, family.id);
   const [{ data: topics }, { data: logs }, { data: materials }, { data: sessions }] = await Promise.all([
-    supabase.from("topics").select("*").eq("track", "school").eq("grade", profile.grade ?? 0).order("subject").order("sort"),
+    schoolTopicsFor(learnerOf(profile)).then((data) => ({ data })),
     supabase.from("lesson_logs").select("subject_name, topic_id, note, log_date").eq("student_id", profile.id).gte("log_date", shiftDate(today, -7)).order("log_date", { ascending: false }),
     supabase.from("materials").select("id, title, subject, status").eq("student_id", profile.id).eq("status", "ready").order("created_at", { ascending: false }).limit(12),
     supabase.from("lesson_sessions").select("id, started_at, finished_at, understanding, lesson_scripts(title)").eq("student_id", profile.id).order("started_at", { ascending: false }).limit(8),
