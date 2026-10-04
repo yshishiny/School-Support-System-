@@ -9,6 +9,7 @@ import { notifyParents } from "@/lib/notify";
 import { checkDueSources } from "@/lib/sources/check";
 import { loadSnapTasks, pruneOldSnaps } from "@/lib/snaps/server";
 import { retryFailedMaterials } from "@/lib/materials/retry";
+import { transcribePendingWorksheets } from "@/lib/materials/worksheet";
 import { runWeeklyCheckpoints } from "@/lib/checkpoint/build";
 import { prepareWeekMaterial } from "@/lib/learning/resources";
 import { releaseStuckVisuals, warmLessonScripts } from "@/lib/teach/warm";
@@ -170,6 +171,17 @@ export async function GET(request: Request) {
       if (r.length) results.materials = r;
     } catch (err) {
       results.materials = [`retry error: ${err instanceof Error ? err.message : String(err)}`];
+    }
+  }
+  // Sheets with questions on them that are still not answerable: the uploader fires these off itself, so this
+  // is for the ones it never got to — a closed tab, a dropped connection, a model that was busy — and for the
+  // backlog that built up while transcribing was something a person had to remember to do.
+  if (Date.now() - started < TIME_BUDGET_MS) {
+    try {
+      const r = await transcribePendingWorksheets();
+      if (r.length) results.worksheets = r;
+    } catch (err) {
+      results.worksheets = [`transcribe error: ${err instanceof Error ? err.message : String(err)}`];
     }
   }
   // Shared chores: hand the turn to the next child when a turn ends, so every version of the app sees the same owner.

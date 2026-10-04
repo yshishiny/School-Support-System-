@@ -32,6 +32,8 @@ const MaterialSchema = z.object({
   summary: z.string().describe("Two or three sentences for the parent: what this file is and what the student is expected to do with it"),
   topics: z.array(z.string()).describe("The specific topics or skills the file covers, in the file's language; at most 12, most important first"),
   digest: z.string().describe("A compact study version of the content (max ~1500 words): key definitions, rules, worked examples, and the kinds of questions asked. Faithful to the file; no invention. Written so practice questions can be generated from it."),
+  has_questions: z.boolean().describe("true when the file itself contains questions or exercises the student is meant to answer — numbered questions, multiple choice, fill-in-the-blanks, problems to solve. false for notes, a syllabus, a letter to parents, or a study guide that only explains."),
+  question_count: z.number().int().describe("Roughly how many such questions or exercises the file holds. 0 when it has none."),
   items: z.array(LooseItemSchema).describe("Tasks for the student. Only when the file or the instructions actually ask for something. Never invent dates."),
   is_week_summary: z.boolean().describe("true when the file is a weekly syllabus / weekly plan / week summary listing what each subject covers in one week"),
   covers_from: z.string().nullable().describe("For a week summary: the first date the file itself states, as YYYY-MM-DD (read day/month order carefully: Egyptian schools write D/M/YYYY); null if none stated"),
@@ -46,6 +48,9 @@ export interface MaterialReading {
   summary: string;
   topics: string[];
   digest: string;
+  /** The file has things to answer, so it is worth transcribing into a set the child can sit on his phone. */
+  hasQuestions: boolean;
+  questionCount: number;
   items: ExtractedItem[];
   is_week_summary: boolean;
   covers_from: string | null;
@@ -74,6 +79,11 @@ export function normaliseReading(raw: z.infer<typeof MaterialSchema>): MaterialR
     summary: (raw.summary ?? "").trim(),
     topics: [...new Set((raw.topics ?? []).map((t) => t.trim()).filter(Boolean))].slice(0, 12),
     digest: raw.digest ?? "",
+    // A label of "worksheet" was the old signal and it was the wrong one twice over: a study guide with thirty
+    // practice questions was never offered to a child, and a "worksheet" that turned out to be a reading
+    // passage cost an AI call that produced nothing. The model is asked the question directly instead.
+    hasQuestions: !!raw.has_questions && (raw.question_count ?? 0) > 0,
+    questionCount: Math.max(0, Math.min(500, Math.trunc(raw.question_count ?? 0))),
     items,
     is_week_summary: !!raw.is_week_summary,
     covers_from: raw.covers_from && /^\d{4}-\d{2}-\d{2}$/.test(raw.covers_from) ? raw.covers_from : null,

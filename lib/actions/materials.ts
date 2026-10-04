@@ -16,7 +16,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { shiftDate, todayIn } from "@/lib/dates";
 import { readMaterial, type MaterialInput } from "@/lib/ai/read-material";
 import { generateQuiz } from "@/lib/ai/generate-quiz";
-import { transcribeWorksheet } from "@/lib/ai/transcribe-worksheet";
+import { transcribeAndStore } from "@/lib/materials/worksheet";
 import { learnerPromptLine } from "@/lib/learner";
 import { themeById } from "@/lib/themes";
 import { MATERIAL_BUCKET, type MaterialRow } from "@/lib/materials/server";
@@ -264,27 +264,23 @@ export async function createMaterialQuizAction(materialId: string, difficulty: "
 
 export interface PrepareWorksheetResult { error?: string; questions?: number; skipped?: number; note?: string }
 
-/** Parent or child: transcribe the sheet's own questions into a stored practice set (once per file). */
+/**
+ * Parent or child: transcribe the sheet's own questions into a set the child can answer.
+ *
+ * Still here because it is still worth having — a sheet the sweep has not reached yet, or one worth reading
+ * again after a bad transcription. What changed is that nobody has to find it: the uploader calls this for
+ * every file the reader says has questions, and the nightly sweep calls the same code for the rest.
+ */
 export async function prepareWorksheetAction(materialId: string): Promise<PrepareWorksheetResult> {
   const { profile, family } = await requireSession();
-  if (!process.env.ANTHROPIC_API_KEY) return { error: "ANTHROPIC_API_KEY is not configured on the server." };
   const admin = createAdminClient();
   const { data } = await admin.from("materials").select("*, profiles!materials_student_id_fkey(grade)").eq("id", materialId).eq("family_id", family.id).maybeSingle();
   const m = data as (MaterialRow & { profiles: { grade: number | null } | null }) | null;
   if (!m) return { error: "File not found." };
   if (profile.role !== "parent" && profile.id !== m.student_id) return { error: "Not allowed." };
-  try {
-    const { data: file } = await admin.storage.from(MATERIAL_BUCKET).download(m.path);
-    if (!file) throw new Error("Could not read the file back.");
-    const buf = Buffer.from(await file.arrayBuffer());
-    const t = await transcribeWorksheet(toInput(buf, m.mime, m.title), { title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
-    if (t.questions.length === 0) return { error: `No question could be transcribed. ${t.note}` };
-    await admin.from("materials").update({ worksheet: { questions: t.questions, skipped: t.skipped, note: t.note, model: t.model, prepared_at: new Date().toISOString() } }).eq("id", m.id);
-    PATHS.forEach((p) => revalidatePath(p));
-    return { questions: t.questions.length, skipped: t.skipped, note: t.note };
-  } catch (err) {
-    return failed("actions.materials.prepareWorksheet", err, friendlyAiError(err instanceof Error ? err.message : String(err)));
-  }
+  const r = await transcribeAndStore(m.id, { path: m.path, mime: m.mime, title: m.title, subject: m.subject, grade: m.profiles?.grade ?? null });
+  PATHS.forEach((p) => revalidatePath(p));
+  return r;
 }
 
 /** The child does the sheet on the system: a quiz built from the stored transcription (can be redone). */

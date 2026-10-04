@@ -70,14 +70,21 @@ export function ReadAgainButton({ materialId }: { materialId: string }) {
   );
 }
 
-/** Turn the sheet's own questions into a stored practice set (parent or child). */
-export function PrepareWorksheetButton({ materialId, prepared }: { materialId: string; prepared: { questions: number; skipped: number; note: string } | null }) {
+/**
+ * Turn the sheet's own questions into a stored practice set (parent or child).
+ *
+ * This runs on its own now — the uploader fires it for every sheet with questions and the nightly sweep picks
+ * up the rest — so the button is for a retry, and its job is mostly to say why a sheet is still not
+ * answerable. A failure used to happen with nobody watching and nowhere to be recorded.
+ */
+export function PrepareWorksheetButton({ materialId, prepared, error }: { materialId: string; prepared: { questions: number; skipped: number; note: string } | null; error?: string | null }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [msg, setMsg] = useState<string | null>(null);
   return (
     <div className="text-xs space-y-1">
       {prepared && <div className="text-good">📝 On-system worksheet ready: {prepared.questions} question{prepared.questions === 1 ? "" : "s"}{prepared.skipped ? ` · ${prepared.skipped} item${prepared.skipped === 1 ? "" : "s"} skipped` : ""}. <span className="muted">{prepared.note}</span></div>}
+      {!prepared && error && <div className="text-warn">📝 Could not be turned into questions: {error}</div>}
       <button type="button" disabled={pending} className={`${prepared ? "btn-ghost" : "btn-primary"} btn-sm`} onClick={() => start(async () => { setMsg(null); const r = await runAction(() => prepareWorksheetAction(materialId), setMsg); if (!r) return; setMsg(r.error ?? `Ready: ${r.questions} questions${r.skipped ? `, ${r.skipped} skipped` : ""}.`); router.refresh(); })}>
         {pending ? "Transcribing the sheet… (up to a minute)" : prepared ? "🔁 Transcribe again" : "📝 Turn this sheet into on-system practice"}
       </button>

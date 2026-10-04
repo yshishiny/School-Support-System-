@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.0-beta.35 — Sheets you can open, and questions that type themselves up (4 October 2026, `v2` branch)
+
+- **A school file is now a page, not a dead row.** Tapping a sheet opens it: the sheet itself rendered in the app, what it is about, the teacher's instructions, the questions to answer, practice, and the paper route — in one place. The title was not a link before, and "Open" threw a raw PDF into a browser tab, outside the app, on a phone.
+- **Sheets with questions become answerable on their own.** Transcribing a sheet was a button somebody had to notice and press, and nobody did: of Omar's seven worksheets three had been done, of Youssef's six files none. The uploader now fires it for every file the reader says has questions — all at once, after the reads, so a parent is not kept waiting through them one by one — and a nightly sweep picks up whatever it missed.
+- **The trigger is whether the file *has* questions, not what it is labelled.** The reader is asked outright, in the same call it was already making. The old `kind === "worksheet"` label was wrong in both directions: a study guide carrying thirty practice questions was never offered to anybody, and a "worksheet" that turned out to be a reading passage cost an AI call that came back with nothing.
+- **When it fails, it says so.** Transcribing now runs with nobody watching, so a failure had nowhere to be recorded and a sheet simply stayed unanswerable with no reason given. The reason is kept and shown, and the sweep knows not to keep retrying a sheet that genuinely has nothing on it.
+- **A file with nothing to answer leads with the file.** On a letter home or a page of notes, reading *is* the task, so it sits straight under the heading instead of below three buttons. On a sheet with questions the buttons lead and the sheet sits under them.
+- **One less thing done on every page load:** Learn was signing a URL for every file a child owns, to fill links that are now a single tap through to the sheet page, which signs its own.
+
 ## 2.1.0-beta.34 — The children get their own syllabus back (23 September 2026, `v2` branch)
 
 - **Every lesson in the app had become unreachable.** The curriculum catalogue was added after the app already had topics, so the 160 topics the school's own work hangs off were never tagged with a curriculum. Once both boys were set to the American curriculum the app started answering with the seeded Common Core list instead — and that list has never had a single lesson against it. 27 lessons, 13 scripts, 29 media sets and 59 quizzes were sitting on topics no child could open.

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createBrowserSupabase } from "@/lib/supabase/client";
-import { knownMaterialsAction, registerMaterialAction } from "@/lib/actions/materials";
+import { knownMaterialsAction, prepareWorksheetAction, registerMaterialAction } from "@/lib/actions/materials";
 import { classify, overCap, skipLine, toUpload, type Candidate } from "@/lib/materials/duplicates";
 import type { RegisterMaterialResult } from "@/lib/materials/read";
 import { ACCEPT, ACCEPT_LABEL, extFor, resolveMime } from "@/lib/materials/files";
@@ -34,11 +34,13 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
   const [results, setResults] = useState<RegisterMaterialResult[]>([]);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [dropped, setDropped] = useState<string[]>([]);
+  const [prepared, setPrepared] = useState<string | null>(null);
 
   async function go() {
     if (!studentId || files.length === 0) return;
     setError(null);
     setResults([]);
+    setPrepared(null);
     setSkipped([]);
     const supabase = createBrowserSupabase();
     const nameOfStudent = (id: string) => students.find((s) => s.id === id)?.full_name.split(" ")[0] ?? "another child";
@@ -98,6 +100,19 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
       setDropped([]);
       setInstructions("");
       router.refresh();
+
+      // Sheets with questions become answerable on their own, here, rather than waiting for somebody to notice
+      // a second button. All at once: each is its own request with its own time budget, so a long PDF cannot
+      // push the batch into a timeout, and a parent is not kept waiting through them one by one. Failures are
+      // counted, not thrown — the files are already uploaded and read, and the nightly sweep tries again.
+      const toPrepare = out.map((r, i) => ({ id: r.id, title: uploaded[i].f.name, needed: r.needsWorksheet })).filter((x) => x.needed && x.id);
+      if (toPrepare.length > 0) {
+        setBusy(`Turning ${toPrepare.length} sheet${toPrepare.length === 1 ? "" : "s"} into questions your child can answer…`);
+        const done = await Promise.all(toPrepare.map((x) => prepareWorksheetAction(x.id!).catch(() => ({ error: "failed" }))));
+        const ok = done.filter((d) => !("error" in d && d.error)).length;
+        setPrepared(`${ok} of ${toPrepare.length} sheet${toPrepare.length === 1 ? "" : "s"} can now be answered in the app.${ok < toPrepare.length ? " The rest will be tried again tonight." : ""}`);
+        router.refresh();
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -154,8 +169,9 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
         </ul>
       )}
       {error && <p className="text-sm text-bad">{error}</p>}
+      {prepared && <p className="text-sm text-good">📝 {prepared}</p>}
       {results.map((r, i) => (
-        <div key={i} className="tile !p-2 text-sm"><b>{r.title}</b><div className="text-xs muted">{r.summary}</div>{r.items ? <div className="text-xs text-good">{r.items} suggested task{r.items === 1 ? "" : "s"} below, waiting for your OK.</div> : null}</div>
+        <div key={i} className="tile !p-2 text-sm"><b>{r.title}</b><div className="text-xs muted">{r.summary}</div>{r.items ? <div className="text-xs text-good">{r.items} suggested task{r.items === 1 ? "" : "s"} below, waiting for your OK.</div> : null}{r.needsWorksheet ? <div className="text-xs text-good">📝 {r.questions ? `About ${r.questions} question${r.questions === 1 ? "" : "s"} on this sheet` : "Questions on this sheet"} — being turned into practice your child can answer.</div> : null}</div>
       ))}
     </div>
   );

@@ -19,7 +19,8 @@ import { Seated } from "@/components/Seated";
 import { learnerOf, schoolTopicsFor } from "@/lib/curriculum";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { DoWorksheetButton, PractiseFromFile, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
-import { signMaterialUrls, type MaterialRow } from "@/lib/materials/server";
+import type { MaterialRow } from "@/lib/materials/server";
+import { offersWorksheet } from "@/lib/materials/worksheet";
 import { WeekPlanCard } from "@/components/WeekPlanCard";
 import type { PlannedQuiz } from "@/lib/plan/prepare";
 import { shiftDate } from "@/lib/dates";
@@ -73,7 +74,6 @@ export default async function LearnPage() {
   const revisions = await loadRevisions([profile.id], 12).catch(() => []);
   const weekMissing = week.filter((w) => !w.hasLesson || !w.hasResources).length;
   const materials = (materialRows ?? []) as MaterialRow[];
-  const materialUrls = await signMaterialUrls(materials.map((m) => ({ id: m.id, path: m.path })));
   type MQ = { material_id: string | null; title: string; attempts: { submitted_at: string | null }[] };
   const mq = (materialQuizzes ?? []) as MQ[];
   const setsFor = (id: string) => mq.filter((q) => q.material_id === id && !q.title.startsWith("Worksheet:")).length;
@@ -273,15 +273,15 @@ export default async function LearnPage() {
       <MoreList show={2} noun="more file" className="space-y-3">
       {materials.map((m) => (
         <section key={m.id} className="card space-y-2">
-          <div className="flex items-start gap-2">
+          <Link href={`/learn/sheet/${m.id}`} className="flex items-start gap-2 hover:text-accent-2">
             <span className="text-3xl sticker-still">{fileEmoji(m.mime)}</span>
             <div className="flex-1 min-w-0">
               <div className="font-bold">{m.title}</div>
               {m.original_name && <div className="text-[11px] muted truncate">📄 {m.original_name}</div>}
               <div className="text-xs muted">{m.subject ?? "no subject"} · {prettyDate(m.created_at.slice(0, 10))}{m.status !== "ready" ? " · not read yet" : ""}</div>
             </div>
-            {materialUrls.get(m.id) && <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm">Open</a>}
-          </div>
+            <span className="btn-ghost btn-sm shrink-0">Open</span>
+          </Link>
           {m.status === "ready" && (() => {
             const st = materialStages(m.created_at.slice(0, 10), attemptDatesFor(m.id), today);
             const nx = nextStage(st);
@@ -295,7 +295,7 @@ export default async function LearnPage() {
           {m.instructions && <p className="text-sm"><b>Teacher says:</b> {m.instructions}</p>}
           {m.summary && <p className="text-xs muted">{m.summary}</p>}
           {m.status === "ready" && m.worksheet?.questions?.length ? <DoWorksheetButton materialId={m.id} questions={m.worksheet.questions.length} attempts={worksheetDone(m.id)} /> : null}
-          {m.status === "ready" && !m.worksheet && m.kind === "worksheet" && <PrepareWorksheetButton materialId={m.id} prepared={null} />}
+          {m.status === "ready" && !m.worksheet && offersWorksheet({ status: m.status, kind: m.kind, hasQuestions: m.has_questions, worksheet: null }) && <PrepareWorksheetButton materialId={m.id} prepared={null} error={m.worksheet_error} />}
           {m.status === "ready" ? <PractiseFromFile materialId={m.id} sets={setsFor(m.id)} /> : <ReadAgainButton materialId={m.id} />}
         </section>
       ))}
@@ -386,16 +386,17 @@ export default async function LearnPage() {
               const full = materials.find((x) => x.id === m.id)!;
               return (
                 <section key={m.id} className="card space-y-2">
-                  <div className="flex items-start gap-2">
+                  {/* The title is the link. "Open" used to be the only clickable thing and it left the app for a
+                      raw PDF; tapping the sheet now opens the one page that has the sheet, what it is about,
+                      its questions and both ways of finishing it. */}
+                  <Link href={`/learn/sheet/${m.id}`} className="flex items-start gap-2 hover:text-accent-2">
                     <span className="text-2xl shrink-0">{fileEmoji(full.mime)}</span>
                     <div className="min-w-0 flex-1">
                       <div className="font-bold leading-tight">{m.title}</div>
                       <div className="text-xs muted">{m.subject ?? "school"} · {prettyDate(m.createdAt.slice(0, 10))}</div>
                     </div>
-                    {materialUrls.get(m.id) && (
-                      <a href={materialUrls.get(m.id)} target="_blank" rel="noreferrer" className="btn-ghost btn-sm shrink-0">Open</a>
-                    )}
-                  </div>
+                    <span className="btn-ghost btn-sm shrink-0">Open</span>
+                  </Link>
                   {full.summary && <p className="text-xs muted leading-snug">{full.summary.slice(0, 180)}</p>}
                   <p className="text-[11px] muted">{act.hint}</p>
                   {m.solvable

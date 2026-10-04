@@ -12,7 +12,23 @@ import { readMaterial, type MaterialInput } from "@/lib/ai/read-material";
  * `lib/actions/materials.ts` because that module is `"use server"`: everything it exports is a callable endpoint,
  * so a shared helper could not be exported from it without also being published.
  */
-export interface RegisterMaterialResult { error?: string; id?: string; title?: string; summary?: string; items?: number }
+export interface RegisterMaterialResult {
+  error?: string;
+  id?: string;
+  title?: string;
+  summary?: string;
+  items?: number;
+  /**
+   * The reader found questions on this file, so it is worth transcribing into a set the child can answer.
+   *
+   * Returned rather than acted on here: the transcription is a second whole-file AI call, and running it
+   * inside the read would double the time a parent waits per file on the slowest part of the app. The uploader
+   * fires these off together once the reads are done, and the nightly sweep catches any it misses.
+   */
+  needsWorksheet?: boolean;
+  /** Roughly how many, so the uploader can say "3 sheets to transcribe" rather than a spinner. */
+  questions?: number;
+}
 
 export function friendlyAiError(msg: string): string {
   if (/credit balance is too low/i.test(msg)) return "The AI account is out of credit. Top up at console.anthropic.com (Plans & Billing), then tap “Read again”.";
@@ -45,9 +61,9 @@ export async function readAndStore(id: string, o: { path: string; mime: string; 
     const weekFields = isWeek ? { is_week_summary: true, covers_week_start: decision!.coversWeekStart, covers_from: reading.covers_from, covers_to: reading.covers_to, date_note: decision!.note, subjects: reading.subjects } : { subjects: reading.subjects };
     await admin
       .from("materials")
-      .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null, ...weekFields })
+      .update({ status: "ready", title: reading.title.slice(0, 120) || o.fallbackTitle, subject: o.subject ?? reading.subject, kind: reading.kind, summary: reading.summary, language: reading.language, topics: reading.topics, digest: reading.digest.slice(0, 20000), items: reading.items, items_reviewed_at: null, error: null, has_questions: reading.hasQuestions, question_count: reading.questionCount, worksheet_error: null, ...weekFields })
       .eq("id", id);
-    return { id, title: reading.title, summary: reading.summary, items: reading.items.length };
+    return { id, title: reading.title, summary: reading.summary, items: reading.items.length, needsWorksheet: reading.hasQuestions, questions: reading.questionCount };
   } catch (err) {
     const msg = friendlyAiError(err instanceof Error ? err.message : String(err));
     await logError("materials.read", err, { meta: { materialId: id, mime: o.mime, title: o.fallbackTitle } });
