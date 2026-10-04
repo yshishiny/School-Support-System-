@@ -27,6 +27,11 @@ export interface MaterialRow {
   error: string | null;
   pages: number | null;
   worksheet: { questions: { prompt: string; choices: string[]; correct_index: number; explanation: string; skill_tag: string; original_type: string }[]; skipped: number; note: string; model: string; prepared_at: string } | null;
+  /** The reader found questions on the file, so it is worth transcribing. Null on rows read before it was asked. */
+  has_questions: boolean | null;
+  question_count: number | null;
+  /** Why the last transcription produced nothing. Transcribing runs unwatched, so it has to say so somewhere. */
+  worksheet_error: string | null;
   created_at: string;
   is_week_summary?: boolean;
   covers_week_start?: string | null;

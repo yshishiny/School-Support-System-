@@ -7,6 +7,7 @@ import { deleteMaterialAction, setMaterialWeekAction, updateMaterialAction } fro
 import { schoolWeekStart } from "@/lib/materials/week";
 import { MaterialUploader } from "@/components/MaterialUploader";
 import { MaterialItemsReview, PrepareWorksheetButton, ReadAgainButton } from "@/components/MaterialCards";
+import { offersWorksheet } from "@/lib/materials/worksheet";
 import { Tabs } from "@/components/Tabs";
 import { fileEmoji } from "@/lib/materials/files";
 import { loadRevisions } from "@/lib/revision/run";
@@ -104,7 +105,7 @@ export default async function MaterialsPage() {
         {m.instructions && <p className="text-xs"><b>Instructions:</b> {m.instructions}</p>}
         {(m.topics?.length ?? 0) > 0 && <div className="flex flex-wrap gap-1">{m.topics!.map((t) => <span key={t} className="chip text-xs">{t}</span>)}</div>}
         {m.status === "ready" && !m.items_reviewed_at && (m.items?.length ?? 0) > 0 && <MaterialItemsReview materialId={m.id} items={m.items!} />}
-        {m.status === "ready" && (m.kind === "worksheet" || m.worksheet) && <PrepareWorksheetButton materialId={m.id} prepared={m.worksheet ? { questions: m.worksheet.questions.length, skipped: m.worksheet.skipped, note: m.worksheet.note } : null} />}
+        {offersWorksheet({ status: m.status, kind: m.kind, hasQuestions: m.has_questions, worksheet: m.worksheet }) && <PrepareWorksheetButton materialId={m.id} prepared={m.worksheet ? { questions: m.worksheet.questions.length, skipped: m.worksheet.skipped, note: m.worksheet.note } : null} error={m.worksheet_error} />}
         <details className="text-xs">
           <summary className="cursor-pointer muted">Edit or delete</summary>
           <form action={updateMaterialAction} className="mt-2 grid gap-2 sm:grid-cols-3">

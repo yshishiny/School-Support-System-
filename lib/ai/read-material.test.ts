@@ -9,6 +9,8 @@ describe("normaliseReading", () => {
       subject: "English",
       language: "English",
       summary: "A reading list.",
+      has_questions: false,
+      question_count: 0,
       topics: Array.from({ length: 15 }, (_, i) => `Topic ${i}`),
       digest: "…",
       is_week_summary: true,
