@@ -102,15 +102,33 @@ export function MaterialUploader({ familyId, students, subjects, fixedStudentId 
       router.refresh();
 
       // Sheets with questions become answerable on their own, here, rather than waiting for somebody to notice
-      // a second button. All at once: each is its own request with its own time budget, so a long PDF cannot
-      // push the batch into a timeout, and a parent is not kept waiting through them one by one. Failures are
-      // counted, not thrown — the files are already uploaded and read, and the nightly sweep tries again.
-      const toPrepare = out.map((r, i) => ({ id: r.id, title: uploaded[i].f.name, needed: r.needsWorksheet })).filter((x) => x.needed && x.id);
+      // a second button.
+      //
+      // Two at a time. Not one, because six sheets one after another is four minutes of a parent watching a
+      // spinner; not all at once, for the same reason the reads above are sequential — a crowd of whole-file
+      // AI calls is how a family hits a rate limit and loses the tail of its own batch. Each is its own
+      // request with its own time budget, so a long PDF cannot drag the others into a timeout.
+      //
+      // Failures are counted, never thrown: the files are uploaded and read already, and the nightly sweep
+      // tries again. Nothing here is a reason to fail an upload that has otherwise worked.
+      const toPrepare = out.map((r, i) => ({ id: r.id, name: uploaded[i].f.name, needed: r.needsWorksheet })).filter((x) => x.needed && x.id);
       if (toPrepare.length > 0) {
-        setBusy(`Turning ${toPrepare.length} sheet${toPrepare.length === 1 ? "" : "s"} into questions your child can answer…`);
-        const done = await Promise.all(toPrepare.map((x) => prepareWorksheetAction(x.id!).catch(() => ({ error: "failed" }))));
-        const ok = done.filter((d) => !("error" in d && d.error)).length;
-        setPrepared(`${ok} of ${toPrepare.length} sheet${toPrepare.length === 1 ? "" : "s"} can now be answered in the app.${ok < toPrepare.length ? " The rest will be tried again tonight." : ""}`);
+        const total = toPrepare.length;
+        const plural = total === 1 ? "" : "s";
+        let finished = 0;
+        let ok = 0;
+        setBusy(`Turning ${total} sheet${plural} into questions your child can answer…`);
+        const queue = [...toPrepare];
+        const worker = async () => {
+          for (let next = queue.shift(); next; next = queue.shift()) {
+            const r = await prepareWorksheetAction(next.id!).catch(() => ({ error: "failed" }));
+            if (!("error" in r && r.error)) ok += 1;
+            finished += 1;
+            setBusy(`Turning sheets into questions — ${finished} of ${total} done`);
+          }
+        };
+        await Promise.all([worker(), worker()]);
+        setPrepared(`${ok} of ${total} sheet${plural} can now be answered in the app.${ok < total ? " The rest will be tried again tonight." : ""}`);
         router.refresh();
       }
     } catch (err) {
